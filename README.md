@@ -1,84 +1,133 @@
 # 🚀 CivicSync – Smart Citizen Service & Public Safety Platform
 
-> Empowering citizens through technology for smarter public services and safer communities.
+> **Empowering Citizens Through Smart Digital Governance**
 
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![MERN](https://img.shields.io/badge/Stack-MERN-green)
 ![Status](https://img.shields.io/badge/Status-Under%20Development-orange)
-
-## 📖 Overview
-
-CivicSync is a MERN Stack-based web application designed to modernize civic issue management and emergency response. It provides a centralized platform where citizens can report public issues, request emergency assistance, and track service progress in real time.
-
-The platform bridges the gap between citizens, government departments, and emergency responders by integrating AI-assisted issue classification, GPS location services, and real-time communication.
+![Stack](https://img.shields.io/badge/Stack-MERN-success)
+![License](https://img.shields.io/badge/License-Academic-blue)
+![Version](https://img.shields.io/badge/Version-1.0-brightgreen)
 
 ---
 
-## 🎯 Problem Statement
+# 📖 Overview
 
-Traditional methods of reporting civic issues rely on phone calls, social media, or messaging applications, resulting in:
+CivicSync is a MERN Stack-based Smart Citizen Service and Public Safety Platform developed as part of the **Software Engineering Laboratory** course at **United International University (UIU)**.
 
+The platform aims to modernize civic service management by providing a centralized digital solution where citizens can report public issues, request emergency assistance, and monitor service progress in real time.
+
+Unlike traditional complaint systems that rely on phone calls, emails, or social media, CivicSync offers an integrated web platform connecting citizens with government departments through location-based reporting, real-time notifications, and intelligent complaint management.
+
+The project also includes an emergency response module that enables users to instantly send SOS requests with live location sharing, allowing responsible departments to respond more efficiently.
+
+---
+
+# 🎯 Objectives
+
+The primary objectives of CivicSync are:
+
+- Digitize civic complaint management.
+- Improve transparency in public service delivery.
+- Reduce complaint processing time.
+- Eliminate duplicate complaint submissions.
+- Improve communication between citizens and government authorities.
+- Provide a centralized emergency response platform.
+- Increase accountability through real-time complaint tracking.
+- Build a scalable Smart City service platform.
+
+---
+
+# ❗ Problem Statement
+
+Citizens frequently experience problems such as damaged roads, water leakage, broken streetlights, overflowing garbage, drainage blockage, and other civic issues.
+
+Currently, these issues are mostly reported through:
+
+- Phone calls
+- Facebook pages
+- Messenger
+- Emails
+- Physical office visits
+
+These traditional methods have several limitations:
+
+- No centralized reporting platform
 - Lack of transparency
-- Delayed issue resolution
+- Delayed response
 - Duplicate complaints
-- Poor communication between citizens and authorities
+- No real-time tracking
+- Poor communication between citizens and departments
 
-Emergency situations also suffer from the absence of a centralized digital platform capable of providing instant assistance and live location sharing.
+Similarly, during emergencies, people often struggle to quickly contact the appropriate emergency service while sharing their exact location.
 
 ---
 
-## 💡 Solution
+# 💡 Proposed Solution
 
-CivicSync provides a centralized digital platform where citizens can:
+CivicSync provides a centralized Smart Government platform where citizens can:
 
-- Report civic issues with GPS location
-- Upload images and videos
-- Track complaint status in real time
-- Send emergency SOS requests
+- Report civic issues using GPS location
+- Upload photos and videos as evidence
+- Track complaint progress in real time
+- Receive instant status updates
+- Verify completed work
+- Submit emergency SOS requests
 - Share live location during emergencies
-- Find nearby police stations and hospitals
+- Locate nearby hospitals, police stations, and fire stations
 
-Government departments receive complaints automatically and can update their progress through dedicated dashboards.
+On the government side, responsible departments receive complaints through dedicated dashboards where officers can manage, monitor, and resolve issues efficiently.
 
 ---
 
-# ✨ Features
+# ✨ Core Modules
 
 ## 🏙️ Civic Service Module
 
-- 🔐 Secure Authentication
-- 📍 GPS-Based Issue Reporting
-- 📷 Image & Video Upload
-- 🤖 AI-Assisted Issue Classification
-- 🔍 Duplicate Issue Detection
-- 🗺️ Interactive City Map
-- 📊 Complaint Tracking
-- ✅ Before & After Verification
-- 👥 Community Verification
+- Secure Authentication
+- GPS-Based Complaint Reporting
+- Image & Video Upload
+- AI-Assisted Complaint Classification
+- Duplicate Complaint Detection
+- Interactive City Map
+- Complaint Tracking
+- Before & After Verification
+- Community Verification
+- Service Rating
 
 ---
 
-## 🚨 Emergency Safety Module
+## 🚨 Emergency Response Module
 
-- 🆘 One-Tap SOS
-- 📡 Live Location Sharing
-- 📧 Emergency Contact Alerts
-- 🚓 Nearby Police Finder
-- 🏥 Nearby Hospital Finder
-- 📄 Incident Reporting
-- 📈 Emergency Status Tracking
+- One-Tap SOS
+- Live Location Sharing
+- Emergency Contact Notification
+- Nearby Police Station Finder
+- Nearby Hospital Finder
+- Nearby Fire Service Finder
+- Emergency Incident Tracking
+- Emergency Status Updates
 
 ---
 
-## 👨‍💼 Admin Module
+## 🏛 Government Management Module
+
+- Department Dashboard
+- Complaint Assignment
+- Complaint Verification
+- Complaint Monitoring
+- Complaint Status Management
+- Department Performance Analytics
+- Report Generation
+
+---
+
+## ⚙️ System Administration Module
 
 - User Management
 - Department Management
-- Officer Assignment
-- Complaint Monitoring
-- Emergency Monitoring
+- Role & Permission Management
 - Analytics Dashboard
-- Report Generation
+- Activity Logs
+- System Configuration
 
 ---
 
@@ -86,134 +135,380 @@ Government departments receive complaints automatically and can update their pro
 
 ## 👤 Citizen
 
+The Citizen is the primary user of the platform.
+
+### Responsibilities
+
 - Register/Login
-- Report Civic Issues
+- Manage Profile
+- Submit Civic Complaints
 - Upload Images & Videos
-- Track Complaint Progress
+- Share GPS Location
+- Track Complaint Status
 - Verify Completed Work
-- Community Voting
-- Send SOS
-- Share Live Location
+- Rate Government Services
+- Community Verification
+- Submit Emergency SOS
+- View Nearby Emergency Services
 
 ---
 
-## 🏢 Department Officer
+## 🖥️ System Administrator
 
-- View Assigned Complaints
-- Update Complaint Status
-- Upload Completion Images
-- Manage Department Issues
+Responsible for managing the overall platform.
 
----
-
-## 🚑 Emergency Officer
-
-- Receive SOS Requests
-- View Live Location
-- Update Emergency Status
-- Coordinate Rescue Operations
-
----
-
-## 👑 Admin
+### Responsibilities
 
 - Manage Users
 - Manage Departments
-- Assign Officers
-- View Reports
-- Monitor Emergency Requests
-- System Analytics
+- Configure System Settings
+- Manage Roles & Permissions
+- View System Analytics
+- Monitor Platform Activity
+- Maintain Security
+- Generate Reports
+
+---
+
+## 🏢 Department Head
+
+Responsible for supervising an individual government department.
+
+### Responsibilities
+
+- Review Complaints
+- Verify Complaint Authenticity
+- Set Priority Level
+- Assign Department Officers
+- Monitor Complaint Progress
+- Approve Completed Work
+- Generate Department Reports
+
+---
+
+## 👨‍💼 Department Officer
+
+Responsible for managing assigned complaints.
+
+### Responsibilities
+
+- Receive Assigned Complaints
+- Inspect Reported Issues
+- Coordinate Field Operations
+- Update Complaint Status
+- Communicate with Citizens
+- Submit Completion Reports
+
+---
+
+## 👷 Field Worker / Engineer
+
+Responsible for resolving civic issues in the field.
+
+### Responsibilities
+
+- Receive Assigned Tasks
+- Navigate Using GPS
+- Perform Field Work
+- Upload Before & After Images
+- Submit Completion Notes
+- Mark Tasks as Completed
+
+---
+
+# 🏛 Government Departments
+
+The platform supports multiple government departments, including:
+
+- Road & Highway Department
+- Waste Management Department
+- Drainage Department
+- Water Supply Department
+- Street Lighting Department
+- Parks & Environment Department
+- Public Health Department
+- Police Department
+- Fire Service & Civil Defence
+- Ambulance Service
+- Disaster Management Department
 
 ---
 
 # 🛠️ Technology Stack
 
-## Frontend
+## 🎨 Frontend
 
 - React.js
+- React Router DOM
 - Tailwind CSS
-- React Router
 - Axios
 - Socket.io Client
+- React Hook Form
 
-## Backend
+---
+
+## ⚙️ Backend
 
 - Node.js
 - Express.js
-- JWT Authentication
 - Socket.io
+- JWT Authentication
+- bcrypt
 - Multer
 
-## Database
+---
+
+## 🗄️ Database
 
 - MongoDB
-- Mongoose
+- Mongoose ODM
 
-## Cloud Services
+---
+
+## ☁️ Cloud Services
 
 - Cloudinary
 
-## Maps & Location
+---
+
+## 📍 Maps & Location
 
 - Google Maps API / OpenStreetMap
 - Browser Geolocation API
 
-## Security
+---
 
-- JWT
-- bcrypt
+## 🤖 AI Services
 
-## AI (Optional)
+- Complaint Classification
+- Duplicate Complaint Detection
+- Priority Suggestion
+- Emergency Detection
+- Complaint Summarization
 
-- Rule-Based Classification
-- Hugging Face API
-- OpenAI API (Future Enhancement)
+> **Note:** AI provides intelligent suggestions only. Final decisions are always made by authorized government officials.
+
+---
+
+## 🔐 Security
+
+- JWT Authentication
+- Role-Based Access Control (RBAC)
+- Password Hashing (bcrypt)
+- Protected API Routes
 
 ---
 
 # 🏗️ System Architecture
 
 ```
-Citizen
-    │
-    ▼
-React Frontend
-    │
-    ▼
-Node.js + Express API
-    │
- ┌──┴──────────┐
- │             │
- ▼             ▼
-MongoDB     Socket.io
- │             │
- ▼             ▼
-Cloudinary   Real-Time Updates
+                            Citizen
+                                │
+                                ▼
+                     React Frontend (Client)
+                                │
+                  REST API + Real-Time Socket
+                                │
+                                ▼
+                   Node.js + Express Server
+        ┌───────────────┼─────────────────┬────────────────┐
+        │               │                 │                │
+        ▼               ▼                 ▼                ▼
+    MongoDB        Cloudinary      Socket.io        AI Engine
+        │               │                 │                │
+        └───────────────┴─────────────────┴────────────────┘
+                                │
+                                ▼
+                    Government Management System
 ```
 
 ---
 
-# 🔄 Workflow
+# 🏛️ Government Complaint Workflow
 
-### Civic Issue Reporting
+```
+Citizen
 
-1. User logs in.
-2. Reports an issue.
-3. Uploads images/videos.
-4. GPS location is captured.
-5. AI classifies the issue.
-6. Complaint is assigned to the appropriate department.
-7. Officer updates status.
-8. Citizen tracks progress.
-9. Community verifies completion.
+        │
 
-### Emergency Response
+        ▼
 
-1. User presses SOS.
-2. Live location is shared.
-3. Emergency officers receive alerts.
-4. Nearby hospitals and police stations are displayed.
-5. Emergency status is updated in real time.
+Submit Complaint
+
+        │
+
+        ▼
+
+AI Analysis
+(Category + Duplicate Detection + Priority Suggestion)
+
+        │
+
+        ▼
+
+Department Head Review
+
+        │
+
+        ▼
+
+Assign Department Officer
+
+        │
+
+        ▼
+
+Assign Field Worker
+
+        │
+
+        ▼
+
+Field Work Completed
+
+        │
+
+        ▼
+
+Officer Verification
+
+        │
+
+        ▼
+
+Department Head Approval
+
+        │
+
+        ▼
+
+Citizen Feedback
+
+        │
+
+        ▼
+
+Complaint Closed
+```
+
+---
+
+# 🚨 Emergency Response Workflow
+
+```
+Citizen
+
+        │
+
+        ▼
+
+Press SOS Button
+
+        │
+
+        ▼
+
+Live Location Shared
+
+        │
+
+        ▼
+
+AI Detects Emergency Type (Optional)
+
+        │
+
+        ▼
+
+Nearest Emergency Department
+
+        │
+
+        ▼
+
+Department Officer
+
+        │
+
+        ▼
+
+Emergency Response Team
+
+        │
+
+        ▼
+
+Rescue Completed
+
+        │
+
+        ▼
+
+Emergency Closed
+```
+
+---
+
+# 📋 Complaint Status
+
+```
+Pending
+    │
+    ▼
+Verified
+    │
+    ▼
+Assigned
+    │
+    ▼
+In Progress
+    │
+    ▼
+Under Review
+    │
+    ▼
+Completed
+    │
+    ▼
+Closed
+```
+
+---
+
+# 📊 Dashboard Overview
+
+## 👤 Citizen Dashboard
+
+- My Complaints
+- Complaint Tracking
+- SOS Requests
+- Notifications
+- Service Ratings
+- Nearby Emergency Services
+- Profile Management
+
+---
+
+## 🏢 Department Dashboard
+
+- Assigned Complaints
+- Complaint Queue
+- Field Task Management
+- Emergency Requests
+- Complaint Analytics
+- Performance Statistics
+
+---
+
+## ⚙️ Administrator Dashboard
+
+- User Management
+- Department Management
+- Role Management
+- System Monitoring
+- Analytics Dashboard
+- Activity Logs
+- Report Generation
 
 ---
 
@@ -223,19 +518,33 @@ Cloudinary   Real-Time Updates
 CivicSync/
 │
 ├── client/
-│   ├── src/
 │   ├── public/
+│   ├── src/
+│   │   ├── assets/
+│   │   ├── components/
+│   │   ├── layouts/
+│   │   ├── pages/
+│   │   ├── routes/
+│   │   ├── hooks/
+│   │   ├── context/
+│   │   ├── services/
+│   │   └── utils/
+│   │
 │   └── package.json
 │
 ├── server/
+│   ├── config/
 │   ├── controllers/
+│   ├── middleware/
 │   ├── models/
 │   ├── routes/
-│   ├── middleware/
+│   ├── services/
 │   ├── socket/
-│   └── package.json
+│   ├── utils/
+│   └── server.js
 │
 ├── README.md
+├── package.json
 └── .env
 ```
 
@@ -249,23 +558,25 @@ CivicSync/
 git clone https://github.com/yourusername/CivicSync.git
 ```
 
-## Install Frontend
+## Install Dependencies
+
+### Frontend
 
 ```bash
 cd client
 npm install
 ```
 
-## Install Backend
+### Backend
 
 ```bash
-cd ../server
+cd server
 npm install
 ```
 
-## Environment Variables
+---
 
-Create a `.env` file:
+# ⚙️ Environment Variables
 
 ```env
 PORT=5000
@@ -279,51 +590,242 @@ CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 
 GOOGLE_MAPS_API_KEY=
+
+OPENAI_API_KEY= (Optional)
 ```
 
 ---
 
-# ▶️ Run Project
+# ▶️ Running the Project
 
-Frontend
+### Start Backend
 
 ```bash
+cd server
 npm run dev
 ```
 
-Backend
+### Start Frontend
 
 ```bash
-npm start
+cd client
+npm run dev
 ```
+
+---
+
+# 🌐 Local Development
+
+| Service | URL |
+|----------|------------------------|
+| Frontend | http://localhost:5173 |
+| Backend | http://localhost:5000 |
+| MongoDB | Atlas / Local Instance |
+
+
+---
+
+# 🗃️ Database Collections
+
+The system is designed using MongoDB with the following core collections:
+
+### 👤 Users
+Stores all registered users with role-based access.
+
+**Fields**
+- Name
+- Email
+- Password (Hashed)
+- Phone Number
+- Role
+- Department
+- Profile Image
+- Status
+- Created At
+
+---
+
+### 🏛 Departments
+
+Stores all government departments.
+
+**Examples**
+
+- Road & Highway Department
+- Waste Management Department
+- Water Supply Department
+- Drainage Department
+- Street Lighting Department
+- Parks & Environment Department
+- Public Health Department
+- Police Department
+- Fire Service & Civil Defence
+- Ambulance Service
+- Disaster Management Department
+
+---
+
+### 📄 Complaints
+
+Stores all civic issue reports.
+
+**Fields**
+
+- Complaint ID
+- Citizen ID
+- Department ID
+- Assigned Officer
+- Assigned Field Worker
+- Category
+- Title
+- Description
+- Images
+- GPS Location
+- Priority
+- Status
+- AI Suggestions
+- Before Images
+- After Images
+- Citizen Feedback
+- Created At
+- Updated At
+
+---
+
+### 🚨 Emergency Requests
+
+Stores emergency SOS requests.
+
+**Fields**
+
+- User ID
+- Emergency Type
+- Live Location
+- Assigned Department
+- Assigned Officer
+- Status
+- Response Time
+- Created At
+
+---
+
+# 🔐 Security Features
+
+- JWT Authentication
+- Password Hashing (bcrypt)
+- Protected API Routes
+- Role-Based Access Control (RBAC)
+- Secure Image Upload
+- Input Validation
+- Environment Variables
+- API Authorization
+- Secure Password Storage
+
+---
+
+# 📡 Major System Features
+
+## Citizen Portal
+
+- User Registration & Login
+- Submit Civic Complaints
+- GPS-Based Reporting
+- Upload Images & Videos
+- Complaint Tracking
+- Emergency SOS
+- Live Location Sharing
+- Community Verification
+- Service Rating
+
+---
+
+## Government Portal
+
+- Department Dashboard
+- Complaint Management
+- Officer Assignment
+- Field Task Monitoring
+- Complaint Verification
+- Complaint Analytics
+- Emergency Monitoring
+- Department Reports
+
+---
+
+## AI Assistance
+
+The AI module works as an intelligent assistant to support government officers.
+
+### AI Capabilities
+
+- Complaint Classification
+- Duplicate Complaint Detection
+- Priority Recommendation
+- Emergency Detection
+- Complaint Summary Generation
+
+> **Note:** AI only provides recommendations. Final decisions are made by authorized government officials.
+
+---
+
+# 📱 Future Enhancements
+
+- Progressive Web App (PWA)
+- Android & iOS Mobile Application
+- Push Notifications
+- SMS & Email Alerts
+- AI Chatbot Assistant
+- Voice-Based Complaint Submission
+- Multi-Language Support
+- Predictive Analytics
+- IoT Sensor Integration
+- Government API Integration
+- Digital Signature Verification
 
 ---
 
 # 📸 Screenshots
 
-> Coming Soon...
+Screenshots will be added after project implementation.
+
+### Planned Screens
+
+- Landing Page
+- Authentication
+- Citizen Dashboard
+- Complaint Details
+- SOS Module
+- Department Dashboard
+- Admin Dashboard
+- Analytics Dashboard
 
 ---
 
-# 🔮 Future Improvements
-
-- AI Chatbot
-- Mobile Application
-- Push Notifications
-- SMS Alerts
-- Multi-language Support
-- Predictive Analytics
-- Government API Integration
-
----
-
-# 🤝 Team
+# 👨‍💻 Team
 
 ## Dark Coders
 
-**Software Engineering Laboratory**
+### Members
 
-Department of Computer Science & Engineering
+| Name | Student ID |
+|------|------------|
+| Sabbir Ahamed Shaon Akanda | 0112330640 |
+| Md. Rahatul Islam | 0112330958 |
+| Md. Al-Amin Islam Shawon | 0112330959 |
+
+---
+
+## Course Information
+
+**Course**
+
+Software Engineering Laboratory
+
+**Department**
+
+Department of Computer Science & Engineering (CSE)
+
+**University**
 
 United International University (UIU)
 
@@ -331,19 +833,63 @@ United International University (UIU)
 
 # 📚 References
 
-- https://www.fixmystreet.com/
-- https://seeclickfix.com/
-- https://www.grs.gov.bd/
-- https://www.999.gov.bd/
-- https://rapidsos.com/
-- https://portal.311.nyc.gov/
+The following platforms and government services were studied during the requirement analysis phase:
+
+- FixMyStreet
+- SeeClickFix
+- Bangladesh Grievance Redress System (GRS)
+- National Emergency Service (999)
+- RapidSOS
+- NYC 311 Service Portal
 
 ---
 
 # 📄 License
 
-This project is developed for academic purposes as part of the **Software Engineering Laboratory** course at **United International University (UIU)**.
+This project has been developed as part of the **Software Engineering Laboratory** course at **United International University (UIU)**.
+
+The project is intended solely for **academic, research, and educational purposes**.
 
 ---
 
-⭐ If you like this project, don't forget to star the repository!
+# 🙏 Acknowledgements
+
+We sincerely thank our course instructor for continuous guidance and valuable feedback throughout the project development process.
+
+Special thanks to:
+
+- Department of Computer Science & Engineering, UIU
+- Open Source Community
+- Google Maps Platform
+- MongoDB
+- React.js
+- Node.js
+- Express.js
+- Cloudinary
+
+---
+
+# ⭐ Project Status
+
+> **Current Version:** v1.0 (Development Phase)
+
+### Current Progress
+
+- ✅ Requirement Analysis
+- ✅ Software Requirement Specification (SRS)
+- ✅ System Design
+- 🔄 UI/UX Design
+- 🔄 Backend Development
+- ⏳ AI Module Integration
+- ⏳ Testing
+- ⏳ Deployment
+
+---
+
+## 🚀 CivicSync
+
+**Empowering Citizens. Strengthening Governance. Building Smarter Communities.**
+
+---
+
+Made with ❤️ by **Dark Coders**
