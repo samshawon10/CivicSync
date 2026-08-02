@@ -805,14 +805,6 @@ Screenshots will be added after project implementation.
 
 ## Dark Coders
 
-### Members
-
-| Name | Student ID |
-|------|------------|
-| Sabbir Ahamed Shaon Akanda | 0112330640 |
-| Md. Rahatul Islam | 0112330958 |
-| Md. Al-Amin Islam Shawon | 0112330959 |
-
 ---
 
 ## Course Information
