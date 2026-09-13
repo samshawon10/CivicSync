@@ -11,7 +11,6 @@ const allowedMimeTypes = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
-  'image/gif',
   'video/mp4',
   'video/webm',
   'video/quicktime'
@@ -29,7 +28,7 @@ const storage = multer.diskStorage({
 
 function fileFilter(req, file, callback) {
   if (!allowedMimeTypes.has(file.mimetype)) {
-    const error = new Error('Only JPG, PNG, WebP, GIF, MP4, WebM, and MOV files are allowed.');
+    const error = new Error('Only JPG, PNG, WebP, MP4, WebM, and MOV files are allowed.');
     error.statusCode = 400;
     return callback(error);
   }

@@ -9,7 +9,8 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ['citizen', 'department_head', 'department_officer', 'field_worker', 'admin'], default: 'citizen' },
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null },
     status: { type: String, enum: ['active', 'suspended'], default: 'active' },
-    emailVerified: { type: Boolean, default: false }
+    emailVerified: { type: Boolean, default: false },
+    preferences: { emailNotifications: { type: Boolean, default: true } }
   },
   { timestamps: true }
 );

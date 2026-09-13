@@ -12,6 +12,7 @@ import complaintRoutes from './routes/complaintRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import adminReportRoutes from './routes/adminReportRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(serverDir, '.env') });
@@ -28,6 +29,7 @@ app.use('/api/complaints', complaintRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin/reports', adminReportRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

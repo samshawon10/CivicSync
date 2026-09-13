@@ -23,7 +23,8 @@ const multipartConfig = {
 
 export const reportsApi = {
   create: (payload) => api.post('/reports', toReportFormData(payload), multipartConfig),
-  mine: () => api.get('/reports/my'),
+  mine: (params) => api.get('/reports/my', { params }),
+  stats: () => api.get('/reports/my/stats'),
   get: (id) => api.get(`/reports/${id}`),
   update: (id, payload) => api.put(`/reports/${id}`, toReportFormData(payload), multipartConfig),
   remove: (id) => api.delete(`/reports/${id}`)
