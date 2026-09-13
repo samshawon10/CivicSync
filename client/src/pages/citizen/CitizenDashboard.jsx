@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReportForm from '../../components/reports/ReportForm.jsx';
-import { DashboardLayout, ProfileHeader } from '../RoleDashboards.jsx';
+import CitizenLayout from '../../components/citizen/CitizenLayout.jsx';
 import { mediaUrl, reportsApi } from '../../services/reportService.js';
 import { apiMessage } from '../../services/api.js';
 
@@ -16,10 +16,11 @@ function MediaPreview({ attachment }) {
 }
 
 export default function CitizenDashboard() {
-  const [reports, setReports] = useState([]);
+  const [reports, setReports] = useState([]); const [stats, setStats] = useState({ total: 0, pending: 0, inProgress: 0, completed: 0, closed: 0 });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -27,8 +28,8 @@ export default function CitizenDashboard() {
   async function load() {
     setLoading(true);
     try {
-      const { data } = await reportsApi.mine();
-      setReports(data.reports);
+      const [reportResponse, statsResponse] = await Promise.all([reportsApi.mine({ limit: 5 }), reportsApi.stats()]);
+      setReports(reportResponse.data.reports); setStats(statsResponse.data.stats);
     } catch (err) {
       setError(apiMessage(err));
     } finally {
@@ -38,11 +39,6 @@ export default function CitizenDashboard() {
 
   useEffect(() => { load(); }, []);
 
-  const stats = useMemo(() => ({
-    total: reports.length,
-    pending: reports.filter((item) => ['pending', 'verified', 'assigned', 'in_progress'].includes(item.status)).length,
-    resolved: reports.filter((item) => ['completed', 'closed'].includes(item.status)).length
-  }), [reports]);
 
   async function save(values) {
     setBusy(true);
@@ -66,25 +62,25 @@ export default function CitizenDashboard() {
   }
 
   async function remove(report) {
-    if (!window.confirm('Are you sure you want to delete this report? This action cannot be undone.')) return;
     setError('');
     try {
       await reportsApi.remove(report._id);
       setReports((items) => items.filter((item) => item._id !== report._id));
       setMessage('Report deleted successfully.');
+      setDeleting(null);
     } catch (err) {
       setError(apiMessage(err));
     }
   }
 
   return (
-    <DashboardLayout title="Citizen Dashboard" items={['Dashboard', 'Report an Issue', 'My Reports']}>
-      <ProfileHeader />
-      <div className="mt-7 grid gap-4 sm:grid-cols-3">
+    <CitizenLayout title="Dashboard">
+      <section className="rounded-2xl bg-ink p-6 text-white"><p className="text-civic-100">Welcome back,</p><h2 className="mt-1 text-3xl font-bold">Your civic reports at a glance</h2><p className="mt-2 text-sm text-slate-300">Follow the progress of the issues you’ve raised in your community.</p></section>
+      <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
           ['Total Reports', stats.total],
           ['Pending Reports', stats.pending],
-          ['Resolved Reports', stats.resolved]
+          ['In Progress', stats.inProgress], ['Completed', stats.completed], ['Closed', stats.closed]
         ].map(([name, value]) => (
           <div key={name} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm text-slate-500">{name}</p>
@@ -128,7 +124,7 @@ export default function CitizenDashboard() {
                       {editable(report) && (
                         <>
                           <button onClick={() => setEditing(report)} className="text-civic-600">Edit</button>
-                          <button onClick={() => remove(report)} className="text-red-600">Delete</button>
+                          <button onClick={() => setDeleting(report)} className="text-red-600">Delete</button>
                         </>
                       )}
                     </div>
@@ -144,6 +140,7 @@ export default function CitizenDashboard() {
           )}
         </section>
       </div>
-    </DashboardLayout>
+      {deleting && <div role="dialog" aria-modal="true" aria-labelledby="delete-report-title" className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-5"><div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"><h2 id="delete-report-title" className="text-lg font-bold text-ink">Delete this report?</h2><p className="mt-2 text-sm text-slate-600">This cannot be undone. Any uploaded media will also be removed.</p><div className="mt-5 flex justify-end gap-3"><button onClick={() => setDeleting(null)} className="rounded-lg border px-4 py-2 font-bold">Cancel</button><button onClick={() => remove(deleting)} className="rounded-lg bg-red-600 px-4 py-2 font-bold text-white">Delete report</button></div></div></div>}
+    </CitizenLayout>
   );
 }

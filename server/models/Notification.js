@@ -1,0 +1,11 @@
+import mongoose from 'mongoose';
+
+const notificationSchema = new mongoose.Schema({
+  recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  report: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null },
+  message: { type: String, required: true, trim: true, maxlength: 300 },
+  type: { type: String, enum: ['report_status', 'system'], default: 'report_status' },
+  readAt: { type: Date, default: null }
+}, { timestamps: true });
+notificationSchema.index({ recipient: 1, createdAt: -1 });
+export default mongoose.model('Notification', notificationSchema);

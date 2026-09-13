@@ -53,3 +53,14 @@ export async function updateUserStatus(req, res, next) {
   } catch (error) { next(error); }
 }
 
+export async function getMyProfile(req, res) { return res.json({ success: true, user: safeUser(req.user), preferences: req.user.preferences || { emailNotifications: true } }); }
+export async function updateMyProfile(req, res, next) {
+  try {
+    const { name, photoURL } = req.body;
+    if (name !== undefined) { if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 80) return res.status(400).json({ success: false, message: 'Name must be between 2 and 80 characters.' }); req.user.name = name.trim(); }
+    if (photoURL !== undefined) { if (typeof photoURL !== 'string' || photoURL.length > 500) return res.status(400).json({ success: false, message: 'Profile photo URL is invalid.' }); req.user.photoURL = photoURL.trim(); }
+    await req.user.save(); res.json({ success: true, user: safeUser(req.user) });
+  } catch (error) { next(error); }
+}
+export async function updateMyPreferences(req, res, next) { try { if (typeof req.body.emailNotifications !== 'boolean') return res.status(400).json({ success: false, message: 'Email notification preference must be true or false.' }); req.user.preferences = { ...(req.user.preferences || {}), emailNotifications: req.body.emailNotifications }; await req.user.save(); res.json({ success: true, preferences: req.user.preferences }); } catch (error) { next(error); } }
+

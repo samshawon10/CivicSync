@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ReportStatusTimeline from '../../components/reports/ReportStatusTimeline.jsx';
-import { DashboardLayout } from '../RoleDashboards.jsx';
+import CitizenLayout from '../../components/citizen/CitizenLayout.jsx';
 import { mediaUrl, reportsApi } from '../../services/reportService.js';
 import { apiMessage } from '../../services/api.js';
 
@@ -40,7 +40,7 @@ export default function ReportDetails() {
   }, [id]);
 
   return (
-    <DashboardLayout title="Report Details" items={['Dashboard', 'Report an Issue', 'My Reports']}>
+    <CitizenLayout title="Report details">
       <button type="button" onClick={() => navigate('/dashboard/citizen')} className="text-sm font-bold text-civic-600">Back to My Reports</button>
       {error ? <p className="mt-5 rounded-lg bg-red-50 p-3 text-red-700">{error}</p> : !report ? <p className="mt-8 text-slate-500">Loading report...</p> : (
         <div className="mt-5 grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
@@ -76,15 +76,17 @@ export default function ReportDetails() {
             </dl>
             <h2 className="mt-6 font-bold text-ink">Description</h2>
             <p className="mt-2 whitespace-pre-wrap leading-7 text-slate-600">{report.description}</p>
+            {(report.location?.area || report.location?.address || report.location?.landmark) && <section className="mt-6"><h2 className="font-bold text-ink">Location</h2><p className="mt-2 text-sm text-slate-600">{[report.location.area, report.location.address, report.location.landmark].filter(Boolean).join(' · ')}</p></section>}
             <AttachmentGallery attachments={report.attachments} />
           </section>
           <aside className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="font-bold text-ink">Report Status</h2>
             <div className="mt-5"><ReportStatusTimeline status={report.status} /></div>
+            {report.activity?.length ? <div className="mt-7 border-t pt-5"><h2 className="font-bold text-ink">Activity</h2><ul className="mt-3 space-y-3">{report.activity.map((item, index) => <li key={`${item.timestamp}-${index}`} className="text-sm"><p className="font-medium text-slate-700">{item.action}</p><p className="text-xs text-slate-500">{new Date(item.timestamp).toLocaleString()}</p></li>)}</ul></div> : null}
             <Link to="/dashboard/citizen" className="mt-6 inline-block text-sm font-bold text-civic-600">View all reports</Link>
           </aside>
         </div>
       )}
-    </DashboardLayout>
+    </CitizenLayout>
   );
 }
