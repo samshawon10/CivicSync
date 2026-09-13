@@ -12,6 +12,7 @@ import complaintRoutes from './routes/complaintRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import adminReportRoutes from './routes/adminReportRoutes.js';
+import departmentRoutes from './routes/departmentRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +30,7 @@ app.use('/api/complaints', complaintRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin/reports', adminReportRoutes);
+app.use('/api/departments', departmentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use(notFound);
 app.use(errorHandler);

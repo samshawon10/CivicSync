@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema(
     photoURL: { type: String, default: '' },
     role: { type: String, enum: ['citizen', 'department_head', 'department_officer', 'field_worker', 'admin'], default: 'citizen' },
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null },
+    departmentName: { type: String, trim: true, default: '' },
     status: { type: String, enum: ['active', 'suspended'], default: 'active' },
     emailVerified: { type: Boolean, default: false },
     preferences: { emailNotifications: { type: Boolean, default: true } }
@@ -16,7 +17,7 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.methods.toSafeObject = function toSafeObject() {
-  return { id: this._id, firebaseUid: this.firebaseUid, name: this.name, email: this.email, photoURL: this.photoURL, role: this.role, department: this.department, status: this.status, emailVerified: this.emailVerified, createdAt: this.createdAt };
+  return { id: this._id, firebaseUid: this.firebaseUid, name: this.name, email: this.email, photoURL: this.photoURL, role: this.role, department: this.department, departmentName: this.departmentName, status: this.status, emailVerified: this.emailVerified, createdAt: this.createdAt };
 };
 
 export default mongoose.model('User', userSchema);
