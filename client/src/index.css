@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme { --color-civic-50: #effcfa; --color-civic-100: #d7f4ef; --color-civic-200: #ace8df; --color-civic-300: #72d3c6; --color-civic-400: #35b29f; --color-civic-500: #088c7c; --color-civic-600: #067264; --color-ink: #12212e; }
+@layer base { html { scroll-behavior: smooth; } body { @apply min-h-screen bg-slate-50 text-slate-800 antialiased; } input, textarea, select { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-civic-500 focus:ring-2 focus:ring-civic-500/20; } }
+
+@keyframes civic-fade-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes civic-scale-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes civic-marker { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.55); opacity: .45; } }
+@keyframes civic-sos { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+
+@layer components {
+  .interactive { transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease, border-color 180ms ease; }
+  .interactive:hover { transform: scale(1.02); }
+  .interactive:active { transform: scale(.98); }
+  .hero-kicker { animation: civic-fade-up .45s ease-out both; }
+  .hero-title { animation: civic-fade-up .62s .1s ease-out both; }
+  .hero-description { animation: civic-fade-up .56s .24s ease-out both; }
+  .hero-actions { animation: civic-fade-up .5s .36s ease-out both; }
+  .hero-visual { animation: civic-scale-in .68s .18s ease-out both; }
+  .hero-marker { animation: civic-marker 2.8s ease-in-out infinite; transform-origin: center; }
+  .sos-pulse { animation: civic-sos 2.6s ease-in-out infinite; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
