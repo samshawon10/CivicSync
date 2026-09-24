@@ -35,5 +35,6 @@ function AdminReports({ onUsers }) { const [reports, setReports] = useState([]);
 
 export const DepartmentHeadDashboard = () => <DepartmentDashboard role="department_head" />;
 export const DepartmentOfficerDashboard = () => <DepartmentDashboard role="department_officer" />;
-export const FieldWorkerDashboard = () => <PlaceholderDashboard role="field_worker" />;
+export const OfficerDashboard = () => <DepartmentDashboard role="officer" />;
+export const FieldWorkerDashboard = () => <DepartmentDashboard role="field_worker" />;
 export const AdminDashboard = () => { const [section, setSection] = useState('users'); return section === 'reports' ? <AdminReports onUsers={() => setSection('users')} /> : <AdminUsers onReports={() => setSection('reports')} />; };

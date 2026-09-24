@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { listNotifications, markAllRead, markRead } from '../controllers/notificationController.js';
+import { deleteNotification, listNotifications, markAllRead, markRead } from '../controllers/notificationController.js';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 const router = Router();
-router.use(requireAuth, requireRole('citizen', 'department_head', 'department_officer', 'field_worker', 'admin'));
+router.use(requireAuth, requireRole('citizen', 'department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker', 'admin'));
 router.get('/', listNotifications);
 router.patch('/read-all', markAllRead);
+router.delete('/:id', deleteNotification);
 router.patch('/:id/read', markRead);
 export default router;

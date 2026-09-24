@@ -7,5 +7,5 @@ export const reportDepartments = [
 ];
 
 export const reportPriorities = ['low', 'medium', 'high', 'urgent'];
-export const reportStatuses = ['pending', 'verified', 'assigned', 'in_progress', 'completed', 'closed'];
+export const reportStatuses = ['pending', 'verified', 'assigned', 'in_progress', 'under_review', 'completed', 'closed'];
 export const editableStatuses = ['pending', 'verified'];

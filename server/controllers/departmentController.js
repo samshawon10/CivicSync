@@ -5,7 +5,8 @@ import User from '../models/User.js';
 import { reportCategories, reportPriorities, reportStatuses } from '../config/reportOptions.js';
 
 const headRoles = ['department_head'];
-const departmentRoles = ['department_head', 'department_officer'];
+const managementRoles = ['department_head', 'department_officer'];
+const departmentRoles = ['department_head', 'department_officer', 'officer', 'field_worker'];
 const completionStatuses = ['submitted', 'approved', 'rejected'];
 
 function label(value = '') {
@@ -23,7 +24,7 @@ function escapeRegex(value) {
 function canAccessReport(user, report) {
   const departmentName = departmentNameFor(user);
   if (!departmentName || report.departmentName !== departmentName) return false;
-  if (user.role === 'department_head') return true;
+  if (managementRoles.includes(user.role)) return true;
   return report.assignedOfficer?.equals?.(user._id) || report.assignedFieldWorker?.equals?.(user._id);
 }
 
@@ -48,7 +49,7 @@ function scopedFilter(req) {
   const departmentName = departmentNameFor(req.user);
   if (!departmentName) return null;
   const filter = { departmentName };
-  if (req.user.role === 'department_officer') filter.$or = [{ assignedOfficer: req.user._id }, { assignedFieldWorker: req.user._id }];
+  if (['officer', 'field_worker'].includes(req.user.role)) filter.$or = [{ assignedOfficer: req.user._id }, { assignedFieldWorker: req.user._id }];
   return filter;
 }
 
@@ -112,9 +113,10 @@ export async function getReport(req, res, next) {
 
 export async function listStaff(req, res, next) {
   try {
+    if (!managementRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only department management can view the department staff directory.' });
     const departmentName = departmentNameFor(req.user);
     if (!departmentName) return res.status(403).json({ success: false, message: 'Department assignment is required.' });
-    const staff = await User.find({ departmentName, role: { $in: ['department_officer', 'field_worker'] }, status: 'active' }).select('name email role departmentName').lean();
+    const staff = await User.find({ departmentName, role: { $in: ['department_officer', 'officer', 'field_worker'] }, status: 'active' }).select('name email role departmentName').lean();
     const workloads = await Report.aggregate([{ $match: { departmentName, status: { $in: ['assigned', 'in_progress'] } } }, { $facet: {
       officers: [{ $match: { assignedOfficer: { $ne: null } } }, { $group: { _id: '$assignedOfficer', count: { $sum: 1 } } }],
       workers: [{ $match: { assignedFieldWorker: { $ne: null } } }, { $group: { _id: '$assignedFieldWorker', count: { $sum: 1 } } }]
@@ -140,14 +142,14 @@ export async function updatePriority(req, res, next) {
 
 export async function assignReport(req, res, next) {
   try {
-    if (!headRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only department heads can assign reports.' });
+    if (!managementRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only department heads and department officers can assign reports.' });
     const { officerId, fieldWorkerId } = req.body;
     const report = await loadScopedReport(req, res);
     if (!report) return;
     const departmentName = departmentNameFor(req.user);
     const [officer, worker] = await Promise.all([
-      officerId ? User.findOne({ _id: officerId, role: 'department_officer', departmentName, status: 'active' }) : null,
-      fieldWorkerId ? User.findOne({ _id: fieldWorkerId, role: 'field_worker', departmentName, status: 'active' }) : null
+      officerId ? User.findOne({ _id: officerId, role: { $in: ['department_officer', 'officer'] }, departmentName, status: 'active' }) : null,
+      fieldWorkerId ? User.findOne({ _id: fieldWorkerId, role: { $in: ['field_worker', 'officer'] }, departmentName, status: 'active' }) : null
     ]);
     if (officerId && !officer) return res.status(400).json({ success: false, message: 'Selected officer is not in this department.' });
     if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Selected field worker is not in this department.' });
@@ -169,7 +171,7 @@ export async function updateStatus(req, res, next) {
     if (!reportStatuses.includes(req.body.status)) return res.status(400).json({ success: false, message: 'Invalid status.' });
     const report = await loadScopedReport(req, res);
     if (!report) return;
-    if (req.user.role === 'department_officer' && ['completed', 'closed'].includes(req.body.status)) return res.status(403).json({ success: false, message: 'Department head approval is required.' });
+    if (req.user.role !== 'department_head' && ['completed', 'closed'].includes(req.body.status)) return res.status(403).json({ success: false, message: 'Department head approval is required.' });
     const previous = report.status;
     report.status = req.body.status;
     report.activity.push({ action: `Status changed from ${label(previous)} to ${label(report.status)}`, actorRole: req.user.role, note: req.body.note || '' });
@@ -183,7 +185,7 @@ export async function submitCompletion(req, res, next) {
   try {
     const report = await loadScopedReport(req, res);
     if (!report) return;
-    if (req.user.role !== 'department_officer' && req.user.role !== 'department_head') return res.status(403).json({ success: false, message: 'You cannot submit completion reports.' });
+    if (!departmentRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'You cannot submit completion reports.' });
     const { summary = '', materials = '', notes = '', beforeImages = [], afterImages = [] } = req.body;
     if (summary.trim().length < 10) return res.status(400).json({ success: false, message: 'Work summary must be at least 10 characters.' });
     report.completionReport = { summary: summary.trim(), materials: String(materials).trim(), notes: String(notes).trim(), beforeImages, afterImages, submittedBy: req.user._id, submittedAt: new Date(), verificationStatus: 'submitted' };

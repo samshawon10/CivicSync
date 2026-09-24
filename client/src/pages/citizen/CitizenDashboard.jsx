@@ -23,13 +23,19 @@ export default function CitizenDashboard() {
   const [deleting, setDeleting] = useState(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [serviceDepartments, setServiceDepartments] = useState([]);
   const navigate = useNavigate();
 
   async function load() {
     setLoading(true);
     try {
-      const [reportResponse, statsResponse] = await Promise.all([reportsApi.mine({ limit: 5 }), reportsApi.stats()]);
+      const [reportResponse, statsResponse, departmentResponse] = await Promise.all([
+        reportsApi.mine({ limit: 5 }),
+        reportsApi.stats(),
+        reportsApi.departments().catch(() => ({ data: { departments: [] } }))
+      ]);
       setReports(reportResponse.data.reports); setStats(statsResponse.data.stats);
+      setServiceDepartments(departmentResponse.data.departments || []);
     } catch (err) {
       setError(apiMessage(err));
     } finally {
@@ -76,6 +82,13 @@ export default function CitizenDashboard() {
   return (
     <CitizenLayout title="Dashboard">
       <section className="rounded-2xl bg-ink p-6 text-white"><p className="text-civic-100">Welcome back,</p><h2 className="mt-1 text-3xl font-bold">Your civic reports at a glance</h2><p className="mt-2 text-sm text-slate-300">Follow the progress of the issues you’ve raised in your community.</p></section>
+      {serviceDepartments.length > 0 && (
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-bold text-ink">City service departments</h2>
+          <p className="mt-1 text-sm text-slate-500">Choose the right department when you raise a new issue.</p>
+          <div className="mt-4 flex flex-wrap gap-2">{serviceDepartments.map((department) => <span key={department._id} className="rounded-full bg-civic-50 px-3 py-1.5 text-xs font-bold text-civic-700">{department.name}</span>)}</div>
+        </section>
+      )}
       <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
           ['Total Reports', stats.total],

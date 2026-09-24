@@ -3,7 +3,7 @@ import { analytics, assignReport, dashboard, getReport, listReports, listStaff, 
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 
 const router = Router();
-router.use(requireAuth, requireRole('department_head', 'department_officer'));
+router.use(requireAuth, requireRole('department_head', 'department_officer', 'officer', 'field_worker'));
 router.get('/dashboard', dashboard);
 router.get('/analytics', analytics);
 router.get('/staff', listStaff);

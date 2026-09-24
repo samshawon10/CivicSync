@@ -6,6 +6,7 @@ import multer from 'multer';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 export const reportUploadDir = path.resolve(serverDir, '..', 'uploads', 'reports');
+export const emergencyUploadDir = path.resolve(serverDir, '..', 'storage', 'emergencies');
 
 const allowedMimeTypes = new Set([
   'image/jpeg',
@@ -17,6 +18,7 @@ const allowedMimeTypes = new Set([
 ]);
 
 fs.mkdirSync(reportUploadDir, { recursive: true });
+fs.mkdirSync(emergencyUploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (req, file, callback) => callback(null, reportUploadDir),
@@ -43,3 +45,14 @@ export const uploadReportMedia = multer({
     files: 5
   }
 }).array('media', 5);
+
+const emergencyStorage = multer.diskStorage({
+  destination: (req, file, callback) => callback(null, emergencyUploadDir),
+  filename: (req, file, callback) => callback(null, `${Date.now()}-${randomUUID()}${path.extname(file.originalname || '').toLowerCase()}`)
+});
+const emergencyMimeTypes = new Set([...allowedMimeTypes, 'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'application/pdf']);
+export const uploadEmergencyEvidence = multer({
+  storage: emergencyStorage,
+  fileFilter: (req, file, callback) => emergencyMimeTypes.has(file.mimetype) ? callback(null, true) : callback(Object.assign(new Error('Only image, video, audio, and PDF evidence files are allowed.'), { statusCode: 400 })),
+  limits: { fileSize: 25 * 1024 * 1024, files: 5 }
+}).array('evidence', 5);

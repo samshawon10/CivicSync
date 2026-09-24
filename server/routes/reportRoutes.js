@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { createReport, deleteReport, getReport, listMyReports, reportStats, updateReport } from '../controllers/reportController.js';
+import { createReport, deleteReport, getReport, listDepartments, listMyReports, reportStats, updateReport } from '../controllers/reportController.js';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 import { uploadReportMedia } from '../middleware/uploadMiddleware.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('citizen'));
+router.get('/departments', listDepartments);
 router.post('/', uploadReportMedia, createReport);
 router.get('/my/stats', reportStats);
 router.get('/my', listMyReports);

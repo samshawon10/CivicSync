@@ -6,6 +6,6 @@ export default function RoleGuard({ role }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="grid min-h-screen place-items-center text-civic-600">Loading CivicSync…</div>;
   if (!user) return <Navigate to="/login" replace />;
-  return user.role === role ? <Outlet /> : <Navigate to={dashboardPathFor(user.role)} replace />;
+  const allowedRoles = Array.isArray(role) ? role : [role];
+  return allowedRoles.includes(user.role) ? <Outlet /> : <Navigate to={dashboardPathFor(user.role)} replace />;
 }
-

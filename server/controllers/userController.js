@@ -1,10 +1,17 @@
 import mongoose from 'mongoose';
 import User from '../models/User.js';
+import Report from '../models/Report.js';
+import Emergency from '../models/Emergency.js';
+import ActivityLog from '../models/ActivityLog.js';
 
-const roles = ['citizen', 'department_head', 'department_officer', 'field_worker', 'admin'];
+const roles = ['citizen', 'admin', 'department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker'];
 const statuses = ['active', 'suspended'];
 
 function safeUser(user) { return user.toSafeObject(); }
+
+function logActivity(admin, action, targetType, targetId, targetName, description, metadata = {}) {
+  return ActivityLog.create({ admin, action, targetType, targetId, targetName, description, metadata }).catch(() => {});
+}
 
 export async function listUsers(req, res, next) {
   try {
@@ -25,19 +32,31 @@ export async function getUser(req, res, next) {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ success: false, message: 'User not found.' });
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-    return res.json({ success: true, user: safeUser(user) });
+    const [reportCount, reportStats, emergencyCount] = await Promise.all([
+      Report.countDocuments({ createdBy: user._id }),
+      Report.aggregate([{ $match: { createdBy: user._id } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Emergency.countDocuments({ citizen: user._id })
+    ]);
+    const reportStatsMap = Object.fromEntries(reportStats.map(r => [r._id, r.count]));
+    return res.json({ success: true, user: safeUser(user), stats: { reports: reportCount, emergencies: emergencyCount, reportsByStatus: reportStatsMap } });
   } catch (error) { next(error); }
 }
 
 export async function updateUserRole(req, res, next) {
   try {
     const { role } = req.body;
-    if (!roles.includes(role)) return res.status(400).json({ success: false, message: 'Invalid user role.' });
+    if (!roles.includes(role) || role !== 'citizen') return res.status(400).json({ success: false, message: 'Use the admin management API to assign privileged roles and departments.' });
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ success: false, message: 'User not found.' });
     if (req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'You cannot change your own admin role.' });
-    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true, runValidators: true });
+    const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-    return res.json({ success: true, message: 'User role updated.', user: safeUser(user) });
+    const previousRole = user.role;
+    user.role = role;
+    user.department = null;
+    user.departmentName = '';
+    await user.save();
+    await logActivity(req.user, 'role_changed', 'user', user._id, user.name, 'Role changed from ' + previousRole + ' to ' + role, { previousRole, newRole: role });
+    res.json({ success: true, message: 'User role updated.', user: safeUser(user) });
   } catch (error) { next(error); }
 }
 
@@ -47,9 +66,25 @@ export async function updateUserStatus(req, res, next) {
     if (!statuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid account status.' });
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ success: false, message: 'User not found.' });
     if (req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'You cannot change your own account status.' });
-    const user = await User.findByIdAndUpdate(req.params.id, { status }, { new: true, runValidators: true });
+    const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-    return res.json({ success: true, message: 'User status updated.', user: safeUser(user) });
+    user.status = status;
+    await user.save();
+    await logActivity(req.user, status === 'suspended' ? 'user_blocked' : 'user_unblocked', 'user', user._id, user.name, 'Account status changed to ' + status, { status });
+    res.json({ success: true, message: 'User status updated.', user: safeUser(user) });
+  } catch (error) { next(error); }
+}
+
+export async function deleteUser(req, res, next) {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ success: false, message: 'User not found.' });
+    if (req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'You cannot delete your own account.' });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+    if (user.role === 'admin') return res.status(400).json({ success: false, message: 'Administrator accounts cannot be deleted.' });
+    await ActivityLog.create({ admin: req.user._id, action: 'user_deleted', targetType: 'user', targetId: user._id, targetName: user.name, description: 'User ' + user.name + ' (' + user.email + ') was deleted.' });
+    await User.deleteOne({ _id: user._id });
+    res.json({ success: true, message: 'User deleted.' });
   } catch (error) { next(error); }
 }
 

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-@theme { --color-civic-50: #effcfa; --color-civic-100: #d7f4ef; --color-civic-200: #ace8df; --color-civic-300: #72d3c6; --color-civic-400: #35b29f; --color-civic-500: #088c7c; --color-civic-600: #067264; --color-ink: #12212e; }
-@layer base { html { scroll-behavior: smooth; } body { @apply min-h-screen bg-slate-50 text-slate-800 antialiased; } input, textarea, select { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-civic-500 focus:ring-2 focus:ring-civic-500/20; } }
+@theme { --color-civic-50: #eff6ff; --color-civic-100: #dbeafe; --color-civic-200: #bfdbfe; --color-civic-300: #93c5fd; --color-civic-400: #60a5fa; --color-civic-500: #3b82f6; --color-civic-600: #2563eb; --color-civic-700: #1d4ed8; --color-ink: #0f2747; --color-teal-50: #f0fdfa; --color-teal-600: #0f766e; }
+@layer base { html { scroll-behavior: smooth; } body { @apply min-h-screen bg-slate-50 font-sans text-slate-800 antialiased; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; } button, a, input, select, textarea { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-500 focus-visible:ring-offset-2; } button:not(:disabled), a { -webkit-tap-highlight-color: transparent; } input, textarea, select { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-civic-500 focus:ring-2 focus:ring-civic-500/20; } button:disabled { @apply cursor-not-allowed opacity-60; } }
 
 @keyframes civic-fade-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes civic-scale-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
@@ -9,6 +9,13 @@
 @keyframes civic-sos { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
 
 @layer components {
+  .civic-card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
+  .civic-page-heading { @apply text-2xl font-bold tracking-tight text-ink sm:text-3xl; }
+  .civic-primary { @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-civic-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-civic-700 active:scale-[.98]; }
+  .civic-secondary { @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-civic-300 hover:bg-civic-50; }
+  .status-success { @apply bg-emerald-50 text-emerald-700; }
+  .status-warning { @apply bg-amber-50 text-amber-700; }
+  .status-danger { @apply bg-red-50 text-red-700; }
   .interactive { transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease, border-color 180ms ease; }
   .interactive:hover { transform: scale(1.02); }
   .interactive:active { transform: scale(.98); }

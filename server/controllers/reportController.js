@@ -3,6 +3,7 @@ import path from 'node:path';
 import mongoose from 'mongoose';
 import Report from '../models/Report.js';
 import Notification from '../models/Notification.js';
+import Department from '../models/Department.js';
 import { reportUploadDir } from '../middleware/uploadMiddleware.js';
 import { reportCategories, reportDepartments, reportPriorities, reportStatuses } from '../config/reportOptions.js';
 
@@ -141,6 +142,13 @@ export async function listAllReports(req, res, next) {
     }
     const reports = await Report.find(filter).populate('createdBy', 'name email').sort({ createdAt: -1 }).limit(200);
     return res.json({ success: true, reports });
+  } catch (error) { next(error); }
+}
+
+export async function listDepartments(req, res, next) {
+  try {
+    const departments = await Department.find({ status: 'active' }).sort({ name: 1 }).lean();
+    return res.json({ success: true, departments });
   } catch (error) { next(error); }
 }
 

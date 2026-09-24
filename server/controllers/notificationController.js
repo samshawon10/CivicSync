@@ -18,3 +18,11 @@ export async function markRead(req, res, next) {
 export async function markAllRead(req, res, next) {
   try { await Notification.updateMany({ recipient: req.user._id, readAt: null }, { readAt: new Date() }); res.json({ success: true }); } catch (error) { next(error); }
 }
+export async function deleteNotification(req, res, next) {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(404).json({ success: false, message: 'Notification not found.' });
+    const notification = await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user._id });
+    if (!notification) return res.status(404).json({ success: false, message: 'Notification not found.' });
+    res.json({ success: true, message: 'Notification deleted.' });
+  } catch (error) { next(error); }
+}

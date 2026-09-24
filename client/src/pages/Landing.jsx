@@ -61,16 +61,16 @@ function HeroVisual() { return <div className="hero-visual relative mx-auto w-fu
 </div>
 <div className="mt-4 grid grid-cols-3 gap-2">
 <div className="rounded-lg bg-slate-50 p-2.5">
-<p className="text-lg font-bold text-ink">24</p>
-<p className="text-[10px] text-slate-500">Active reports</p>
+<p className="text-sm font-bold text-ink">Reports</p>
+<p className="text-[10px] text-slate-500">Centralized tracking</p>
 </div>
 <div className="rounded-lg bg-slate-50 p-2.5">
-<p className="text-lg font-bold text-ink">92%</p>
-<p className="text-[10px] text-slate-500">Resolved</p>
+<p className="text-sm font-bold text-ink">Progress</p>
+<p className="text-[10px] text-slate-500">Clear milestones</p>
 </div>
 <div className="rounded-lg bg-slate-50 p-2.5">
-<p className="text-lg font-bold text-ink">4m</p>
-<p className="text-[10px] text-slate-500">Avg. response</p>
+<p className="text-sm font-bold text-ink">Response</p>
+<p className="text-[10px] text-slate-500">Coordinated teams</p>
 </div>
 </div>
 </div>

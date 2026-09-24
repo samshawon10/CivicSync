@@ -1,2 +1,2 @@
 import api from './api.js';
-export const notificationsApi = { list: () => api.get('/notifications'), read: (id) => api.patch(`/notifications/${id}/read`), readAll: () => api.patch('/notifications/read-all') };
+export const notificationsApi = { list: () => api.get('/notifications'), read: (id) => api.patch(`/notifications/${id}/read`), readAll: () => api.patch('/notifications/read-all'), remove: (id) => api.delete(`/notifications/${id}`) };

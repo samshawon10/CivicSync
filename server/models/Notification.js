@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 const notificationSchema = new mongoose.Schema({
   recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   report: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null },
+  relatedType: { type: String, enum: ['report', 'emergency', 'department', 'user', 'system'], default: 'system' },
+  relatedId: { type: mongoose.Schema.Types.ObjectId, default: null },
   message: { type: String, required: true, trim: true, maxlength: 300 },
   type: { type: String, enum: ['report_status', 'system'], default: 'report_status' },
   readAt: { type: Date, default: null }

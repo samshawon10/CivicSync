@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { reportsApi } from '../../services/reportService.js';
 
 const maxFiles = 5;
 const maxFileSize = 25 * 1024 * 1024;
@@ -27,6 +28,19 @@ export default function ReportForm({ report, onSave, onCancel, busy }) {
   const [values, setValues] = useState(blank);
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
+  const [liveDepartments, setLiveDepartments] = useState([]);
+
+  useEffect(() => {
+    reportsApi.departments().then(({ data }) => setLiveDepartments(data.departments || [])).catch(() => setLiveDepartments([]));
+  }, []);
+
+  const departmentOptions = liveDepartments.length ? liveDepartments.map((d) => d.name) : departments;
+
+  useEffect(() => {
+    if (departmentOptions.length && !departmentOptions.includes(values.departmentName) && departmentOptions[0]) {
+      setValues((prev) => ({ ...prev, departmentName: departmentOptions[0] }));
+    }
+  }, [departmentOptions, values.departmentName]);
 
   useEffect(() => {
     setValues(report ? {
@@ -63,12 +77,12 @@ export default function ReportForm({ report, onSave, onCancel, busy }) {
 
   return (
     <form onSubmit={submit} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-bold text-ink">{report ? 'Edit report' : 'Report an issue'}</h2>
+      <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
+        <div><p className="text-xs font-bold tracking-[.14em] text-civic-600">CIVIC SERVICE REQUEST</p><h2 className="mt-1 text-lg font-bold text-ink">{report ? 'Edit report' : 'Report an issue'}</h2></div>
         {report && <button type="button" onClick={onCancel} className="text-sm font-bold text-slate-500">Cancel</button>}
       </div>
       <div className="space-y-3">
-        <label className="block text-sm font-semibold">
+        <p className="text-sm font-bold text-ink">Basic information</p><label className="block text-sm font-semibold">
           Issue title
           <input name="title" value={values.title} onChange={change} required maxLength="140" />
         </label>
@@ -82,11 +96,11 @@ export default function ReportForm({ report, onSave, onCancel, busy }) {
           <label className="text-sm font-semibold">
             Department name
             <select name="departmentName" value={values.departmentName} onChange={change}>
-              {departments.map((department) => <option key={department} value={department}>{department}</option>)}
+              {departmentOptions.map((department) => <option key={department} value={department}>{department}</option>)}
             </select>
           </label>
         </div>
-        <label className="block text-sm font-semibold">
+        <p className="pt-2 text-sm font-bold text-ink">Evidence and description</p><label className="block text-sm font-semibold">
           Priority
           <select name="priority" value={values.priority} onChange={change}>
             <option value="low">Low</option>
@@ -105,10 +119,10 @@ export default function ReportForm({ report, onSave, onCancel, busy }) {
           Description
           <textarea name="description" rows="4" value={values.description} onChange={change} required maxLength="2000" />
         </label>
-        <fieldset className="grid gap-3 sm:grid-cols-2"><legend className="text-sm font-semibold">Location (optional)</legend><input name="area" value={values.area} onChange={change} placeholder="Area" /><input name="landmark" value={values.landmark} onChange={change} placeholder="Landmark" /><input className="sm:col-span-2" name="address" value={values.address} onChange={change} placeholder="Address or location details" /><input name="latitude" type="number" step="any" value={values.latitude} onChange={change} placeholder="Latitude" /><input name="longitude" type="number" step="any" value={values.longitude} onChange={change} placeholder="Longitude" /></fieldset>
+        <fieldset className="grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-2"><legend className="pr-2 text-sm font-bold text-ink">Location <span className="font-normal text-slate-500">(optional)</span></legend><input name="area" value={values.area} onChange={change} placeholder="Area" /><input name="landmark" value={values.landmark} onChange={change} placeholder="Landmark" /><input className="sm:col-span-2" name="address" value={values.address} onChange={change} placeholder="Address or location details" /><input name="latitude" type="number" step="any" value={values.latitude} onChange={change} placeholder="Latitude" /><input name="longitude" type="number" step="any" value={values.longitude} onChange={change} placeholder="Longitude" /></fieldset>
         <label className="block text-sm font-semibold">Additional information<textarea name="additionalInfo" rows="2" value={values.additionalInfo} onChange={change} maxLength="1000" /></label>
         {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
-        <button disabled={busy} className="rounded-lg bg-civic-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">{busy ? 'Saving...' : report ? 'Save changes' : 'Submit report'}</button>
+        <button disabled={busy} className="civic-primary w-full sm:w-auto">{busy ? 'Saving...' : report ? 'Save changes' : 'Submit report'}</button>
       </div>
     </form>
   );

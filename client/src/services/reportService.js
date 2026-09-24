@@ -22,6 +22,7 @@ const multipartConfig = {
 };
 
 export const reportsApi = {
+  departments: () => api.get('/reports/departments'),
   create: (payload) => api.post('/reports', toReportFormData(payload), multipartConfig),
   mine: (params) => api.get('/reports/my', { params }),
   stats: () => api.get('/reports/my/stats'),
