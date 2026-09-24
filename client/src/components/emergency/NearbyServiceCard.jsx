@@ -1,20 +1,24 @@
-import { label } from '../../services/emergencyService.js';
+import { Navigation, Phone } from 'lucide-react';
+import { directionsUrl, label } from '../../services/emergencyService.js';
+import { FacilityIcon } from './mapVisuals.jsx';
 
-const icons = { hospital: '🏥', police: '🚓', fire_station: '🚒', ambulance: '🚑', shelter: '🏠', safe_point: '🛡️' };
-
-export default function NearbyServiceCard({ facility }) {
+export default function NearbyServiceCard({ facility, origin }) {
   if (!facility) return null;
+  const directions = directionsUrl(facility, origin);
   return (
     <article className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-      <div className="min-w-0">
-        <p className="font-bold text-ink"><span className="mr-1">{icons[facility.type] || '📍'}</span>{facility.name}</p>
-        <p className="text-xs capitalize text-slate-500">{label(facility.type)}{facility.distanceKm != null ? ` · ${facility.distanceKm} km away` : ''}</p>
-        {facility.address && <p className="truncate text-xs text-slate-400">{facility.address}</p>}
-        {!facility.available && <p className="text-xs font-bold text-amber-600">Currently marked unavailable</p>}
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-civic-50 text-civic-700"><FacilityIcon type={facility.type} size={19} /></span>
+        <div className="min-w-0">
+          <p className="font-bold text-ink">{facility.name}</p>
+          <p className="text-xs text-slate-500">{label(facility.type)}{facility.distanceKm != null ? ` · ${facility.distanceKm} km away` : ''}</p>
+          {facility.address ? <p className="truncate text-xs text-slate-400">{facility.address}</p> : null}
+          {facility.active === false ? <p className="text-xs font-bold text-slate-500">Inactive listing</p> : facility.available === false ? <p className="text-xs font-bold text-amber-600">Currently marked unavailable</p> : <p className="text-xs font-bold text-emerald-700">Available</p>}
+        </div>
       </div>
       <div className="flex shrink-0 flex-col gap-1.5 text-xs font-bold">
-        {facility.phone && <a href={`tel:${facility.phone}`} className="rounded-lg bg-civic-50 px-3 py-1.5 text-center text-civic-700 hover:bg-civic-100">Call</a>}
-        <a target="_blank" rel="noreferrer" href={`https://www.openstreetmap.org/directions?to=${facility.latitude}%2C${facility.longitude}`} className="rounded-lg bg-slate-100 px-3 py-1.5 text-center text-slate-700 hover:bg-slate-200">Navigate</a>
+        {facility.phone ? <a href={`tel:${facility.phone}`} className="inline-flex items-center justify-center gap-1 rounded-lg bg-civic-50 px-3 py-1.5 text-center text-civic-700 hover:bg-civic-100"><Phone size={13} /> Call</a> : null}
+        {directions ? <a target="_blank" rel="noreferrer" href={directions} className="inline-flex items-center justify-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-center text-slate-700 hover:bg-slate-200"><Navigation size={13} /> Directions</a> : null}
       </div>
     </article>
   );

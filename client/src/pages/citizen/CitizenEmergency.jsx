@@ -1,7 +1,9 @@
+import { Bell, Hospital, MapPinned, PhoneCall, ShieldCheck, Siren } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CitizenLayout from '../../components/citizen/CitizenLayout.jsx';
 import SOSButton from '../../components/emergency/SOSButton.jsx';
+import EmergencyMap from '../../components/emergency/EmergencyMap.jsx';
 import EmergencyCard, { ErrorState } from '../../components/emergency/EmergencyCard.jsx';
 import { emergencyApi, label } from '../../services/emergencyService.js';
 import { apiMessage } from '../../services/api.js';
@@ -9,12 +11,12 @@ import useGeolocation from '../../hooks/useGeolocation.js';
 import useEmergencyEvents from '../../hooks/useEmergencyEvents.js';
 
 const quickLinks = [
-  ['Report emergency', '/dashboard/citizen/emergency/new', '📝'],
-  ['Women Safety', '/dashboard/citizen/women-safety', '🛡️'],
-  ['Safety Map', '/dashboard/citizen/safety-map', '🗺️'],
-  ['Safety Alerts', '/dashboard/citizen/alerts', '📢'],
-  ['Nearby services', '/dashboard/citizen/nearby-services', '🏥'],
-  ['Emergency contacts', '/dashboard/citizen/emergency-contacts', '👥']
+  ['Report emergency', '/dashboard/citizen/emergency/new', Siren],
+  ['Women Safety', '/dashboard/citizen/women-safety', ShieldCheck],
+  ['Safety Map', '/dashboard/citizen/safety-map', MapPinned],
+  ['Safety Alerts', '/dashboard/citizen/alerts', Bell],
+  ['Nearby services', '/dashboard/citizen/nearby-services', Hospital],
+  ['Emergency contacts', '/dashboard/citizen/emergency-contacts', PhoneCall]
 ];
 
 export default function CitizenEmergency() {
@@ -151,7 +153,7 @@ export default function CitizenEmergency() {
             <div className="mt-5 rounded-xl bg-white/95 p-4 text-slate-800">
               <p className="text-sm font-black text-red-700">Emergency ID: {sosResult.emergencyId}</p>
               <ul className="mt-2 space-y-1 text-sm">
-                <li>{sosResult._locationCaptured ? '✓' : '✗'} Location {sosResult._locationCaptured ? 'captured' : 'NOT captured — enter an address'}</li>
+                <li>{sosResult._locationCaptured ? '✓' : '✗'} Location {sosResult._locationCaptured ? `captured${Number.isFinite(Number(sosResult.location?.accuracy)) ? ` (±${Math.round(Number(sosResult.location.accuracy))} m)` : ''}` : 'NOT captured — enter an address'}</li>
                 <li>✓ Emergency Command notified (server confirmed)</li>
                 <li>{sosResult._contactInfo?.recorded ? `✓ ${sosResult._contactInfo.recorded} emergency contact(s) recorded for command` : '— No enabled emergency contacts on file'}</li>
                 {!sosResult._contactInfo?.recorded && <li className="text-xs text-slate-500">Add contacts so command can reach your next of kin (SMS delivery needs an SMS gateway, which is not configured).</li>}
@@ -162,6 +164,12 @@ export default function CitizenEmergency() {
                   <button onClick={attachAddress} disabled={busy || !addressDraft.trim()} className="civic-primary">Save location</button>
                 </div>
               )}
+              {sosResult.location?.latitude != null && sosResult.location?.longitude != null ? (
+                <div className="mt-4">
+                  <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Your emergency location</p>
+                  <EmergencyMap height="h-64" emergencies={[sosResult]} userLocation={sosResult.location} showControls={false} autoFit />
+                </div>
+              ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <span className="text-xs font-black uppercase text-slate-500">Response status:</span>
                 <span className={`rounded-full px-3 py-1 text-xs font-black ${activeStatus === 'DISPATCHING' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{label(activeStatus)}</span>
@@ -182,9 +190,9 @@ export default function CitizenEmergency() {
         </section>
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {quickLinks.map(([text, to, icon]) => (
-            <button key={to} onClick={() => navigate(to)} className="civic-card interactive flex flex-col items-center gap-1 p-4 text-center">
-              <span className="text-2xl">{icon}</span>
+          {quickLinks.map(([text, to, Icon]) => (
+            <button key={to} onClick={() => navigate(to)} className="civic-card interactive flex flex-col items-center gap-2 p-4 text-center">
+              <Icon size={24} className="text-civic-600" aria-hidden="true" />
               <span className="text-xs font-bold text-ink">{text}</span>
             </button>
           ))}

@@ -1,6 +1,27 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>CivicSync</title></head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c1b30" />
+    <meta name="description" content="CivicSync — civic technology and public safety administration platform." />
+    <title>CivicSync</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
+    />
+    <script>
+      // Apply the saved theme before first paint to avoid a light flash.
+      try {
+        const stored = localStorage.getItem('civicsync.theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (stored === 'dark' || (stored !== 'light' && stored !== 'dark' && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (error) { /* storage unavailable — fall back to light */ }
+    </script>
+  </head>
   <body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body>
 </html>
-

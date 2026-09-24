@@ -67,6 +67,13 @@ export default function ReportForm({ report, onSave, onCancel, busy }) {
     e.preventDefault();
     if (values.title.trim().length < 3 || values.description.trim().length < 10) return setError('Use a title of at least 3 characters and a description of at least 10 characters.');
     if (!values.departmentName.trim()) return setError('Choose the responsible department.');
+    const hasLatitude = String(values.latitude).trim() !== '';
+    const hasLongitude = String(values.longitude).trim() !== '';
+    if (hasLatitude !== hasLongitude) return setError('Provide both latitude and longitude, or leave both blank.');
+    if (hasLatitude) {
+      const latitude = Number(values.latitude); const longitude = Number(values.longitude);
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) return setError('Enter valid latitude and longitude values.');
+    }
     if (files.length > maxFiles) return setError(`Upload up to ${maxFiles} files per report.`);
     if (files.some((file) => !allowedTypes.has(file.type))) return setError('Only JPG, PNG, WebP, MP4, WebM, and MOV files are allowed.');
     if (files.some((file) => file.size > maxFileSize)) return setError('Each media file must be 25 MB or smaller.');

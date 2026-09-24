@@ -1,24 +1,174 @@
 @import "tailwindcss";
 
-@theme { --color-civic-50: #eff6ff; --color-civic-100: #dbeafe; --color-civic-200: #bfdbfe; --color-civic-300: #93c5fd; --color-civic-400: #60a5fa; --color-civic-500: #3b82f6; --color-civic-600: #2563eb; --color-civic-700: #1d4ed8; --color-ink: #0f2747; --color-teal-50: #f0fdfa; --color-teal-600: #0f766e; }
-@layer base { html { scroll-behavior: smooth; } body { @apply min-h-screen bg-slate-50 font-sans text-slate-800 antialiased; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; } button, a, input, select, textarea { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-500 focus-visible:ring-offset-2; } button:not(:disabled), a { -webkit-tap-highlight-color: transparent; } input, textarea, select { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-civic-500 focus:ring-2 focus:ring-civic-500/20; } button:disabled { @apply cursor-not-allowed opacity-60; } }
+/* ---------------------------------------------------------------------------
+   CivicSync design tokens
+   ---------------------------------------------------------------------------
+   Semantic tokens (app / surface / line / fg / muted) resolve through runtime
+   CSS variables declared in `:root` and `.dark`, so every component that uses
+   `bg-surface`, `text-fg` or `border-line` follows the active theme without a
+   single duplicated class.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-civic-50: #eff6ff;
+  --color-civic-100: #dbeafe;
+  --color-civic-200: #bfdbfe;
+  --color-civic-300: #93c5fd;
+  --color-civic-400: #60a5fa;
+  --color-civic-500: #3b82f6;
+  --color-civic-600: #2563eb;
+  --color-civic-700: #1d4ed8;
+  --color-ink: #0f2747;
+  --color-teal-50: #f0fdfa;
+  --color-teal-600: #0f766e;
+
+  /* Typography */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Spacing rhythm used by the administration shell */
+  --spacing-admin: 20px;
+
+  /* Named radius tokens (core radius scale is left untouched so existing
+     screens keep their current geometry). */
+  --radius-card: 12px;
+  --radius-shell: 16px;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(.32, .72, 0, 1);
+  --dur-fast: 130ms;
+  --dur-normal: 200ms;
+  --dur-complex: 300ms;
+}
+
+@theme inline {
+  --color-app: var(--app-bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+}
+
+/* Class-based dark mode so the preference persists across reloads. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --app-bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --line: #e3e8ef;
+  --line-strong: #cbd5e1;
+  --fg: #0f2747;
+  --fg-muted: #55657c;
+  --fg-subtle: #8394a9;
+  --skeleton-base: #e8ecf3;
+  --skeleton-shine: rgba(255, 255, 255, .72);
+  --sidebar-bg: #0c1b30;
+  --sidebar-fg: #c7d3e4;
+  --sidebar-active: rgba(37, 99, 235, .22);
+  --shadow-token: 0 1px 2px rgba(15, 39, 71, .05), 0 8px 24px -18px rgba(15, 39, 71, .35);
+  color-scheme: light;
+}
+
+.dark {
+  --app-bg: #070d18;
+  --surface: #101a2c;
+  --surface-2: #0c1524;
+  --line: #223046;
+  --line-strong: #33445e;
+  --fg: #e9eef7;
+  --fg-muted: #a3b1c6;
+  --fg-subtle: #7d8ca3;
+  --skeleton-base: #1b2739;
+  --skeleton-shine: rgba(255, 255, 255, .07);
+  --sidebar-bg: #060c16;
+  --sidebar-fg: #a9b8cd;
+  --sidebar-active: rgba(59, 130, 246, .26);
+  --shadow-token: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 30px -20px rgba(0, 0, 0, .75);
+  color-scheme: dark;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    @apply min-h-screen font-sans antialiased;
+    background-color: var(--app-bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.01em; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  button, a, input, select, textarea { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic-500 focus-visible:ring-offset-2; }
+  .dark button, .dark a, .dark input, .dark select, .dark textarea { --tw-ring-offset-color: var(--surface); }
+  button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
+  input, textarea, select {
+    @apply w-full rounded-lg px-3 py-2.5 text-sm outline-none transition;
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
+    color: var(--fg);
+    transition-duration: var(--dur-fast);
+  }
+  input::placeholder, textarea::placeholder { color: var(--fg-subtle); }
+  input:focus, textarea:focus, select:focus { border-color: var(--color-civic-500); box-shadow: 0 0 0 3px rgba(59, 130, 246, .18); }
+  button:disabled { @apply cursor-not-allowed opacity-60; }
+  ::selection { background: rgba(37, 99, 235, .22); }
+}
 
 @keyframes civic-fade-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes civic-scale-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
 @keyframes civic-marker { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.55); opacity: .45; } }
 @keyframes civic-sos { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+@keyframes civic-shimmer { 100% { transform: translateX(100%); } }
+@keyframes civic-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes civic-drawer-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes civic-modal-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes civic-toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes civic-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
 @layer components {
-  .civic-card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
-  .civic-page-heading { @apply text-2xl font-bold tracking-tight text-ink sm:text-3xl; }
-  .civic-primary { @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-civic-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-civic-700 active:scale-[.98]; }
-  .civic-secondary { @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-civic-300 hover:bg-civic-50; }
-  .status-success { @apply bg-emerald-50 text-emerald-700; }
-  .status-warning { @apply bg-amber-50 text-amber-700; }
-  .status-danger { @apply bg-red-50 text-red-700; }
-  .interactive { transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, color 180ms ease, border-color 180ms ease; }
-  .interactive:hover { transform: scale(1.02); }
-  .interactive:active { transform: scale(.98); }
+  .civic-card { background-color: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-token); }
+  .civic-page-heading { font-family: var(--font-display); font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; color: var(--fg); }
+  .civic-section-title { font-family: var(--font-display); font-size: 1.0625rem; font-weight: 600; color: var(--fg); }
+
+  /* Buttons — one system, four intents, three sizes */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; font-weight: 600; font-size: .875rem; padding: 9px 14px; border: 1px solid transparent; transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn-primary { background-color: var(--color-civic-600); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background-color: var(--color-civic-700); }
+  .btn-secondary { background-color: var(--surface); border-color: var(--line-strong); color: var(--fg); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--color-civic-300); background-color: var(--surface-2); }
+  .btn-ghost { background-color: transparent; color: var(--fg-muted); }
+  .btn-ghost:hover:not(:disabled) { background-color: var(--surface-2); color: var(--fg); }
+  .btn-danger { background-color: #dc2626; color: #fff; }
+  .btn-danger:hover:not(:disabled) { background-color: #b91c1c; }
+  .btn-sm { padding: 6px 10px; font-size: .8125rem; border-radius: 8px; }
+  .btn-icon { padding: 8px; border-radius: 10px; }
+  .civic-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 10px; padding: 9px 16px; font-size: .875rem; font-weight: 600; background-color: var(--color-civic-600); color: #fff; transition: background-color var(--dur-fast) var(--ease-standard); }
+  .civic-primary:hover:not(:disabled) { background-color: var(--color-civic-700); }
+  .civic-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 10px; padding: 9px 16px; font-size: .875rem; font-weight: 600; background-color: var(--surface); border: 1px solid var(--line-strong); color: var(--fg); transition: border-color var(--dur-fast) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard); }
+  .civic-secondary:hover:not(:disabled) { border-color: var(--color-civic-300); background-color: var(--surface-2); }
+
+  /* Semantic status surfaces (always paired with a label or icon) */
+  .status-success { background-color: color-mix(in oklab, #10b981 14%, var(--surface)); color: #047857; }
+  .status-warning { background-color: color-mix(in oklab, #f59e0b 16%, var(--surface)); color: #b45309; }
+  .status-danger { background-color: color-mix(in oklab, #ef4444 14%, var(--surface)); color: #b91c1c; }
+  .status-info { background-color: color-mix(in oklab, #3b82f6 14%, var(--surface)); color: #1d4ed8; }
+  .status-neutral { background-color: var(--surface-2); color: var(--fg-muted); }
+  .status-high { background-color: color-mix(in oklab, #f97316 16%, var(--surface)); color: #c2410c; }
+  .status-medium { background-color: color-mix(in oklab, #eab308 18%, var(--surface)); color: #a16207; }
+  .status-muted { background-color: var(--surface-2); color: var(--fg-subtle); }
+  .dark .status-high { color: #fdba74; }
+  .dark .status-medium { color: #fde047; }
+  .dark .status-success { color: #6ee7b7; }
+  .dark .status-warning { color: #fcd34d; }
+  .dark .status-danger { color: #fca5a5; }
+  .dark .status-info { color: #93c5fd; }
+}
+
+@layer components {
+  .interactive { transition: transform var(--dur-normal) var(--ease-standard), box-shadow var(--dur-normal) var(--ease-standard), background-color var(--dur-normal) var(--ease-standard), color var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard); }
   .hero-kicker { animation: civic-fade-up .45s ease-out both; }
   .hero-title { animation: civic-fade-up .62s .1s ease-out both; }
   .hero-description { animation: civic-fade-up .56s .24s ease-out both; }
@@ -26,9 +176,120 @@
   .hero-visual { animation: civic-scale-in .68s .18s ease-out both; }
   .hero-marker { animation: civic-marker 2.8s ease-in-out infinite; transform-origin: center; }
   .sos-pulse { animation: civic-sos 2.6s ease-in-out infinite; }
+
+  /* Page, drawer, modal, menu and toast entrances */
+  .page-enter { animation: civic-page-in var(--dur-normal) var(--ease-standard) both; }
+  .drawer-panel { animation: civic-drawer-in var(--dur-normal) var(--ease-standard) both; }
+  .modal-panel { animation: civic-modal-in var(--dur-normal) var(--ease-standard) both; }
+  .menu-panel { animation: civic-menu-in var(--dur-fast) var(--ease-standard) both; }
+  .toast-panel { animation: civic-toast-in var(--dur-normal) var(--ease-standard) both; }
+
+  /* Skeleton loading system */
+  .skeleton { position: relative; overflow: hidden; background-color: var(--skeleton-base); border-radius: 8px; }
+  .skeleton::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background-image: linear-gradient(90deg, transparent, var(--skeleton-shine), transparent); animation: civic-shimmer 1.5s var(--ease-standard) infinite; }
+
+  /* Enterprise table */
+  .data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .875rem; }
+  .data-table thead th { position: sticky; top: 0; z-index: 1; background-color: var(--surface-2); color: var(--fg-muted); font-size: .6875rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .data-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--line); color: var(--fg); vertical-align: middle; }
+  .data-table tbody tr { transition: background-color var(--dur-fast) var(--ease-standard); }
+  .data-table tbody tr:hover { background-color: var(--surface-2); }
+  .data-table tbody tr:last-child td { border-bottom: 0; }
+
+  .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px; font-size: .75rem; font-weight: 600; border: 1px solid transparent; }
+
+  /* Sidebar navigation */
+  .nav-group-label { font-size: .6875rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: color-mix(in oklab, var(--sidebar-fg) 60%, transparent); padding: 14px 12px 6px; }
+  .nav-item { position: relative; display: flex; align-items: center; gap: 10px; border-radius: 10px; padding: 9px 11px; font-size: .875rem; font-weight: 550; color: var(--sidebar-fg); transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard); }
+  .nav-item:hover { background-color: rgba(255, 255, 255, .07); color: #fff; }
+  .nav-item-active { background-color: var(--sidebar-active); color: #fff; }
+  .nav-item-active::before { content: ''; position: absolute; left: -11px; width: 3px; height: 20px; border-radius: 0 3px 3px 0; background-color: var(--color-civic-400); }
 }
+
+/* ---------------------------------------------------------------------------
+   Dark-mode bridge for legacy utility classes.
+   The administration surface is built directly on semantic tokens, but older
+   pages across CivicSync still use raw slate/white utilities. These rules sit
+   outside every cascade layer, so they win over the layered utilities and the
+   whole product follows the theme instead of showing white cards on a dark
+   shell.
+--------------------------------------------------------------------------- */
+.dark .bg-white { background-color: var(--surface); }
+.dark .bg-slate-50 { background-color: var(--surface); }
+.dark .bg-slate-100 { background-color: var(--surface-2); }
+.dark .bg-slate-200 { background-color: var(--line); }
+.dark .bg-white\/95 { background-color: color-mix(in oklab, var(--surface) 95%, transparent); }
+.dark .bg-white\/80 { background-color: color-mix(in oklab, var(--surface) 80%, transparent); }
+.dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-300, .dark .ring-slate-200 { border-color: var(--line); }
+.dark .ring-slate-200 { --tw-ring-color: var(--line); }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]), .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]), .dark .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: var(--line); }
+.dark .text-ink, .dark .text-slate-900, .dark .text-slate-800 { color: var(--fg); }
+.dark .text-slate-700, .dark .text-slate-600 { color: var(--fg-muted); }
+.dark .text-slate-500, .dark .text-slate-400 { color: var(--fg-subtle); }
+.dark .bg-civic-50, .dark .hover\:bg-civic-50:hover { background-color: color-mix(in oklab, #3b82f6 16%, var(--surface)); }
+.dark .bg-civic-100 { background-color: color-mix(in oklab, #3b82f6 26%, var(--surface)); }
+.dark .text-civic-700, .dark .text-civic-600, .dark .text-civic-800 { color: #93c5fd; }
+.dark .hover\:bg-slate-50:hover, .dark .hover\:bg-slate-100:hover { background-color: var(--surface-2); }
+.dark .hover\:border-civic-300:hover { border-color: var(--color-civic-500); }
+.dark .bg-emerald-50 { background-color: color-mix(in oklab, #10b981 16%, var(--surface)); }
+.dark .bg-red-50, .dark .bg-rose-50 { background-color: color-mix(in oklab, #ef4444 16%, var(--surface)); }
+.dark .bg-amber-50 { background-color: color-mix(in oklab, #f59e0b 18%, var(--surface)); }
+.dark .bg-orange-50 { background-color: color-mix(in oklab, #f97316 18%, var(--surface)); }
+.dark .bg-sky-50 { background-color: color-mix(in oklab, #0ea5e9 16%, var(--surface)); }
+.dark .bg-indigo-50 { background-color: color-mix(in oklab, #6366f1 16%, var(--surface)); }
+.dark .bg-purple-50 { background-color: color-mix(in oklab, #a855f7 16%, var(--surface)); }
+.dark .border-emerald-200, .dark .border-red-200, .dark .border-rose-200 { border-color: var(--line); }
+.dark .text-emerald-700, .dark .text-emerald-800 { color: #6ee7b7; }
+.dark .text-red-700, .dark .text-rose-700, .dark .text-rose-800 { color: #fca5a5; }
+.dark .text-amber-700 { color: #fcd34d; }
+.dark .text-orange-700 { color: #fdba74; }
+.dark .text-sky-700 { color: #7dd3fc; }
+.dark .text-indigo-700 { color: #a5b4fc; }
+.dark .text-purple-700 { color: #d8b4fe; }
+.dark .bg-slate-950\/30, .dark .bg-slate-950\/35, .dark .bg-slate-950\/40, .dark .bg-slate-950\/45 { background-color: rgba(2, 6, 16, .68); }
+.dark .bg-ink\/45 { background-color: rgba(2, 6, 16, .68); }
+
+/* Smart map markers: semantic pins, current-location halo and cluster badges. */
+.civic-map-marker-wrapper, .civic-map-cluster-wrapper { background: transparent; border: 0; }
+.civic-map-marker { display: grid; place-items: center; width: 36px; height: 36px; border: 3px solid white; border-radius: 50% 50% 50% 8px; background: var(--marker-color); color: white; box-shadow: 0 5px 14px rgba(15, 23, 42, .32); transform: rotate(-45deg); font-size: 10px; font-weight: 900; letter-spacing: -.02em; }
+.civic-map-marker > span { transform: rotate(45deg); }
+.civic-map-marker--emergency { width: 40px; height: 40px; font-size: 18px; }
+.civic-map-marker.is-selected { outline: 4px solid color-mix(in oklab, var(--marker-color) 30%, transparent); transform: rotate(-45deg) scale(1.12); }
+.civic-user-marker { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(37, 99, 235, .18); border: 2px solid rgba(37, 99, 235, .35); }
+.civic-user-marker > span { width: 14px; height: 14px; border-radius: 50%; background: #2563eb; border: 3px solid white; box-shadow: 0 2px 8px rgba(37, 99, 235, .5); }
+.civic-map-cluster { display: grid; place-items: center; width: var(--cluster-size); height: var(--cluster-size); border-radius: 50%; background: rgba(37, 99, 235, .9); color: white; border: 4px solid rgba(255, 255, 255, .9); box-shadow: 0 6px 18px rgba(15, 23, 42, .3); font-size: 12px; font-weight: 900; }
+.dark .civic-map-marker { border-color: var(--surface); }
+.dark .civic-user-marker > span { border-color: var(--surface); }
+
+
+/* Leaflet stays usable in dark mode: tiles are inverted, popups use surfaces. */
+.dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.86) contrast(.92) saturate(.7); }
+.dark .leaflet-container { background-color: #0b1420; }
+.dark .leaflet-popup-content-wrapper, .dark .leaflet-popup-tip { background-color: var(--surface); color: var(--fg); box-shadow: var(--shadow-token); }
+.dark .leaflet-bar a { background-color: var(--surface); color: var(--fg); border-color: var(--line); }
+.dark .leaflet-control-attribution { background-color: color-mix(in oklab, var(--surface) 85%, transparent) !important; color: var(--fg-subtle) !important; }
+.dark .leaflet-control-attribution a { color: var(--color-civic-400) !important; }
+
+/* Scrollbars — subtle, theme-aware, never a visual noise source. */
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: var(--line-strong); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+
+/* Command palette / global search input: sits inside a bordered container. */
+.search-input { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 4px 0 !important; color: var(--fg); font-size: .95rem; }
+.search-input:focus { box-shadow: none !important; }
+
+/* Screen-reader utility used by skeleton and live regions. */
+.sr-only-focusable:focus { position: static; width: auto; height: auto; padding: 8px; margin: 0; overflow: visible; clip: auto; white-space: normal; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .skeleton::after { display: none; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
 }

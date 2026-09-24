@@ -27,6 +27,8 @@ export const reportsApi = {
   mine: (params) => api.get('/reports/my', { params }),
   stats: () => api.get('/reports/my/stats'),
   get: (id) => api.get(`/reports/${id}`),
+  verifyResolution: (id, payload) => api.post(`/reports/${id}/verify-resolution`, payload),
+  feedback: (id, payload) => api.post(`/reports/${id}/feedback`, payload),
   update: (id, payload) => api.put(`/reports/${id}`, toReportFormData(payload), multipartConfig),
   remove: (id) => api.delete(`/reports/${id}`)
 };

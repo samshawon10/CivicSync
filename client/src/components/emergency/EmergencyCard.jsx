@@ -2,6 +2,8 @@ import { label } from '../../services/emergencyService.js';
 import SeverityBadge from './SeverityBadge.jsx';
 import EmergencyStatusBadge from './EmergencyStatusBadge.jsx';
 
+const slaLabel = (sla) => ({ on_track: 'SLA on track', warning: 'SLA warning', breached: 'SLA breached', resolved: 'SLA resolved', unknown: 'SLA unknown' }[sla?.state] || 'SLA unavailable');
+
 export function EmptyState({ title, hint, action }) {
   return <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center"><p className="font-bold text-ink">{title}</p>{hint && <p className="mt-1 text-sm text-slate-500">{hint}</p>}{action && <div className="mt-4">{action}</div>}</div>;
 }
@@ -24,6 +26,7 @@ export default function EmergencyCard({ emergency, onOpen, footer }) {
           <p className="text-xs font-black text-red-700">{emergency.emergencyId}</p>
           <SeverityBadge value={emergency.severity} />
           <EmergencyStatusBadge value={emergency.status} />
+          {emergency.sla && <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${emergency.sla.state === 'breached' ? 'bg-red-100 text-red-700' : emergency.sla.state === 'warning' ? 'bg-amber-100 text-amber-800' : emergency.sla.state === 'resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{slaLabel(emergency.sla)}</span>}
           {emergency.visibility === 'restricted' && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-purple-700">Restricted</span>}
         </div>
         <h3 className="mt-1 truncate font-bold text-ink">{emergency.title}</h3>

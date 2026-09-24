@@ -10,7 +10,7 @@ const statuses = ['active', 'suspended'];
 function safeUser(user) { return user.toSafeObject(); }
 
 function logActivity(admin, action, targetType, targetId, targetName, description, metadata = {}) {
-  return ActivityLog.create({ admin, action, targetType, targetId, targetName, description, metadata }).catch(() => {});
+  return ActivityLog.create({ admin, actorRole: admin.role || '', action, targetType, targetId, targetName, description, metadata, result: 'success' }).catch(() => {});
 }
 
 export async function listUsers(req, res, next) {
@@ -82,7 +82,7 @@ export async function deleteUser(req, res, next) {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
     if (user.role === 'admin') return res.status(400).json({ success: false, message: 'Administrator accounts cannot be deleted.' });
-    await ActivityLog.create({ admin: req.user._id, action: 'user_deleted', targetType: 'user', targetId: user._id, targetName: user.name, description: 'User ' + user.name + ' (' + user.email + ') was deleted.' });
+    await logActivity(req.user, 'user_deleted', 'user', user._id, user.name, 'User ' + user.name + ' (' + user.email + ') was deleted.');
     await User.deleteOne({ _id: user._id });
     res.json({ success: true, message: 'User deleted.' });
   } catch (error) { next(error); }

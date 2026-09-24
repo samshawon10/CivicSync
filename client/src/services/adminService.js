@@ -1,10 +1,55 @@
 import api from './api.js';
 
+/**
+ * Super Admin API surface. Every method maps to an existing backend route —
+ * nothing here is stubbed or mocked.
+ */
 export const adminApi = {
-  dashboard: (params) => api.get('/admin/dashboard', { params }), analytics: (params) => api.get('/admin/analytics', { params }),
-  users: (params) => api.get('/admin/users', { params }), user: (id) => api.get(`/admin/users/${id}`), selectUsers: (q) => api.get('/admin/users/select', { params: { q } }), updateUserRole: (id, payload) => api.patch(`/admin/users/${id}/role`, payload), updateUserStatus: (id, status) => api.patch(`/admin/users/${id}/status`, { status }), deleteUser: (id) => api.delete(`/admin/users/${id}`),
-  departments: (params) => api.get('/admin/departments', { params }), department: (id) => api.get(`/admin/departments/${id}`), createDepartment: (payload) => api.post('/admin/departments', payload), updateDepartment: (id, payload) => api.patch(`/admin/departments/${id}`, payload), assignHead: (id, userId) => api.post(`/admin/departments/${id}/head`, { userId }), deleteDepartment: (id) => api.delete(`/admin/departments/${id}`),
+  // Overview, governance and intelligence
+  dashboard: (params) => api.get('/admin/dashboard', { params }),
+  analytics: (params) => api.get('/admin/analytics', { params }),
+  governance: (params) => api.get('/admin/governance', { params }),
+  operationsAnalytics: (params) => api.get('/admin/analytics/operations', { params }),
+  systemHealth: () => api.get('/admin/system-health'),
+  permissions: () => api.get('/admin/permissions'),
+  search: (q, config) => api.get('/admin/search', { params: { q }, ...config }),
+  categoryGovernance: () => api.get('/admin/governance/categories'),
+
+  // Users
+  users: (params) => api.get('/admin/users', { params }),
+  user: (id) => api.get(`/admin/users/${id}`),
+  selectUsers: (q) => api.get('/admin/users/select', { params: { q } }),
+  updateUserRole: (id, payload) => api.patch(`/admin/users/${id}/role`, payload),
+  updateUserStatus: (id, status) => api.patch(`/admin/users/${id}/status`, { status }),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
+
+  // Departments
+  departments: (params) => api.get('/admin/departments', { params }),
+  department: (id) => api.get(`/admin/departments/${id}`),
+  createDepartment: (payload) => api.post('/admin/departments', payload),
+  updateDepartment: (id, payload) => api.patch(`/admin/departments/${id}`, payload),
+  assignHead: (id, userId) => api.post(`/admin/departments/${id}/head`, { userId }),
+  assignEmergencyHead: (id, userId) => api.post(`/admin/departments/${id}/emergency-head`, { userId }),
+  updateEmergencyRouting: (id, payload) => api.patch(`/admin/departments/${id}/emergency-routing`, payload),
+  deleteDepartment: (id) => api.delete(`/admin/departments/${id}`),
   citizenDepartments: () => api.get('/admin/departments/citizen-list'),
-  complaints: (params) => api.get('/admin/complaints', { params }), complaint: (id) => api.get(`/admin/complaints/${id}`), updateComplaint: (id, payload) => api.patch(`/admin/complaints/${id}`, payload), deleteComplaint: (id) => api.delete(`/admin/complaints/${id}`),
-  emergencies: (params) => api.get('/admin/emergencies', { params }), updateEmergency: (id, payload) => api.patch(`/admin/emergencies/${id}`, payload), logs: (params) => api.get('/admin/activity-logs', { params }), settings: () => api.get('/admin/settings'), updateSettings: (payload) => api.patch('/admin/settings', payload), exportUrl: (type) => `${api.defaults.baseURL}/admin/reports/export?type=${type}`
+
+  // Complaints
+  complaints: (params) => api.get('/admin/complaints', { params }),
+  complaint: (id) => api.get(`/admin/complaints/${id}`),
+  updateComplaint: (id, payload) => api.patch(`/admin/complaints/${id}`, payload),
+  deleteComplaint: (id) => api.delete(`/admin/complaints/${id}`),
+
+  // Emergency oversight
+  emergencies: (params) => api.get('/admin/emergencies', { params }),
+  emergency: (id) => api.get(`/admin/emergencies/${id}`),
+  updateEmergency: (id, payload) => api.patch(`/admin/emergencies/${id}`, payload),
+
+  // Audit trail, export and configuration
+  logs: (params) => api.get('/admin/activity-logs', { params }),
+  settings: () => api.get('/admin/settings'),
+  updateSettings: (payload) => api.patch('/admin/settings', payload),
+  exportUrl: (type) => `${api.defaults.baseURL}/admin/reports/export?type=${type}`
 };
+
+export default adminApi;

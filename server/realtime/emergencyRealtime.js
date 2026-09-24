@@ -31,3 +31,18 @@ export function emitEmergencyEvent(event, payload, { userIds = [], roles = [] } 
   for (const userId of userIds.map(normalizeId).filter(Boolean)) io.to(`user:${userId}`).emit(event, payload);
   for (const role of roles.filter(Boolean)) io.to(`role:${role}`).emit(event, payload);
 }
+
+/**
+ * Real Socket.IO status for the Super Admin system-health card.
+ * Reports only what the server can actually observe — never a fabricated
+ * "connected" state.
+ */
+export function realtimeStatus() {
+  if (!io) return { initialized: false, connections: null, rooms: null };
+  const sockets = io.sockets?.sockets;
+  return {
+    initialized: true,
+    connections: sockets?.size ?? 0,
+    rooms: io.sockets?.adapter?.rooms?.size ?? null
+  };
+}

@@ -1,3 +1,4 @@
+import { LocateFixed } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import CitizenLayout from '../../components/citizen/CitizenLayout.jsx';
@@ -98,8 +99,8 @@ export default function CreateEmergency() {
           <fieldset className="space-y-3 border-t border-slate-100 pt-4">
             <legend className="text-sm font-black text-ink">Location</legend>
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={captureGps} className="civic-secondary">{geolocation.loading ? 'Locating…' : '📍 Capture my location'}</button>
-              {coords && <span className="text-xs font-bold text-emerald-700">✓ GPS captured ({coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)})</span>}
+              <button type="button" onClick={captureGps} className="civic-secondary inline-flex items-center justify-center gap-2"><LocateFixed size={16} /> {geolocation.loading ? 'Locating…' : 'Capture my location'}</button>
+        {coords && <span className="text-xs font-bold text-emerald-700">✓ GPS captured ({coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}){Number.isFinite(Number(coords.accuracy)) ? ` · ±${Math.round(Number(coords.accuracy))} m` : ''}</span>}
               {gpsError && <span className="text-xs font-bold text-amber-700">{gpsError}</span>}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -108,7 +109,7 @@ export default function CreateEmergency() {
             </div>
             <div className="rounded-lg border border-slate-200 p-2">
               <p className="mb-1 text-xs font-bold text-slate-500">Or tap the map to pin the exact spot (optional)</p>
-              <EmergencyMap height="h-64" emergencies={coords ? [{ _id: 'pinned', emergencyId: 'Pinned', title: 'Selected location', category: 'other', severity: 'low', status: 'reported', createdAt: new Date().toISOString(), location: { latitude: coords.latitude, longitude: coords.longitude } }] : []} showControls={false} autoFit={Boolean(coords)} onMapClick={(point) => setCoords(point)} />
+              <EmergencyMap height="h-64" userLocation={coords} showControls={false} autoFit={Boolean(coords)} onMapClick={(point) => setCoords(point)} />
             </div>
           </fieldset>
 

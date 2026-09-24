@@ -26,11 +26,16 @@ export default function useGeolocation({ auto = false, timeout = 10000 } = {}) {
     setError('');
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const next = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        const next = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy ?? null,
+          timestamp: position.timestamp || Date.now()
+        };
         setLocation(next);
         setAccuracy(position.coords.accuracy ?? null);
         setLoading(false);
-        resolve({ ok: true, location: next, accuracy: position.coords.accuracy ?? null });
+        resolve({ ok: true, location: next });
       },
       (err) => {
         const message = err.code === err.PERMISSION_DENIED
@@ -51,10 +56,15 @@ export default function useGeolocation({ auto = false, timeout = 10000 } = {}) {
     if (watchId.current !== null) return true;
     watchId.current = navigator.geolocation.watchPosition(
       (position) => {
-        const next = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        const next = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy ?? null,
+          timestamp: position.timestamp || Date.now()
+        };
         setLocation(next);
         setAccuracy(position.coords.accuracy ?? null);
-        if (onUpdate) onUpdate({ ...next, accuracy: position.coords.accuracy ?? null });
+        if (onUpdate) onUpdate(next);
       },
       () => setError('Live location updates are unavailable. Check device location settings.'),
       { enableHighAccuracy: true, maximumAge: 5000 }

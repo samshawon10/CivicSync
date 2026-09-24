@@ -46,11 +46,24 @@ export const emergencyApi = {
   deleteContact: (id) => api.delete(`/emergency-contacts/${id}`)
 };
 
-export const facilityTypes = ['hospital', 'police', 'fire_station', 'ambulance', 'shelter', 'safe_point'];
+export const facilityGroups = [
+  { key: 'emergency', label: 'Emergency', types: ['emergency_center', 'ambulance', 'fire_station'] },
+  { key: 'safety', label: 'Safety', types: ['police', 'safe_point', 'shelter', 'flood_shelter', 'hazard', 'road_blockage'] },
+  { key: 'healthcare', label: 'Healthcare', types: ['hospital', 'pharmacy', 'clinic', 'first_aid_center'] },
+  { key: 'community', label: 'Civic / Community', types: ['mosque', 'school', 'government_office', 'help_center', 'safe_water_point', 'public_toilet'] }
+];
+
+export const facilityTypeLabels = {
+  emergency_center: 'Emergency Center', ambulance: 'Ambulance', fire_station: 'Fire Station', police: 'Police Station', safe_point: 'Safe Point', shelter: 'Emergency Shelter', flood_shelter: 'Flood Shelter', hazard: 'Hazard / Dangerous Area', road_blockage: 'Road Blockage', hospital: 'Hospital', pharmacy: 'Pharmacy', clinic: 'Clinic', first_aid_center: 'First Aid Center', mosque: 'Mosque', school: 'School', government_office: 'Government Office', help_center: 'Help Center', safe_water_point: 'Safe Water Point', public_toilet: 'Public Toilet'
+};
+
+export const facilityTypes = Object.keys(facilityTypeLabels);
+export const nearestHelpTypes = ['police', 'ambulance', 'hospital', 'fire_station', 'safe_point', 'shelter', 'pharmacy'];
 
 export const facilitiesApi = {
+  catalog: () => api.get('/emergency-services/catalog'),
   list: (params) => api.get('/emergency-services', { params }),
-  nearby: (params) => api.get('/emergency-services/nearby', { params }),
+  nearby: (params) => api.get('/emergency-services/nearby', { params: { ...params, ...(Array.isArray(params?.types) ? { types: params.types.join(',') } : {}) } }),
   create: (payload) => api.post('/emergency-services', payload),
   update: (id, payload) => api.patch(`/emergency-services/${id}`, payload),
   remove: (id) => api.delete(`/emergency-services/${id}`)
@@ -62,6 +75,16 @@ export const responseTeamsApi = {
   update: (id, payload) => api.patch(`/response-teams/${id}`, payload),
   remove: (id) => api.delete(`/response-teams/${id}`)
 };
+
+export function directionsUrl(destination, origin) {
+  if (!destination || !Number.isFinite(Number(destination.latitude)) || !Number.isFinite(Number(destination.longitude))) return '';
+  const to = `${Number(destination.latitude).toFixed(6)},${Number(destination.longitude).toFixed(6)}`;
+  const params = new URLSearchParams({ engine: 'fossgis_osrm_car', to });
+  if (origin && Number.isFinite(Number(origin.latitude)) && Number.isFinite(Number(origin.longitude))) {
+    params.set('from', `${Number(origin.latitude).toFixed(6)},${Number(origin.longitude).toFixed(6)}`);
+  }
+  return `https://www.openstreetmap.org/directions?${params.toString()}`;
+}
 
 export const label = (value = '') => String(value || '').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 

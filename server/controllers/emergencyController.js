@@ -8,11 +8,14 @@ import EmergencyResponseAssignment from '../models/EmergencyResponseAssignment.j
 import EmergencyResponderLocation from '../models/EmergencyResponderLocation.js';
 import ResponseTeam from '../models/ResponseTeam.js';
 import Notification from '../models/Notification.js';
+import SystemSetting from '../models/SystemSetting.js';
 import ActivityLog from '../models/ActivityLog.js';
 import User from '../models/User.js';
 import { emergencyUploadDir } from '../middleware/uploadMiddleware.js';
 import { emitEmergencyEvent } from '../realtime/emergencyRealtime.js';
 import { canTransitionAssignment, canTransitionEmergency } from '../services/emergencyLifecycle.js';
+import { evaluateEmergencySla } from '../services/emergencySla.js';
+import { sanitizeSettings } from '../config/settingsDefaults.js';
 import { activeEmergencyStatuses, assignmentStatuses, emergencyCategories, emergencyRoleGroups, emergencySeverities, emergencyStatuses, emergencyTypeCatalog, responseTypes, sensitiveCategories } from '../config/emergencyOptions.js';
 import { haversineKm, isSensitiveCategory, suggestEmergencyClassification, suggestedTeamTypes } from '../services/emergencyIntelligence.js';
 
@@ -44,7 +47,7 @@ function responseStatus(status) {
 }
 async function audit(user, action, emergency, description = '', targetType = 'emergency') {
   if (!user?._id) return;
-  await ActivityLog.create({ admin: user._id, action, targetType, targetId: emergency._id, targetName: emergency.emergencyId || emergency.title, description }).catch(() => {});
+  await ActivityLog.create({ admin: user._id, actorRole: user.role || '', action, targetType, targetId: emergency._id, targetName: emergency.emergencyId || emergency.title, description, result: 'success' }).catch(() => {});
 }
 async function notify(recipient, emergency, message) {
   if (!recipient) return;
@@ -60,6 +63,16 @@ async function populatedEmergency(id) {
     .populate('citizen', 'name email phone')
     .populate('emergencyHead', 'name email role')
     .populate({ path: 'responseAssignments', populate: [{ path: 'emergencyOfficer', select: 'name email phone role' }, { path: 'fieldWorkers', select: 'name email phone role' }] });
+}
+async function loadEmergencySettings() {
+  const record = await SystemSetting.findOne({ key: 'admin_portal' }).lean().catch(() => null);
+  return sanitizeSettings(record?.value || {}, {}).settings;
+}
+async function emergencyWithSla(emergency, viewer, summary = false, settingsOverride = null) {
+  const value = emergencyForViewer(emergency, viewer, summary);
+  const settings = settingsOverride || await loadEmergencySettings();
+  value.sla = evaluateEmergencySla(emergency, settings);
+  return value;
 }
 function emergencyForViewer(emergency, viewer, summary = false) {
   const value = typeof emergency?.toObject === 'function' ? emergency.toObject() : { ...(emergency || {}) };
@@ -129,8 +142,13 @@ export async function createEmergency(req, res, next) {
     const hasLongitude = longitudeInput !== undefined && longitudeInput !== null && longitudeInput !== '';
     if (hasLatitude !== hasLongitude) return res.status(400).json({ success: false, message: 'Provide both latitude and longitude, or omit both.' });
     if (hasLatitude && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180)) return res.status(400).json({ success: false, message: 'Emergency coordinates must be valid latitude/longitude values.' });
-    const locationValue = { address: clean(location.address || req.body.address, 300), landmark: clean(location.landmark, 150) };
-    if (hasLatitude) Object.assign(locationValue, { latitude, longitude });
+    const accuracy = location.accuracy === undefined || location.accuracy === null || location.accuracy === '' ? null : Number(location.accuracy);
+    if (accuracy !== null && (!Number.isFinite(accuracy) || accuracy < 0)) return res.status(400).json({ success: false, message: 'Location accuracy must be a non-negative number of metres.' });
+    const capturedAtInput = location.timestamp ?? location.capturedAt;
+    const capturedAt = capturedAtInput ? new Date(capturedAtInput) : null;
+    if (capturedAt && Number.isNaN(capturedAt.getTime())) return res.status(400).json({ success: false, message: 'Location capture timestamp is invalid.' });
+    const locationValue = { address: clean(location.address || req.body.address, 300), landmark: clean(location.landmark, 150), accuracy, capturedAt };
+    if (hasLatitude) Object.assign(locationValue, { latitude, longitude, point: { type: 'Point', coordinates: [longitude, latitude] } });
     const source = req.body.notSafe ? 'not_safe' : req.body.sos ? 'sos' : 'report';
     // Advisory classification (rule-based; never auto-applied over an explicit citizen choice).
     const suggestion = suggestEmergencyClassification(clean(req.body.title, 140), clean(req.body.description, 2000));
@@ -162,7 +180,7 @@ export async function createEmergency(req, res, next) {
     res.status(201).json({
       success: true,
       message: 'Emergency command has been notified.',
-      emergency: emergencyForViewer(await populatedEmergency(emergency._id), req.user),
+      emergency: await emergencyWithSla(await populatedEmergency(emergency._id), req.user),
       advisory: { classification: suggestion, note: 'Advisory suggestion only — Emergency Command makes the final classification.' },
       emergencyContacts: { recorded: sosContacts.length, channel: sosContacts.length ? 'recorded_for_command' : 'none', delivery: 'no_sms_gateway_configured' }
     });
@@ -181,11 +199,12 @@ export async function listEmergencies(req, res, next) {
     const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50); const safePage = Math.max(Number(page) || 1, 1);
     const sortOrder = sort === 'oldest' ? { createdAt: 1 } : sort === 'severity' ? { severity: -1, createdAt: -1 } : { createdAt: -1 };
     const [emergencies, total] = await Promise.all([Emergency.find(filter).populate('citizen', 'name').populate({ path: 'responseAssignments', populate: { path: 'emergencyOfficer', select: 'name' } }).sort(sortOrder).skip((safePage - 1) * safeLimit).limit(safeLimit), Emergency.countDocuments(filter)]);
-    res.json({ success: true, emergencies: emergencies.map((item) => emergencyForViewer(item, req.user, true)), pagination: { page: safePage, limit: safeLimit, total, pages: Math.ceil(total / safeLimit) } });
+    const settings = await loadEmergencySettings();
+    res.json({ success: true, emergencies: await Promise.all(emergencies.map((item) => emergencyWithSla(item, req.user, true, settings))), pagination: { page: safePage, limit: safeLimit, total, pages: Math.ceil(total / safeLimit) } });
   } catch (error) { next(error); }
 }
 
-export async function getEmergency(req, res, next) { try { const emergency = await scopedEmergency(req, res); if (emergency) res.json({ success: true, emergency: emergencyForViewer(emergency, req.user) }); } catch (error) { next(error); } }
+export async function getEmergency(req, res, next) { try { const emergency = await scopedEmergency(req, res); if (emergency) res.json({ success: true, emergency: await emergencyWithSla(emergency, req.user) }); } catch (error) { next(error); } }
 
 export async function similarEmergencies(req, res, next) {
   try {
@@ -270,7 +289,19 @@ export async function updateEmergency(req, res, next) {
       const nextLatitude = Number(rawLocation.latitude);
       const nextLongitude = Number(rawLocation.longitude);
       if (hasLatitude && (!Number.isFinite(nextLatitude) || nextLatitude < -90 || nextLatitude > 90 || !Number.isFinite(nextLongitude) || nextLongitude < -180 || nextLongitude > 180)) return res.status(400).json({ success: false, message: 'Emergency coordinates must be valid latitude/longitude values.' });
-      emergency.location = { ...emergency.location.toObject(), address: clean(rawLocation.address, 300), landmark: clean(rawLocation.landmark, 150), ...(hasLatitude ? { latitude: nextLatitude, longitude: nextLongitude } : {}) };
+      const accuracy = rawLocation.accuracy === undefined || rawLocation.accuracy === null || rawLocation.accuracy === '' ? null : Number(rawLocation.accuracy);
+      if (accuracy !== null && (!Number.isFinite(accuracy) || accuracy < 0)) return res.status(400).json({ success: false, message: 'Location accuracy must be a non-negative number of metres.' });
+      const capturedAtInput = rawLocation.timestamp ?? rawLocation.capturedAt;
+      const capturedAt = capturedAtInput ? new Date(capturedAtInput) : null;
+      if (capturedAt && Number.isNaN(capturedAt.getTime())) return res.status(400).json({ success: false, message: 'Location capture timestamp is invalid.' });
+      emergency.location = {
+        ...emergency.location.toObject(),
+        address: clean(rawLocation.address, 300),
+        landmark: clean(rawLocation.landmark, 150),
+        accuracy,
+        capturedAt,
+        ...(hasLatitude ? { latitude: nextLatitude, longitude: nextLongitude, point: { type: 'Point', coordinates: [nextLongitude, nextLatitude] } } : {})
+      };
     }
     emergency.activity.push({ action: command ? 'Emergency details updated by command' : 'Emergency details updated', actorRole: req.user.role, note: clean(req.body.note, 500) });
     await emergency.save();
@@ -388,11 +419,45 @@ export async function dashboard(req, res, next) {
     const statuses = Object.fromEntries(statusRows.map((row) => [row._id, row.count])); const severity = Object.fromEntries(severityRows.map((row) => [row._id, row.count]));
     const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
     const resolvedToday = await Emergency.countDocuments({ ...scope, status: { $in: ['resolved', 'closed'] }, resolvedAt: { $gte: startOfDay } });
-    res.json({ success: true, stats: { total: activeEmergencyStatuses.reduce((sum, status) => sum + (statuses[status] || 0), 0), critical: severity.critical || 0, assigned: activeAssignmentCount, awaitingAssignment: (statuses.reported || 0) + (statuses.received || 0) + (statuses.verified || 0) + (statuses.assessing || 0), responding: (statuses.dispatched || 0) + (statuses.en_route || 0) + (statuses.responding || 0) + (statuses.escalated || 0) + (statuses.requires_backup || 0), onScene: statuses.on_scene || 0, resolvedToday }, recent: recent.map((item) => emergencyForViewer(item, req.user, true)), assignments });
+    const settings = await loadEmergencySettings();
+    res.json({ success: true, stats: { total: activeEmergencyStatuses.reduce((sum, status) => sum + (statuses[status] || 0), 0), critical: severity.critical || 0, assigned: activeAssignmentCount, awaitingAssignment: (statuses.reported || 0) + (statuses.received || 0) + (statuses.verified || 0) + (statuses.assessing || 0), responding: (statuses.dispatched || 0) + (statuses.en_route || 0) + (statuses.responding || 0) + (statuses.escalated || 0) + (statuses.requires_backup || 0), onScene: statuses.on_scene || 0, resolvedToday }, recent: await Promise.all(recent.map((item) => emergencyWithSla(item, req.user, true, settings))), assignments });
   } catch (error) { next(error); }
 }
 
-export async function mapEmergencies(req, res, next) { try { if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Only emergency command can view global active incident locations.' }); const filter = { status: { $in: activeEmergencyStatuses }, 'location.latitude': { $ne: null }, 'location.longitude': { $ne: null } }; if (emergencyCategories.includes(req.query.category)) filter.category = req.query.category; const emergencies = await Emergency.find(filter).select('emergencyId title category severity status location createdAt').sort({ createdAt: -1 }).limit(500).lean(); res.json({ success: true, emergencies }); } catch (error) { next(error); } }
+export async function mapEmergencies(req, res, next) {
+  try {
+    if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Only emergency command can view global active incident locations.' });
+    const filter = { 'location.latitude': { $ne: null }, 'location.longitude': { $ne: null } };
+    if (req.query.category && await validCategory(req.query.category)) filter.category = req.query.category;
+    if (req.query.status === 'all') {
+      // Explicitly all statuses for historical command review.
+    } else if (req.query.status && emergencyStatuses.includes(req.query.status)) {
+      filter.status = req.query.status;
+    } else {
+      filter.status = { $in: activeEmergencyStatuses };
+    }
+    if (req.query.from || req.query.to) {
+      filter.createdAt = {};
+      if (req.query.from && !Number.isNaN(Date.parse(req.query.from))) filter.createdAt.$gte = new Date(req.query.from);
+      if (req.query.to && !Number.isNaN(Date.parse(req.query.to))) {
+        const to = new Date(req.query.to); to.setHours(23, 59, 59, 999); filter.createdAt.$lte = to;
+      }
+      if (!Object.keys(filter.createdAt).length) delete filter.createdAt;
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 1000);
+    const [emergencyRows, total] = await Promise.all([
+      Emergency.find(filter)
+        .select('emergencyId title category severity status location createdAt assignedDepartment emergencyHead responseAssignments')
+        .populate('assignedDepartment', 'name')
+        .populate('emergencyHead', 'name role')
+        .populate('responseAssignments', 'responseType status')
+        .sort({ createdAt: -1 }).limit(limit).lean(),
+      Emergency.countDocuments(filter)
+    ]);
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ success: true, emergencies: emergencyRows, pagination: { total, limit, returned: emergencyRows.length, truncated: total > emergencyRows.length } });
+  } catch (error) { next(error); }
+}
 export async function hotspots(req, res, next) {
   try {
     // Aggregated, anonymized density data only — safe for any authenticated user (staff or citizen).
@@ -401,6 +466,7 @@ export async function hotspots(req, res, next) {
     const since = new Date(Date.now() - days * 86400000);
     const filter = { createdAt: { $gte: since }, 'location.latitude': { $ne: null }, 'location.longitude': { $ne: null } };
     if (!commandAccess(req.user)) filter.visibility = 'standard';
+    if (req.query.activeOnly === 'true' || req.query.activeOnly === true) filter.status = { $in: activeEmergencyStatuses };
     if (emergencyCategories.includes(req.query.category) || (req.query.category && await EmergencyCategory.exists({ key: req.query.category, active: true }))) filter.category = req.query.category;
     const [areas, totalReports] = await Promise.all([
       Emergency.aggregate([
@@ -412,6 +478,7 @@ export async function hotspots(req, res, next) {
       ]),
       Emergency.countDocuments(filter)
     ]);
+    res.set('Cache-Control', 'private, no-store');
     res.json({
       success: true,
       label: 'Reported Incident Area',
@@ -420,7 +487,8 @@ export async function hotspots(req, res, next) {
       totalReports,
       insufficientData: areas.length === 0,
       message: areas.length ? undefined : 'No sufficient reported incident data for the selected period.',
-      areas
+      areas,
+      activeOnly: req.query.activeOnly === 'true' || req.query.activeOnly === true
     });
   } catch (error) { next(error); }
 }

@@ -1,5 +1,10 @@
 import mongoose from 'mongoose';
 
+const pointSchema = new mongoose.Schema({
+  type: { type: String, enum: ['Point'], default: 'Point' },
+  coordinates: { type: [Number], default: undefined }
+}, { _id: false });
+
 const emergencySchema = new mongoose.Schema(
   {
     citizen: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
@@ -17,7 +22,12 @@ const emergencySchema = new mongoose.Schema(
       address: { type: String, trim: true, maxlength: 300, default: '' },
       landmark: { type: String, trim: true, maxlength: 150, default: '' },
       latitude: { type: Number, min: -90, max: 90 },
-      longitude: { type: Number, min: -180, max: 180 }
+      longitude: { type: Number, min: -180, max: 180 },
+      accuracy: { type: Number, min: 0, default: null },
+      capturedAt: { type: Date, default: null },
+      // GeoJSON duplicates validated coordinates for indexed geospatial queries.
+      // The legacy latitude/longitude fields above remain for compatibility.
+      point: { type: pointSchema, default: undefined }
     },
     status: { type: String, trim: true, default: 'reported', index: true },
     priority: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'high' },
@@ -96,6 +106,7 @@ emergencySchema.index({ category: 1, createdAt: -1 });
 emergencySchema.index({ severity: 1, status: 1, createdAt: -1 });
 emergencySchema.index({ visibility: 1, createdAt: -1 });
 emergencySchema.index({ 'location.latitude': 1, 'location.longitude': 1 });
+emergencySchema.index({ 'location.point': '2dsphere' }, { sparse: true });
 emergencySchema.index({ responseAssignments: 1, status: 1 });
 emergencySchema.index({ type: 1, status: 1 });
 emergencySchema.index({ assignedOfficer: 1, status: 1 });

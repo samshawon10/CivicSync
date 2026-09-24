@@ -5,8 +5,10 @@ import Report from '../models/Report.js';
 import Emergency from '../models/Emergency.js';
 import ActivityLog from '../models/ActivityLog.js';
 import SystemSetting from '../models/SystemSetting.js';
+import { canTransitionReport } from '../services/reportLifecycle.js';
 import { reportPriorities, reportStatuses } from '../config/reportOptions.js';
 import { emergencyStatuses } from '../config/emergencyOptions.js';
+import { sanitizeSettings } from '../config/settingsDefaults.js';
 
 const roles = ['citizen', 'admin', 'department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker'];
 const departmentHeadRoles = ['department_head', 'emergency_department_head'];
@@ -14,7 +16,7 @@ const emergencyRoles = ['emergency_department_head', 'emergency_department_offic
 const userStatuses = ['active', 'suspended'];
 const emergencyTypes = ['police', 'fire', 'medical', 'accident', 'disaster', 'other'];
 const statusLabels = Object.fromEntries(reportStatuses.map((value) => [value, value.replaceAll('_', ' ')]));
-const transitionMap = { pending: ['verified'], verified: ['assigned'], assigned: ['in_progress'], in_progress: ['under_review'], under_review: ['completed'], completed: ['closed'], closed: [] };
+
 
 function objectId(value) { return mongoose.Types.ObjectId.isValid(value); }
 function escapeRegex(value = '') { return value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -22,7 +24,19 @@ function pageOf(value) { return Math.max(1, Number(value) || 1); }
 function limitOf(value) { return Math.min(50, Math.max(1, Number(value) || 15)); }
 function dateRange(value) { const days = { '7d': 7, '30d': 30, '3m': 90, '6m': 180, '1y': 365 }[value] || 30; const end = new Date(); const start = new Date(end); start.setDate(start.getDate() - days); const previousStart = new Date(start); previousStart.setDate(previousStart.getDate() - days); return { start, end, previousStart, days }; }
 function safeUser(user) { return { id: user._id, name: user.name, email: user.email, phone: user.phone || '', photoURL: user.photoURL || '', role: user.role, department: user.department, departmentName: user.departmentName || '', status: user.status, createdAt: user.createdAt }; }
-async function log(admin, action, targetType, targetId, targetName, description, metadata = {}) { await ActivityLog.create({ admin: admin._id || admin, action, targetType, targetId, targetName, description, metadata }); }
+async function log(admin, action, targetType, targetId, targetName, description, metadata = {}, options = {}) {
+  await ActivityLog.create({
+    admin: admin._id || admin,
+    actorRole: admin.role || options.actorRole || '',
+    action,
+    targetType,
+    targetId,
+    targetName,
+    description,
+    metadata,
+    result: options.result || 'success'
+  });
+}
 function reportFilter(query = {}) { const filter = {}; if (reportStatuses.includes(query.status)) filter.status = query.status; if (reportPriorities.includes(query.priority)) filter.priority = query.priority; if (query.department?.trim()) filter.departmentName = query.department.trim(); if (query.category?.trim()) filter.category = query.category.trim(); if (query.from || query.to) { filter.createdAt = {}; if (query.from && !Number.isNaN(Date.parse(query.from))) filter.createdAt.$gte = new Date(query.from); if (query.to && !Number.isNaN(Date.parse(query.to))) { const end = new Date(query.to); end.setHours(23, 59, 59, 999); filter.createdAt.$lte = end; } } if (query.search?.trim()) { const expression = new RegExp(escapeRegex(query.search), 'i'); filter.$or = [{ title: expression }, { description: expression }, { departmentName: expression }]; } return filter; }
 function reportQuery(filter) { return Report.find(filter).populate('createdBy', 'name email phone photoURL').populate('assignedOfficer', 'name email phone photoURL').populate('assignedFieldWorker', 'name email phone photoURL'); }
 
@@ -91,15 +105,67 @@ export async function deleteDepartment(req, res, next) { try { if (!objectId(req
 
 export async function listComplaints(req, res, next) { try { const filter = reportFilter(req.query); const page = pageOf(req.query.page); const limit = limitOf(req.query.limit); const [complaints, total] = await Promise.all([reportQuery(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), Report.countDocuments(filter)]); res.json({ success: true, complaints, pagination: { page, limit, total, pages: Math.ceil(total / limit) } }); } catch (error) { next(error); } }
 export async function getComplaintDetail(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await reportQuery({ _id: req.params.id }).populate('completionReport.submittedBy', 'name email photoURL').lean(); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); res.json({ success: true, complaint }); } catch (error) { next(error); } }
-export async function updateComplaint(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await Report.findById(req.params.id); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const { status, priority, departmentName, officerId, fieldWorkerId, note = '' } = req.body; if (status !== undefined) { if (!reportStatuses.includes(status) || (status !== complaint.status && !transitionMap[complaint.status]?.includes(status))) return res.status(400).json({ success: false, message: `Invalid complaint status transition from ${statusLabels[complaint.status] || complaint.status}.` }); complaint.status = status; } if (priority !== undefined) { if (!reportPriorities.includes(priority)) return res.status(400).json({ success: false, message: 'Invalid priority.' }); complaint.priority = priority; } if (departmentName !== undefined) { const department = await Department.findOne({ name: departmentName, status: 'active', scope: { $in: ['civic', 'hybrid'] } }); if (!department) return res.status(400).json({ success: false, message: 'Choose an active civic department.' }); complaint.departmentName = department.name; } const assignedDepartment = complaint.departmentName; if (officerId !== undefined) { const officer = officerId ? await User.findOne({ _id: officerId, role: { $in: ['department_officer', 'officer'] }, departmentName: assignedDepartment, status: 'active' }) : null; if (officerId && !officer) return res.status(400).json({ success: false, message: 'Selected officer is not active in this department.' }); complaint.assignedOfficer = officer?._id || null; } if (fieldWorkerId !== undefined) { const worker = fieldWorkerId ? await User.findOne({ _id: fieldWorkerId, role: 'field_worker', departmentName: assignedDepartment, status: 'active' }) : null; if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Selected field worker is not active in this department.' }); complaint.assignedFieldWorker = worker?._id || null; } if ((officerId || fieldWorkerId) && ['pending', 'verified'].includes(complaint.status)) complaint.status = 'assigned'; complaint.activity.push({ action: 'Updated by administrator', actorRole: 'admin', note: String(note).slice(0, 500) }); await complaint.save(); await log(req.user, 'complaint_updated', 'report', complaint._id, complaint.title, 'Complaint management data updated.'); await complaint.populate('createdBy', 'name email phone photoURL'); await complaint.populate('assignedOfficer', 'name email photoURL'); await complaint.populate('assignedFieldWorker', 'name email photoURL'); res.json({ success: true, message: 'Complaint updated.', complaint }); } catch (error) { next(error); } }
+export async function updateComplaint(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await Report.findById(req.params.id); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const { status, priority, departmentName, officerId, fieldWorkerId, note = '' } = req.body; if (status !== undefined) { if (!reportStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid complaint status.' }); if (status !== complaint.status && !canTransitionReport(complaint.status, status)) return res.status(409).json({ success: false, message: `Invalid complaint status transition from ${statusLabels[complaint.status] || complaint.status}.` }); complaint.status = status; } if (priority !== undefined) { if (!reportPriorities.includes(priority)) return res.status(400).json({ success: false, message: 'Invalid priority.' }); complaint.priority = priority; } if (departmentName !== undefined) { const department = await Department.findOne({ name: departmentName, status: 'active', scope: { $in: ['civic', 'hybrid'] } }); if (!department) return res.status(400).json({ success: false, message: 'Choose an active civic department.' }); complaint.departmentName = department.name; } const assignedDepartment = complaint.departmentName; if (officerId !== undefined) { const officer = officerId ? await User.findOne({ _id: officerId, role: { $in: ['department_officer', 'officer'] }, departmentName: assignedDepartment, status: 'active' }) : null; if (officerId && !officer) return res.status(400).json({ success: false, message: 'Selected officer is not active in this department.' }); complaint.assignedOfficer = officer?._id || null; } if (fieldWorkerId !== undefined) { const worker = fieldWorkerId ? await User.findOne({ _id: fieldWorkerId, role: 'field_worker', departmentName: assignedDepartment, status: 'active' }) : null; if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Selected field worker is not active in this department.' }); complaint.assignedFieldWorker = worker?._id || null; } if ((officerId || fieldWorkerId) && ['pending', 'verified'].includes(complaint.status)) complaint.status = 'assigned'; complaint.activity.push({ action: 'Updated by administrator', actorRole: 'admin', note: String(note).slice(0, 500) }); await complaint.save(); await log(req.user, 'complaint_updated', 'report', complaint._id, complaint.title, 'Complaint management data updated.'); await complaint.populate('createdBy', 'name email phone photoURL'); await complaint.populate('assignedOfficer', 'name email photoURL'); await complaint.populate('assignedFieldWorker', 'name email photoURL'); res.json({ success: true, message: 'Complaint updated.', complaint }); } catch (error) { next(error); } }
 export async function deleteComplaint(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await Report.findById(req.params.id); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); await log(req.user, 'complaint_deleted', 'report', complaint._id, complaint.title, 'Complaint deleted.'); await complaint.deleteOne(); res.json({ success: true, message: 'Complaint deleted.' }); } catch (error) { next(error); } }
 
 export async function listEmergencies(req, res, next) { try { const filter = {}; if (emergencyStatuses.includes(req.query.status)) filter.status = req.query.status; if (req.query.type) filter.type = req.query.type; if (req.query.search?.trim()) { const exp = new RegExp(escapeRegex(req.query.search), 'i'); filter.$or = [{ title: exp }, { citizenName: exp }, { 'location.address': exp }]; } const page = pageOf(req.query.page); const limit = limitOf(req.query.limit); const [emergencies, total] = await Promise.all([Emergency.find(filter).populate('citizen', 'name email phone photoURL').populate('assignedDepartment', 'name').populate('assignedOfficer', 'name email photoURL').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), Emergency.countDocuments(filter)]); res.json({ success: true, emergencies, pagination: { page, limit, total, pages: Math.ceil(total / limit) } }); } catch (error) { next(error); } }
 export async function getEmergencyDetail(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Emergency not found.' }); const emergency = await Emergency.findById(req.params.id).populate('citizen', 'name email phone photoURL').populate('assignedDepartment', 'name').populate('assignedOfficer', 'name email phone photoURL').lean(); if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found.' }); res.json({ success: true, emergency }); } catch (error) { next(error); } }
 export async function updateEmergency(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Emergency not found.' }); const emergency = await Emergency.findById(req.params.id); if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found.' }); const { status, departmentId, officerId, fieldWorkerId, notes } = req.body; if (status !== undefined && !emergencyStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid emergency status.' }); if (departmentId !== undefined) { const department = departmentId ? await Department.findById(departmentId) : null; if (departmentId && (!department || !['emergency', 'hybrid'].includes(department.scope) || !department.emergencyTypes.includes(emergency.type))) return res.status(400).json({ success: false, message: 'Choose an emergency-enabled department configured for this emergency type.' }); emergency.assignedDepartment = department?._id || null; } else if (!emergency.assignedDepartment) { const department = await Department.findOne({ status: 'active', scope: { $in: ['emergency', 'hybrid'] }, emergencyTypes: emergency.type }); if (department) emergency.assignedDepartment = department._id; } const assignmentDepartment = emergency.assignedDepartment; if (officerId !== undefined) { const officer = officerId ? await User.findOne({ _id: officerId, department: assignmentDepartment, status: 'active', role: { $in: ['emergency_department_officer', 'emergency_officer'] } }) : null; if (officerId && !officer) return res.status(400).json({ success: false, message: 'Officer is not active in the assigned emergency department.' }); emergency.assignedOfficer = officer?._id || null; } if (fieldWorkerId !== undefined) { const worker = fieldWorkerId ? await User.findOne({ _id: fieldWorkerId, department: assignmentDepartment, status: 'active', role: 'emergency_field_worker' }) : null; if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Field worker is not active in the assigned emergency department.' }); emergency.assignedFieldWorker = worker?._id || null; } if (status) { if (status === 'resolved' && !emergency.resolvedAt) { emergency.resolvedAt = new Date(); } emergency.status = status; } if (notes !== undefined) emergency.notes = String(notes).slice(0, 1000); emergency.activity.push({ action: 'Emergency updated by administrator', actorRole: 'admin', note: String(notes || '').slice(0, 500) }); await emergency.save(); await log(req.user, 'emergency_updated', 'emergency', emergency._id, emergency.title, 'Emergency updated.'); res.json({ success: true, message: 'Emergency updated.', emergency }); } catch (error) { next(error); } }
 
-export async function listActivityLogs(req, res, next) { try { const page = pageOf(req.query.page); const limit = limitOf(req.query.limit); const filter = req.query.action?.trim() ? { action: req.query.action.trim() } : {}; const [logs, total] = await Promise.all([ActivityLog.find(filter).populate('admin', 'name email photoURL').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), ActivityLog.countDocuments(filter)]); res.json({ success: true, logs, pagination: { page, limit, total, pages: Math.ceil(total / limit) } }); } catch (error) { next(error); } }
-const safeSettings = { general: { portalName: 'CivicSync', timezone: 'Asia/Dhaka' }, notifications: { emailDigest: true, criticalAlerts: true }, security: { sessionNotice: true, activityRetentionDays: 365 } };
-export async function getSettings(req, res, next) { try { const record = await SystemSetting.findOne({ key: 'admin_portal' }).lean(); res.json({ success: true, settings: { ...safeSettings, ...(record?.value || {}) } }); } catch (error) { next(error); } }
-export async function updateSettings(req, res, next) { try { const value = { general: { ...safeSettings.general, ...(req.body.general || {}) }, notifications: { ...safeSettings.notifications, ...(req.body.notifications || {}) }, security: { ...safeSettings.security, ...(req.body.security || {}) } }; await SystemSetting.findOneAndUpdate({ key: 'admin_portal' }, { value, updatedBy: req.user._id }, { upsert: true, new: true, setDefaultsOnInsert: true }); await log(req.user, 'settings_changed', 'system', req.user._id, 'Admin portal settings', 'System settings updated.'); res.json({ success: true, message: 'Settings saved.', settings: value }); } catch (error) { next(error); } }
+export async function listActivityLogs(req, res, next) {
+  try {
+    const page = pageOf(req.query.page);
+    const limit = limitOf(req.query.limit);
+    const filter = {};
+    if (req.query.action?.trim()) filter.action = req.query.action.trim();
+    if (req.query.module?.trim()) filter.targetType = req.query.module.trim();
+    if (['success', 'failure', 'info'].includes(req.query.result)) filter.result = req.query.result;
+    if (req.query.role?.trim()) filter.actorRole = req.query.role.trim();
+    if (objectId(req.query.actor)) filter.admin = req.query.actor;
+    if (req.query.search?.trim()) {
+      const expression = new RegExp(escapeRegex(req.query.search), 'i');
+      filter.$or = [{ description: expression }, { targetName: expression }, { action: expression }];
+    }
+    if (req.query.from || req.query.to) {
+      filter.createdAt = {};
+      if (req.query.from && !Number.isNaN(Date.parse(req.query.from))) filter.createdAt.$gte = new Date(req.query.from);
+      if (req.query.to && !Number.isNaN(Date.parse(req.query.to))) {
+        const end = new Date(req.query.to);
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = end;
+      }
+    }
+    const [logs, total, actions, modules, roles] = await Promise.all([
+      ActivityLog.find(filter).populate('admin', 'name email photoURL role').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      ActivityLog.countDocuments(filter),
+      ActivityLog.distinct('action'),
+      ActivityLog.distinct('targetType'),
+      ActivityLog.distinct('actorRole')
+    ]);
+    res.json({
+      success: true,
+      logs,
+      pagination: { page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) },
+      facets: { actions: actions.sort(), modules: modules.sort(), roles: roles.filter(Boolean).sort() }
+    });
+  } catch (error) { next(error); }
+}
+export async function getSettings(req, res, next) {
+  try {
+    const record = await SystemSetting.findOne({ key: 'admin_portal' }).lean();
+    const { settings } = sanitizeSettings(record?.value || {}, {});
+    res.json({ success: true, settings, lastUpdatedAt: record?.updatedAt || null });
+  } catch (error) { next(error); }
+}
+
+export async function updateSettings(req, res, next) {
+  try {
+    const record = await SystemSetting.findOne({ key: 'admin_portal' }).lean();
+    const { settings, errors, changed } = sanitizeSettings(record?.value || {}, req.body || {});
+    if (errors.length) return res.status(400).json({ success: false, message: errors.join(' ') });
+    await SystemSetting.findOneAndUpdate({ key: 'admin_portal' }, { value: settings, updatedBy: req.user._id }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    await log(req.user, 'settings_changed', 'system', req.user._id, 'Admin portal settings', changed.length ? `Updated: ${changed.join(', ')}` : 'Settings saved with no field changes.', { changed });
+    res.json({ success: true, message: 'Settings saved.', settings, changed });
+  } catch (error) { next(error); }
+}
 export async function exportReport(req, res, next) { try { const type = ['complaints', 'emergencies', 'users', 'departments'].includes(req.query.type) ? req.query.type : 'complaints'; let headers; let rows; if (type === 'emergencies') { headers = ['Emergency ID', 'Citizen', 'Type', 'Status', 'Department', 'Created']; rows = (await Emergency.find().populate('assignedDepartment', 'name').sort({ createdAt: -1 }).lean()).map((item) => [item._id, item.citizenName, item.type, item.status, item.assignedDepartment?.name || '', item.createdAt]); } else if (type === 'users') { headers = ['User ID', 'Name', 'Email', 'Role', 'Status', 'Department', 'Joined']; rows = (await User.find().sort({ createdAt: -1 }).lean()).map((item) => [item._id, item.name, item.email, item.role, item.status, item.departmentName, item.createdAt]); } else if (type === 'departments') { headers = ['Department', 'Type', 'Status', 'Email', 'Created']; rows = (await Department.find().sort({ name: 1 }).lean()).map((item) => [item.name, item.type, item.status, item.email, item.createdAt]); } else { headers = ['Complaint ID', 'Title', 'Citizen', 'Department', 'Priority', 'Status', 'Created']; rows = (await reportQuery(reportFilter(req.query)).sort({ createdAt: -1 }).lean()).map((item) => [item._id, item.title, item.createdBy?.name || '', item.departmentName, item.priority, item.status, item.createdAt]); } const csv = [headers, ...rows].map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n'); res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', `attachment; filename="civicsync-${type}-${new Date().toISOString().slice(0, 10)}.csv"`); res.send(csv); } catch (error) { next(error); } }

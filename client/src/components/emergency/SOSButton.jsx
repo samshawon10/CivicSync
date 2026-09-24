@@ -1,3 +1,4 @@
+import { CheckCircle2, LocateFixed, Siren } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 /**
@@ -11,6 +12,7 @@ import { useEffect, useRef, useState } from 'react';
  */
 export default function SOSButton({ onActivate, captureLocation, label = 'SOS\nHOLD', title = 'HOLD TO SEND SOS', busy = false }) {
   const [holding, setHolding] = useState(false);
+  const [phase, setPhase] = useState('idle');
   const [progress, setProgress] = useState(0);
   const timer = useRef(null);
   const raf = useRef(null);
@@ -31,15 +33,19 @@ export default function SOSButton({ onActivate, captureLocation, label = 'SOS\nH
       return;
     }
     setHolding(true);
+    setPhase('holding');
     setProgress(0);
     startedAt.current = Date.now();
     raf.current = requestAnimationFrame(tick);
     timer.current = setTimeout(async () => {
       setHolding(false);
       setProgress(0);
+      setPhase('locating');
       cancelAnimationFrame(raf.current);
       const result = captureLocation ? await captureLocation() : { ok: false, location: null, error: 'Location service not attached.' };
-      onActivate?.(result.location, { offline: false, locationStatus: result });
+      setPhase(result.ok ? 'located' : 'error');
+      await onActivate?.(result.location, { offline: false, locationStatus: result });
+      setPhase('idle');
     }, duration);
   }
 
@@ -47,6 +53,7 @@ export default function SOSButton({ onActivate, captureLocation, label = 'SOS\nH
     clearTimeout(timer.current);
     cancelAnimationFrame(raf.current);
     setHolding(false);
+    setPhase('idle');
     setProgress(0);
   }
 
@@ -68,9 +75,11 @@ export default function SOSButton({ onActivate, captureLocation, label = 'SOS\nH
         className={`sos-pulse relative grid h-36 w-36 select-none place-items-center rounded-full border-8 border-red-300 bg-white text-center text-xl font-black whitespace-pre-line text-red-700 shadow-2xl transition ${holding ? 'scale-95 bg-red-100' : ''}`}
         style={holding ? { background: `conic-gradient(#fee2e2 ${progress * 3.6}deg, #ffffff 0deg)` } : undefined}
       >
-        {busy ? 'SENDING…' : holding ? `HOLD ${Math.ceil((duration - (Date.now() - startedAt.current)) / 1000) || 1}` : label}
+        {busy ? <><Siren size={28} /> SENDING…</> : holding ? `HOLD ${Math.ceil((duration - (Date.now() - startedAt.current)) / 1000) || 1}` : <><Siren size={30} />{label.split('\n').map((line) => <span key={line} className="block">{line}</span>)}</>}
       </button>
-      <p className="text-[11px] font-semibold text-red-100/90">Press and hold for 3 seconds</p>
+      <p className="text-[11px] font-semibold text-red-100/90" aria-live="polite">
+        {phase === 'locating' ? <span className="inline-flex items-center gap-1"><LocateFixed size={13} /> Requesting location permission…</span> : phase === 'located' ? <span className="inline-flex items-center gap-1"><CheckCircle2 size={13} /> Location detected · submitting emergency</span> : phase === 'error' ? 'Location unavailable · enter an address below' : 'Press and hold for 3 seconds'}
+      </p>
     </div>
   );
 }

@@ -12,6 +12,8 @@ const reportSchema = new mongoose.Schema({
   additionalInfo: { type: String, trim: true, maxlength: 1000, default: '' },
   status: { type: String, enum: reportStatuses, default: 'pending' },
   assignedOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    citizenResolution: { status: { type: String, enum: ['pending', 'confirmed', 'reopen_requested'], default: 'pending' }, note: { type: String, trim: true, maxlength: 500, default: '' }, requestedAt: { type: Date, default: null }, resolvedAt: { type: Date, default: null } },
+    citizenFeedback: { rating: { type: Number, min: 1, max: 5, default: null }, comment: { type: String, trim: true, maxlength: 1000, default: '' }, submittedAt: { type: Date, default: null } },
   assignedFieldWorker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   dueAt: { type: Date, default: null },
   completionReport: {

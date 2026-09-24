@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Notification from '../models/Notification.js';
 import Report from '../models/Report.js';
 import User from '../models/User.js';
+import { canReviewReportCompletion, canTransitionReport } from '../services/reportLifecycle.js';
 import { reportCategories, reportPriorities, reportStatuses } from '../config/reportOptions.js';
 
 const headRoles = ['department_head'];
@@ -173,6 +174,8 @@ export async function updateStatus(req, res, next) {
     if (!report) return;
     if (req.user.role !== 'department_head' && ['completed', 'closed'].includes(req.body.status)) return res.status(403).json({ success: false, message: 'Department head approval is required.' });
     const previous = report.status;
+    if (req.body.status === 'closed' && !canTransitionReport(previous, 'closed')) return res.status(409).json({ success: false, message: `Invalid status transition from ${label(previous)} to closed.` });
+    if (req.body.status !== previous && !canTransitionReport(previous, req.body.status)) return res.status(409).json({ success: false, message: `Invalid status transition from ${label(previous)} to ${label(req.body.status)}.` });
     report.status = req.body.status;
     report.activity.push({ action: `Status changed from ${label(previous)} to ${label(report.status)}`, actorRole: req.user.role, note: req.body.note || '' });
     await report.save();
@@ -188,6 +191,7 @@ export async function submitCompletion(req, res, next) {
     if (!departmentRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'You cannot submit completion reports.' });
     const { summary = '', materials = '', notes = '', beforeImages = [], afterImages = [] } = req.body;
     if (summary.trim().length < 10) return res.status(400).json({ success: false, message: 'Work summary must be at least 10 characters.' });
+    if (!canTransitionReport(report.status, 'completed')) return res.status(409).json({ success: false, message: `A completion report can only be submitted from under review; current status is ${label(report.status)}.` });
     report.completionReport = { summary: summary.trim(), materials: String(materials).trim(), notes: String(notes).trim(), beforeImages, afterImages, submittedBy: req.user._id, submittedAt: new Date(), verificationStatus: 'submitted' };
     report.status = 'completed';
     report.activity.push({ action: 'Completion report submitted', actorRole: req.user.role, note: summary.trim().slice(0, 160) });
@@ -202,6 +206,7 @@ export async function reviewCompletion(req, res, next) {
     if (!completionStatuses.includes(req.body.verificationStatus)) return res.status(400).json({ success: false, message: 'Invalid verification status.' });
     const report = await loadScopedReport(req, res);
     if (!report) return;
+    if (!canReviewReportCompletion(report.status, report.completionReport.verificationStatus, req.body.verificationStatus)) return res.status(409).json({ success: false, message: 'Completion review is only available for a submitted completion report.' });
     report.completionReport.verificationStatus = req.body.verificationStatus;
     if (req.body.verificationStatus === 'approved') report.status = 'closed';
     if (req.body.verificationStatus === 'rejected') report.status = 'in_progress';

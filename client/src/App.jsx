@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './routes/ProtectedRoute.jsx';
 import Landing from './pages/Landing.jsx';
@@ -12,13 +13,13 @@ import { useAuth } from './context/AuthContext.jsx';
 import { dashboardPathFor } from './utils/roles.js';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
-import AdminPortal from './pages/admin/AdminPortal.jsx';
-import CitizenEmergency from './pages/citizen/CitizenEmergency.jsx';
-import CreateEmergency from './pages/citizen/CreateEmergency.jsx';
-import EmergencyTracking from './pages/citizen/EmergencyTracking.jsx';
-import SafetyMap from './pages/citizen/SafetyMap.jsx';
+const AdminPortal = lazy(() => import('./pages/admin/AdminPortal.jsx'));
+const CitizenEmergency = lazy(() => import('./pages/citizen/CitizenEmergency.jsx'));
+const CreateEmergency = lazy(() => import('./pages/citizen/CreateEmergency.jsx'));
+const EmergencyTracking = lazy(() => import('./pages/citizen/EmergencyTracking.jsx'));
+const SafetyMap = lazy(() => import('./pages/citizen/SafetyMap.jsx'));
+const NearbyServices = lazy(() => import('./pages/citizen/NearbyServices.jsx'));
 import SafetyAlerts from './pages/citizen/SafetyAlerts.jsx';
-import NearbyServices from './pages/citizen/NearbyServices.jsx';
 import EmergencyContacts from './pages/citizen/EmergencyContacts.jsx';
 import WomenSafety from './pages/citizen/WomenSafety.jsx';
 import EmergencyAnalytics from './pages/emergency/EmergencyAnalytics.jsx';
@@ -28,7 +29,8 @@ export default function App() {
   const { user, loading } = useAuth();
   const roleRedirect = loading ? <div className="grid min-h-screen place-items-center text-civic-600">Loading CivicSync…</div> : <Navigate to={user ? dashboardPathFor(user.role) : '/login'} replace />;
   return (
-    <Routes>
+    <Suspense fallback={<div className="grid min-h-screen place-items-center bg-slate-50 text-sm font-semibold text-civic-600" aria-live="polite">Loading CivicSync…</div>}>
+      <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -77,6 +79,7 @@ export default function App() {
         <Route path="/admin/:section" element={<AdminPortal />} />
       </Route>
       <Route path="*" element={roleRedirect} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }
