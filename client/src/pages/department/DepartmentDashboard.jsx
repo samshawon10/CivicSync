@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Activity, BriefcaseBusiness, ChartNoAxesCombined, ClipboardList, Command, HardHat, History, LogOut, Menu, NotebookPen, ShieldAlert, Users, X } from 'lucide-react';
+import { Activity, Boxes, BriefcaseBusiness, ChartNoAxesCombined, ClipboardList, Command, HardHat, History, LogOut, Menu, NotebookPen, ShieldAlert, Users, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import api, { apiMessage } from '../../services/api.js';
 import { departmentApi } from '../../services/departmentService.js';
 import { mediaUrl } from '../../services/reportService.js';
 import { SkeletonKpiGrid, SkeletonTable } from '../../components/ui/Skeleton.jsx';
+import CaseDirectory from '../../components/department/CaseDirectory.jsx';
+import CaseWorkspace from '../../components/department/CaseWorkspace.jsx';
+import EscalationCenter from '../../components/department/EscalationCenter.jsx';
+import ResourceCenter from '../../components/department/ResourceCenter.jsx';
+import TaskExecution from '../../components/department/TaskExecution.jsx';
+import TeamManagement from '../../components/department/TeamManagement.jsx';
 
 const statuses = ['pending', 'verified', 'assigned', 'in_progress', 'under_review', 'completed', 'closed'];
 const priorities = ['low', 'medium', 'high', 'urgent'];
@@ -66,10 +72,10 @@ function DepartmentShell({ children, active, setActive }) {
   const roleName = user.role === 'department_head' ? 'Department Head' : user.role === 'department_officer' ? 'Department Officer' : user.role === 'officer' ? 'Officer' : 'Field Worker';
   const homePath = user.role === 'department_head' ? '/dashboard/department-head' : user.role === 'department_officer' ? '/dashboard/department-officer' : user.role === 'officer' ? '/dashboard/officer' : '/dashboard/field-worker';
   const items = isHead
-    ? [['overview', 'Command Center', Command], ['complaints', 'Cases', ClipboardList], ['escalations', 'Escalations', ShieldAlert], ['field', 'People & Workload', Users], ['analytics', 'Department Analytics', ChartNoAxesCombined], ['activity', 'Department Activity', History], ['notifications', 'Notifications', Activity]]
+    ? [['overview', 'Command Center', Command], ['workspace', 'Case Workspace', BriefcaseBusiness], ['complaints', 'Cases', ClipboardList], ['tasks', 'Field Task Board', HardHat], ['escalations', 'Escalations & SLA', ShieldAlert], ['teams', 'Team Management', Users], ['resources', 'Resource Management', Boxes], ['field', 'People & Workload', Users], ['analytics', 'Department Analytics', ChartNoAxesCombined], ['activity', 'Department Activity', History], ['notifications', 'Notifications', Activity]]
     : isWorker
-      ? [['overview', 'Home', HardHat], ['complaints', 'My Tasks', ClipboardList], ['notes', 'Case Notes', NotebookPen], ['notifications', 'Notifications', Activity]]
-      : [['overview', 'Operations Desk', BriefcaseBusiness], ['complaints', 'Department Cases', ClipboardList], ...(canManageStaff ? [['field', 'Field Workers', Users]] : []), ['notes', 'Case Notes', NotebookPen], ['analytics', 'Workload Analytics', ChartNoAxesCombined], ['notifications', 'Notifications', Activity]];
+      ? [['overview', 'Home', HardHat], ['tasks', 'My Tasks', ClipboardList], ['workspace', 'Case Workspace', BriefcaseBusiness], ['resources', 'Resources', Boxes], ['notes', 'Case Notes', NotebookPen], ['notifications', 'Notifications', Activity]]
+      : [['overview', 'Operations Desk', BriefcaseBusiness], ['workspace', 'Case Workspace', BriefcaseBusiness], ['complaints', 'Department Cases', ClipboardList], ['tasks', 'Field Task Board', HardHat], ['escalations', 'Escalations & SLA', ShieldAlert], ['teams', 'Team Management', Users], ['resources', 'Resources', Boxes], ...(canManageStaff ? [['field', 'Field Workers', Users]] : []), ['notes', 'Case Notes', NotebookPen], ['analytics', 'Workload Analytics', ChartNoAxesCombined], ['notifications', 'Notifications', Activity]];
   async function signOut() { await logout(); navigate('/login'); }
   function go(key) { setActive(key); setOpen(false); }
   const sidebar = <aside className="flex h-full flex-col bg-ink p-5 text-white"><div><Link to={homePath} className="text-xl font-extrabold">Civic<span className="text-civic-300">Sync</span></Link><p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{user.departmentName || 'Department workspace'}</p><div className="mt-6 rounded-lg border border-white/10 bg-white/5 p-3"><p className="text-sm font-bold">{user.name}</p><p className="mt-1 text-xs text-slate-300">{roleName}</p></div></div><nav aria-label={`${roleName} navigation`} className="mt-6 space-y-1">{items.map(([key, label, Icon]) => <button key={key} onClick={() => go(key)} aria-current={active === key ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold transition ${active === key ? 'bg-white text-ink shadow-sm' : 'text-slate-200 hover:bg-white/10'}`}><Icon size={17} aria-hidden="true" />{label}</button>)}</nav><button onClick={signOut} className="mt-auto flex min-h-11 items-center gap-3 rounded-lg border border-white/15 px-3 text-sm font-bold text-white hover:bg-white/10"><LogOut size={17} />Sign out</button></aside>;
@@ -236,6 +242,8 @@ function Notifications() {
 export default function DepartmentDashboard({ role }) {
   const { user } = useAuth();
   const [active, setActive] = useState('overview');
+  const [workspaceCaseId, setWorkspaceCaseId] = useState('');
+  const [staffDirectory, setStaffDirectory] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -247,6 +255,15 @@ export default function DepartmentDashboard({ role }) {
     try { const { data } = await departmentApi.dashboard(); setDashboardData(data); } catch (err) { setError(apiMessage(err)); } finally { setLoading(false); }
   }
   useEffect(() => { loadDashboard(); }, []);
-  const activeLabel = { overview: isHead ? 'Department command center' : role === 'field_worker' ? 'My active work' : 'Operations queue', complaints: role === 'field_worker' ? 'Assigned tasks' : 'Department cases', escalations: 'Overdue and unresolved cases', field: isHead ? 'People and workload' : 'Field worker workload', analytics: isHead ? 'Department analytics' : 'Workload analytics', activity: 'Department activity', notes: 'Case notes', notifications: 'Notifications' }[active];
-  return <DepartmentShell active={active} setActive={setActive}><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-bold text-civic-700">{isHead ? 'Department-wide command center' : role === 'field_worker' ? 'Assigned field work' : 'Assigned operations workspace'}</p><h2 className="text-2xl font-black text-fg">{activeLabel}</h2></div><span className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-bold text-fg-muted">{new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</span></div>{active === 'overview' && <Overview data={data} loading={loading} error={error} reload={loadDashboard} setActive={setActive} isHead={isHead} />}{active === 'complaints' && <Complaints isHead={isHead} canManage={canManage} />}{active === 'escalations' && <Complaints isHead canManage overdueOnly />}{active === 'field' && <FieldOperations />}{active === 'analytics' && <Analytics />}{active === 'activity' && <DepartmentActivity />}{active === 'notes' && <CaseNotes />}{active === 'notifications' && <Notifications />}</DepartmentShell>;
+  useEffect(() => {
+    if (!canManage) { setStaffDirectory([]); return undefined; }
+    let alive = true;
+    departmentApi.staff()
+      .then(({ data }) => { if (alive) setStaffDirectory(data.staff || []); })
+      .catch(() => { if (alive) setStaffDirectory([]); });
+    return () => { alive = false; };
+  }, [canManage]);
+  function openCase(caseId) { setWorkspaceCaseId(caseId); }
+  const activeLabel = { overview: isHead ? 'Department command center' : role === 'field_worker' ? 'My active work' : 'Operations queue', workspace: 'Unified case workspace', tasks: role === 'field_worker' ? 'My field tasks' : 'Field task execution board', teams: 'Response teams & workload', resources: 'Resource pool & approvals', complaints: role === 'field_worker' ? 'Assigned tasks' : 'Department cases', escalations: 'Escalations, SLA breaches and overdue cases', field: isHead ? 'People and workload' : 'Field worker workload', analytics: isHead ? 'Department analytics' : 'Workload analytics', activity: 'Department activity', notes: 'Case notes', notifications: 'Notifications' }[active];
+  return <DepartmentShell active={active} setActive={setActive}><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-bold text-civic-700">{isHead ? 'Department-wide command center' : role === 'field_worker' ? 'Assigned field work' : 'Assigned operations workspace'}</p><h2 className="text-2xl font-black text-fg">{activeLabel}</h2></div><span className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-bold text-fg-muted">{new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</span></div>{active === 'overview' && <Overview data={data} loading={loading} error={error} reload={loadDashboard} setActive={setActive} isHead={isHead} />}{active === 'workspace' && <CaseDirectory onOpenCase={openCase} />}{active === 'tasks' && <TaskExecution role={role} onOpenCase={openCase} />}{active === 'complaints' && <Complaints isHead={isHead} canManage={canManage} />}{active === 'escalations' && <EscalationCenter role={role} onOpenCase={openCase} />}{active === 'teams' && <TeamManagement canManage={isHead} />}{active === 'resources' && <ResourceCenter role={role} />}{active === 'field' && <FieldOperations />}{active === 'analytics' && <Analytics />}{active === 'activity' && <DepartmentActivity />}{active === 'notes' && <CaseNotes />}{active === 'notifications' && <Notifications />}{workspaceCaseId && <CaseWorkspace caseId={workspaceCaseId} role={role} staff={staffDirectory} onClose={() => setWorkspaceCaseId('')} onChanged={loadDashboard} />}</DepartmentShell>;
 }

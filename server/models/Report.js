@@ -12,9 +12,48 @@ const reportSchema = new mongoose.Schema({
   additionalInfo: { type: String, trim: true, maxlength: 1000, default: '' },
   status: { type: String, enum: reportStatuses, default: 'pending' },
   assignedOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
-    citizenResolution: { status: { type: String, enum: ['pending', 'confirmed', 'reopen_requested'], default: 'pending' }, note: { type: String, trim: true, maxlength: 500, default: '' }, requestedAt: { type: Date, default: null }, resolvedAt: { type: Date, default: null } },
-    citizenFeedback: { rating: { type: Number, min: 1, max: 5, default: null }, comment: { type: String, trim: true, maxlength: 1000, default: '' }, submittedAt: { type: Date, default: null } },
+  citizenResolution: { status: { type: String, enum: ['pending', 'confirmed', 'reopen_requested'], default: 'pending' }, note: { type: String, trim: true, maxlength: 500, default: '' }, requestedAt: { type: Date, default: null }, resolvedAt: { type: Date, default: null } },
+  citizenFeedback: { rating: { type: Number, min: 1, max: 5, default: null }, comment: { type: String, trim: true, maxlength: 1000, default: '' }, submittedAt: { type: Date, default: null } },
   assignedFieldWorker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  // Connected Operations Engine extensions
+  assignedTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'DepartmentTeam', default: null, index: true },
+  teamLeader: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  activeTask: { type: mongoose.Schema.Types.ObjectId, ref: 'DepartmentTask', default: null },
+  sla: {
+    responseDueAt: { type: Date, default: null },
+    arrivalDueAt: { type: Date, default: null },
+    resolutionDueAt: { type: Date, default: null },
+    acknowledgedAt: { type: Date, default: null },
+    arrivedAt: { type: Date, default: null },
+    resolvedAt: { type: Date, default: null }
+  },
+  escalation: {
+    isEscalated: { type: Boolean, default: false, index: true },
+    reason: { type: String, default: '' },
+    escalatedAt: { type: Date, default: null },
+    escalatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    resolvedAt: { type: Date, default: null },
+    resolutionNote: { type: String, default: '' }
+  },
+  handoverHistory: [
+    {
+      previousOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      newOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      reason: { type: String, default: '' },
+      notes: { type: String, default: '' },
+      transferredAt: { type: Date, default: Date.now }
+    }
+  ],
+  messages: [
+    {
+      sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      senderName: { type: String, default: '' },
+      senderRole: { type: String, default: '' },
+      text: { type: String, required: true, trim: true, maxlength: 1000 },
+      isInternal: { type: Boolean, default: true },
+      createdAt: { type: Date, default: Date.now }
+    }
+  ],
   dueAt: { type: Date, default: null },
   completionReport: {
     summary: { type: String, trim: true, maxlength: 1200, default: '' },
@@ -42,3 +81,4 @@ reportSchema.index({ createdBy: 1, status: 1 });
 reportSchema.index({ departmentName: 1, status: 1, priority: 1, updatedAt: -1 });
 
 export default mongoose.model('Report', reportSchema);
+
