@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiMessage } from '../../services/api.js';
+import { confirmAction, showSuccess } from '../../utils/sweetAlert.js';
 import { emergencyApi } from '../../services/emergencyService.js';
 import { ErrorState, LoadingState } from './EmergencyCard.jsx';
 
@@ -45,11 +46,14 @@ export default function EmergencyContactManager() {
   }
 
   async function remove(id) {
+    const contact = contacts.find((item) => item._id === id);
+    if (!await confirmAction({ title: 'Delete emergency contact?', text: `Remove ${contact?.name || 'this contact'} from your SOS list?`, confirmLabel: 'Delete contact' })) return;
     setError('');
     try {
       await emergencyApi.deleteContact(id);
       setContacts((items) => items.filter((item) => item._id !== id));
       if (editingId === id) { setEditingId(null); setForm(blank); }
+      showSuccess('Emergency contact removed', 'The contact is no longer included in SOS records.');
     } catch (err) { setError(apiMessage(err)); }
   }
 

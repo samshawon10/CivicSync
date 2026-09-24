@@ -7,6 +7,7 @@ import EmergencyMap from '../../components/emergency/EmergencyMap.jsx';
 import { ErrorState } from '../../components/emergency/EmergencyCard.jsx';
 import { emergencyApi, label } from '../../services/emergencyService.js';
 import { apiMessage } from '../../services/api.js';
+import { showSuccess } from '../../utils/sweetAlert.js';
 import useGeolocation from '../../hooks/useGeolocation.js';
 
 const blank = { category: 'not_sure', subcategory: 'other', title: '', description: '', severity: 'high', address: '', landmark: '' };
@@ -67,6 +68,7 @@ export default function CreateEmergency() {
         ...(personCategories.includes(form.category) ? { personDetails: person } : {})
       };
       const { data } = await emergencyApi.create(payload);
+      showSuccess('Emergency submitted', `Emergency ${data.emergency.emergencyId || ''} was received by Emergency Command.`);
       navigate(`/dashboard/citizen/emergency/${data.emergency._id}`, { state: { created: true } });
     } catch (err) { setError(apiMessage(err)); } finally { setBusy(false); }
   }

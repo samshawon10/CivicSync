@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
+import { confirmAction } from '../../utils/sweetAlert.js';
 import { Button } from './primitives.jsx';
 import { cx } from '../../utils/format.js';
 
@@ -93,38 +94,20 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, width
  * Destructive-action confirmation. `requireText` forces an explicit typed
  * confirmation for the most sensitive operations.
  */
-export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel = 'Confirm', danger = true, busy = false, requireText = '' }) {
-  const [typed, setTyped] = useState('');
-  const panelRef = useOverlay(open, onClose);
-  useEffect(() => { if (!open) setTyped(''); }, [open]);
-  if (!open) return null;
-  const blocked = Boolean(requireText) && typed.trim().toLowerCase() !== requireText.toLowerCase();
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/50 p-4" role="presentation">
-      <button type="button" aria-label="Cancel" tabIndex={-1} onClick={onClose} className="absolute inset-0 cursor-default" />
-      <div ref={panelRef} role="alertdialog" aria-modal="true" aria-label={title} tabIndex={-1} className="modal-panel relative w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-        <div className="flex gap-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ backgroundColor: 'color-mix(in oklab, #ef4444 14%, var(--surface))', color: '#dc2626' }}>
-            <Icon name="alertTriangle" size={18} />
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-fg">{title}</h2>
-            <p className="mt-1 text-[13px] text-fg-muted">{message}</p>
-          </div>
-        </div>
-        {requireText && (
-          <label className="mt-4 block space-y-1.5">
-            <span className="text-[13px] font-semibold text-fg">Type <span className="font-mono">{requireText}</span> to confirm</span>
-            <input value={typed} onChange={(event) => setTyped(event.target.value)} autoComplete="off" aria-label="Confirmation text" />
-          </label>
-        )}
-        <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <Button onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button variant={danger ? 'danger' : 'primary'} onClick={onConfirm} loading={busy} disabled={blocked}>{confirmLabel}</Button>
-        </div>
-      </div>
-    </div>
-  );
+export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel = 'Confirm', danger = true, requireText = '' }) {
+  const callbacks = useRef({ onConfirm, onClose });
+  callbacks.current = { onConfirm, onClose };
+  useEffect(() => {
+    if (!open) return undefined;
+    let active = true;
+    confirmAction({ title, text: message, confirmLabel, danger, requireText }).then((confirmed) => {
+      if (!active) return;
+      if (confirmed) { callbacks.current.onConfirm?.(); callbacks.current.onClose?.(); }
+      else callbacks.current.onClose?.();
+    });
+    return () => { active = false; };
+  }, [open, title, message, confirmLabel, danger, requireText]);
+  return null;
 }
 
 export function DropdownMenu({ label, icon, items = [], align = 'right', className = '' }) {

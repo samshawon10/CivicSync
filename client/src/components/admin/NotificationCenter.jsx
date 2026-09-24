@@ -7,6 +7,7 @@ import { useToast } from '../ui/Toaster.jsx';
 import Icon from '../ui/Icon.jsx';
 import { notificationsApi } from '../../services/notificationService.js';
 import { apiMessage } from '../../services/api.js';
+import { confirmAction } from '../../utils/sweetAlert.js';
 import { formatRelative } from '../../utils/format.js';
 
 const typeTone = { report_status: 'info', system: 'neutral' };
@@ -51,6 +52,7 @@ export default function NotificationCenter({ open, onClose }) {
   }
 
   async function remove(id) {
+    if (!await confirmAction({ title: 'Delete notification?', text: 'This notification will be permanently removed from your feed.', confirmLabel: 'Delete notification' })) return;
     try {
       await notificationsApi.remove(id);
       setState((current) => {

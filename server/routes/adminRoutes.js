@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 import { assignDepartmentHead, assignEmergencyDepartmentHead, createDepartment, deleteComplaint, deleteDepartment, deleteUser, exportReport, getAnalytics, getComplaintDetail, getDashboardStats, getDepartmentDetail, getEmergencyDetail, getSettings, getUserDetail, listActivityLogs, listComplaints, listDepartments, listDepartmentsForCitizen, listEmergencies, listUsers, selectUsers, updateComplaint, updateDepartment, updateEmergency, updateEmergencyRouting, updateSettings, updateUserRole, updateUserStatus } from '../controllers/adminController.js';
-import { getCategoryGovernance, getGovernanceOverview, getOperationsAnalytics, getPermissions, getSystemHealth, globalSearch } from '../controllers/adminGovernanceController.js';
+import { getCategoryGovernance, getGovernanceOverview, getMapTileHealth, getOperationsAnalytics, getPermissions, getSystemHealth, globalSearch } from '../controllers/adminGovernanceController.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('admin'));
@@ -10,6 +10,7 @@ router.get('/analytics', getAnalytics);
 router.get('/analytics/operations', getOperationsAnalytics);
 router.get('/governance', getGovernanceOverview);
 router.get('/governance/categories', getCategoryGovernance);
+router.get('/system-health/map-tiles', getMapTileHealth);
 router.get('/system-health', getSystemHealth);
 router.get('/permissions', getPermissions);
 router.get('/search', globalSearch);

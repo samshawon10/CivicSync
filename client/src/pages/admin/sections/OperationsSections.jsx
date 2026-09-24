@@ -407,10 +407,12 @@ export function AlertsSection() {
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState({ title: '', message: '', category: 'public_safety', severity: 'medium', address: '' });
+  const [editTarget, setEditTarget] = useState(null);
+  const [form, setForm] = useState({ title: '', message: '', category: 'public_safety', severity: 'medium', status: 'active', address: '', affectedArea: '', radiusKm: '', startAt: '', endAt: '', latitude: '', longitude: '' });
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const [toggleTarget, setToggleTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const alerts = useAsync(() => emergencyApi.alerts({ all: 'true' }).then((response) => response.data.alerts), []);
   const rows = alerts.data || [];
@@ -429,18 +431,36 @@ export function AlertsSection() {
   async function createAlert() {
     setBusy(true); setFormError('');
     try {
-      await emergencyApi.createAlert({
-        title: form.title,
-        message: form.message,
-        category: form.category,
-        severity: form.severity,
-        location: { address: form.address }
-      });
-      toast.success('Broadcast published. Active citizens receive it in their notification feed.');
+      const hasLatitude = form.latitude !== '';
+      const hasLongitude = form.longitude !== '';
+      if (hasLatitude !== hasLongitude) throw new Error('Enter both latitude and longitude, or leave both blank.');
+      const latitude = Number(form.latitude);
+      const longitude = Number(form.longitude);
+      if (hasLatitude && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180)) throw new Error('Enter valid latitude and longitude values.');
+      const payload = {
+        title: form.title, message: form.message, category: form.category, severity: form.severity, status: form.status,
+        affectedArea: form.affectedArea, radiusKm: form.radiusKm === '' ? undefined : Number(form.radiusKm),
+        startAt: form.startAt || undefined, endAt: form.endAt || undefined,
+        location: { address: form.address, ...(hasLatitude ? { latitude, longitude } : {}) }
+      };
+      const result = editTarget ? await emergencyApi.updateAlert(editTarget._id, payload) : await emergencyApi.createAlert(payload);
+      const { data } = result;
+      toast.success(data.delivery === 'in_app' ? (editTarget ? 'Broadcast updated. Active citizens receive the new version in their notification feed.' : 'Broadcast published. Active citizens receive it in their notification feed.') : 'Broadcast saved. It is scheduled and is not yet active.');
       setCreateOpen(false);
-      setForm({ title: '', message: '', category: 'public_safety', severity: 'medium', address: '' });
+      setEditTarget(null);
+      setForm({ title: '', message: '', category: 'public_safety', severity: 'medium', status: 'active', address: '', affectedArea: '', radiusKm: '', startAt: '', endAt: '', latitude: '', longitude: '' });
       alerts.reload();
     } catch (error) { setFormError(apiMessage(error)); } finally { setBusy(false); }
+  }
+
+  async function removeAlert() {
+    setBusy(true);
+    try {
+      await emergencyApi.deleteAlert(deleteTarget._id);
+      toast.success(`Broadcast “${deleteTarget.title}” deleted.`);
+      setDeleteTarget(null);
+      alerts.reload();
+    } catch (error) { toast.error(apiMessage(error)); } finally { setBusy(false); }
   }
 
   async function toggleAlert() {
@@ -465,16 +485,16 @@ export function AlertsSection() {
     },
     { key: 'severity', label: 'Severity', render: (row) => <Badge tone={severityTone(row.severity)}>{labelize(row.severity)}</Badge> },
     { key: 'category', label: 'Category', render: (row) => <span className="text-[13px] text-fg-muted">{labelize(row.category || 'public_safety')}</span> },
-    { key: 'location', label: 'Area', render: (row) => <span className="text-[13px] text-fg-muted">{row.location?.address || 'Whole platform'}</span> },
-    { key: 'active', label: 'State', render: (row) => (row.active ? <Badge tone="success">Active</Badge> : <Badge tone="muted">Closed</Badge>) },
+    { key: 'location', label: 'Area', render: (row) => <span className="text-[13px] text-fg-muted">{row.affectedArea || row.location?.address || 'Whole platform'}{row.radiusKm ? ` · ${row.radiusKm} km radius` : ''}</span> },
+    { key: 'status', label: 'State', render: (row) => <Badge tone={row.status === 'active' ? 'success' : row.status === 'scheduled' ? 'info' : 'muted'}>{labelize(row.status)}</Badge> },
     { key: 'createdAt', label: 'Published', sortable: true, render: (row) => <span className="text-[13px] text-fg-muted">{formatRelative(row.createdAt)}</span> },
     {
       key: 'actions', label: '', align: 'right',
       render: (row) => (
-        <div onClick={(event) => event.stopPropagation()}>
-          <Button size="sm" icon={row.active ? 'close' : 'check'} onClick={() => setToggleTarget(row)}>
-            {row.active ? 'Close' : 'Reopen'}
-          </Button>
+        <div onClick={(event) => event.stopPropagation()} className="flex justify-end gap-1.5">
+          <Button size="sm" icon="pencil" onClick={() => { setForm({ title: row.title, message: row.message, category: row.category || 'public_safety', severity: row.severity || 'medium', status: row.status || 'active', address: row.location?.address || '', affectedArea: row.affectedArea || '', radiusKm: row.radiusKm ?? '', startAt: row.startAt ? row.startAt.slice(0, 16) : '', endAt: row.endAt ? row.endAt.slice(0, 16) : '', latitude: row.location?.latitude ?? '', longitude: row.location?.longitude ?? '' }); setEditTarget(row); setCreateOpen(true); }}>Edit</Button>
+          <Button size="sm" icon={row.active ? 'close' : 'check'} onClick={() => setToggleTarget(row)}>{row.active ? 'Close' : 'Publish'}</Button>
+          <Button size="sm" variant="danger" icon="trash" onClick={() => setDeleteTarget(row)} aria-label={`Delete ${row.title}`} />
         </div>
       )
     }
@@ -485,7 +505,7 @@ export function AlertsSection() {
       <SectionHeading
         title="Public safety broadcasts"
         subtitle={`${activeCount} active · ${rows.length} listed. Publishing notifies every active citizen in-app. Message content is immutable after publish — close and re-publish to amend.`}
-        action={<Button variant="primary" icon="plus" onClick={() => { setFormError(''); setCreateOpen(true); }}>New broadcast</Button>}
+        action={<Button variant="primary" icon="plus" onClick={() => { setFormError(''); setEditTarget(null); setCreateOpen(true); }}>New broadcast</Button>}
       />
       <DataTable
         caption="Public safety broadcasts"
@@ -499,8 +519,8 @@ export function AlertsSection() {
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="New public safety broadcast"
-        subtitle="Delivered in-app to every active citizen account immediately on publish."
+        title={editTarget ? `Edit “${editTarget.title}”` : 'New public safety broadcast'}
+        subtitle={editTarget ? 'Updates are persisted and active citizens are notified in-app when the alert is active.' : 'In-app delivery only. Scheduled alerts remain inactive until their start time.'}
         footer={
           <>
             <Button onClick={() => setCreateOpen(false)} disabled={busy}>Cancel</Button>
@@ -517,16 +537,19 @@ export function AlertsSection() {
           </Field>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Category">
-              <input value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} maxLength={80} />
+              <select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>{['emergency', 'public_safety', 'road', 'flood', 'fire', 'weather', 'infrastructure', 'announcement'].map((value) => <option key={value} value={value}>{labelize(value)}</option>)}</select>
             </Field>
-            <Field label="Severity">
-              <select value={form.severity} onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value }))}>
-                {['low', 'medium', 'high', 'critical'].map((value) => <option key={value} value={value}>{labelize(value)}</option>)}
-              </select>
-            </Field>
-            <Field label="Area (optional)">
-              <input value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} maxLength={300} placeholder="Address or 'Citywide'" />
-            </Field>
+            <Field label="Severity"><select value={form.severity} onChange={(event) => setForm((current) => ({ ...current, severity: event.target.value }))}>{['low', 'medium', 'high', 'critical'].map((value) => <option key={value} value={value}>{labelize(value)}</option>)}</select></Field>
+            <Field label="Status"><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>{['draft', 'scheduled', 'active', 'expired', 'cancelled'].map((value) => <option key={value} value={value}>{labelize(value)}</option>)}</select></Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Affected area"><input value={form.affectedArea} onChange={(event) => setForm((current) => ({ ...current, affectedArea: event.target.value }))} maxLength={160} placeholder="Citywide, district or route" /></Field>
+            <Field label="Address / area description"><input value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} maxLength={300} /></Field>
+            <Field label="Start time"><input type="datetime-local" value={form.startAt} onChange={(event) => setForm((current) => ({ ...current, startAt: event.target.value }))} /></Field>
+            <Field label="End time"><input type="datetime-local" value={form.endAt} onChange={(event) => setForm((current) => ({ ...current, endAt: event.target.value }))} /></Field>
+            <Field label="Radius (km)" hint="0.1–100"><input type="number" min="0.1" max="100" step="0.1" value={form.radiusKm} onChange={(event) => setForm((current) => ({ ...current, radiusKm: event.target.value }))} /></Field>
+            <Field label="Center latitude" hint="Optional"><input type="number" min="-90" max="90" value={form.latitude} onChange={(event) => setForm((current) => ({ ...current, latitude: event.target.value }))} /></Field>
+            <Field label="Center longitude" hint="Optional"><input type="number" min="-180" max="180" value={form.longitude} onChange={(event) => setForm((current) => ({ ...current, longitude: event.target.value }))} /></Field>
           </div>
           {formError ? <ErrorState message={formError} /> : null}
         </div>
@@ -535,14 +558,24 @@ export function AlertsSection() {
       <ConfirmDialog
         open={Boolean(toggleTarget)}
         onClose={() => setToggleTarget(null)}
-        title={toggleTarget?.active ? `Close “${toggleTarget?.title}”?` : `Reopen “${toggleTarget?.title}”?`}
+        title={toggleTarget?.active ? `Close “${toggleTarget?.title}”?` : `Publish “${toggleTarget?.title}”?`}
         message={toggleTarget?.active
           ? 'The broadcast is removed from citizen notification feeds. Existing notifications already delivered remain in user histories.'
-          : 'The broadcast becomes visible again on citizen safety feeds. No new notifications are sent.'}
-        confirmLabel={toggleTarget?.active ? 'Close broadcast' : 'Reopen broadcast'}
+          : 'The broadcast becomes active and is delivered in-app to active citizens.'}
+        confirmLabel={toggleTarget?.active ? 'Close broadcast' : 'Publish broadcast'}
         danger={Boolean(toggleTarget?.active)}
         busy={busy}
         onConfirm={toggleAlert}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title={`Delete “${deleteTarget?.title || 'broadcast'}”?`}
+        message="This permanently removes the broadcast record. Existing citizen notifications remain in their history, but the alert is no longer managed or published."
+        confirmLabel="Delete broadcast"
+        danger
+        busy={busy}
+        onConfirm={removeAlert}
       />
     </div>
   );

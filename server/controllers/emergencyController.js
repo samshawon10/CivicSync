@@ -16,7 +16,7 @@ import { emitEmergencyEvent } from '../realtime/emergencyRealtime.js';
 import { canTransitionAssignment, canTransitionEmergency } from '../services/emergencyLifecycle.js';
 import { evaluateEmergencySla } from '../services/emergencySla.js';
 import { sanitizeSettings } from '../config/settingsDefaults.js';
-import { activeEmergencyStatuses, assignmentStatuses, emergencyCategories, emergencyRoleGroups, emergencySeverities, emergencyStatuses, emergencyTypeCatalog, responseTypes, sensitiveCategories } from '../config/emergencyOptions.js';
+import { activeEmergencyStatuses, alertCategories, alertStatuses, assignmentStatuses, emergencyCategories, emergencyRoleGroups, emergencySeverities, emergencyStatuses, emergencyTypeCatalog, responseTypes, sensitiveCategories } from '../config/emergencyOptions.js';
 import { haversineKm, isSensitiveCategory, suggestEmergencyClassification, suggestedTeamTypes } from '../services/emergencyIntelligence.js';
 
 const commandRoles = emergencyRoleGroups.command;
@@ -550,16 +550,133 @@ export async function analytics(req, res, next) {
 }
 export async function emergencyTypes(req, res, next) { try { const configured = await EmergencyCategory.find({ active: true }).select('key label subcategories').sort({ label: 1 }).lean(); const keys = new Set(configured.map((category) => category.key)); const categories = [...emergencyTypeCatalog, ...configured.filter((category) => !keys.has(category.key) || !emergencyTypeCatalog.some((item) => item.key === category.key)).map((category) => ({ key: category.key, label: category.label, subcategories: category.subcategories.filter((item) => item.active !== false).map((item) => item.key) }))]; res.json({ success: true, categories }); } catch (error) { next(error); } }
 export async function manageCategories(req, res, next) { try { if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Only Super Admin can manage emergency categories.' }); const categories = await EmergencyCategory.find().sort({ label: 1 }); res.json({ success: true, categories }); } catch (error) { next(error); } }
-export async function createCategory(req, res, next) { try { if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Only Super Admin can manage emergency categories.' }); const key = clean(req.body.key, 80).toLowerCase().replace(/\s+/g, '_'); if (!/^[a-z0-9_]+$/.test(key) || !clean(req.body.label, 80)) return res.status(400).json({ success: false, message: 'A valid category key and label are required.' }); const subcategories = Array.isArray(req.body.subcategories) ? req.body.subcategories.map((item) => ({ key: clean(typeof item === 'string' ? item : item.key, 80).toLowerCase().replace(/\s+/g, '_'), label: clean(typeof item === 'string' ? title(item) : item.label, 100) })).filter((item) => item.key && item.label) : []; const category = await EmergencyCategory.create({ key, label: clean(req.body.label, 80), subcategories, createdBy: req.user._id }); res.status(201).json({ success: true, category }); } catch (error) { next(error); } }
-export async function updateCategory(req, res, next) { try { if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Only Super Admin can manage emergency categories.' }); if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Category not found.' }); const category = await EmergencyCategory.findByIdAndUpdate(req.params.id, { ...(req.body.label !== undefined ? { label: clean(req.body.label, 80) } : {}), ...(typeof req.body.active === 'boolean' ? { active: req.body.active } : {}) }, { new: true, runValidators: true }); if (!category) return res.status(404).json({ success: false, message: 'Category not found.' }); res.json({ success: true, category }); } catch (error) { next(error); } }
+
+function categoryPayload(body) {
+  const key = clean(body.key, 80).toLowerCase().replace(/\s+/g, '_');
+  if (!/^[a-z0-9_]+$/.test(key) || !clean(body.label, 80)) return { error: 'A valid category key and label are required.' };
+  const priority = ['low', 'medium', 'high', 'critical'].includes(body.priority) ? body.priority : 'medium';
+  const color = /^#[0-9a-f]{6}$/i.test(String(body.color || '')) ? body.color : '#2563eb';
+  const responseTargetMinutes = Number(body.responseTargetMinutes);
+  const responseWarningMinutes = Number(body.responseWarningMinutes);
+  const responseCriticalMinutes = Number(body.responseCriticalMinutes);
+  if (![responseTargetMinutes, responseWarningMinutes, responseCriticalMinutes].every((value) => Number.isInteger(value) && value >= 1 && value <= 1440)) return { error: 'Response-time values must be whole minutes between 1 and 1440.' };
+  if (responseWarningMinutes > responseTargetMinutes || responseCriticalMinutes > responseTargetMinutes) return { error: 'Warning and critical thresholds cannot exceed the target response time.' };
+  const subcategories = Array.isArray(body.subcategories) ? body.subcategories.map((item) => ({ key: clean(typeof item === 'string' ? item : item.key, 80).toLowerCase().replace(/\s+/g, '_'), label: clean(typeof item === 'string' ? title(item) : item.label, 100), active: typeof item === 'object' ? item.active !== false : true })).filter((item) => /^[a-z0-9_]+$/.test(item.key) && item.label) : [];
+  return { value: { key, label: clean(body.label, 80), description: clean(body.description, 300), icon: clean(body.icon || 'siren', 60) || 'siren', priority, color, subcategories, responseTargetMinutes, responseWarningMinutes, responseCriticalMinutes, responseTimeActive: typeof body.responseTimeActive === 'boolean' ? body.responseTimeActive : true, active: typeof body.active === 'boolean' ? body.active : true } };
+}
+
+export async function createCategory(req, res, next) { try { if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Only Super Admin can manage emergency categories.' }); const payload = categoryPayload(req.body); if (payload.error) return res.status(400).json({ success: false, message: payload.error }); if (await EmergencyCategory.exists({ key: payload.value.key })) return res.status(409).json({ success: false, message: 'A category with this key already exists.' }); const category = await EmergencyCategory.create({ ...payload.value, createdBy: req.user._id }); res.status(201).json({ success: true, category }); } catch (error) { next(error); } }
+
+export async function updateCategory(req, res, next) { try { if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Only Super Admin can manage emergency categories.' }); if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Category not found.' }); const existing = await EmergencyCategory.findById(req.params.id); if (!existing) return res.status(404).json({ success: false, message: 'Category not found.' }); const payload = categoryPayload({ ...existing.toObject(), ...req.body, key: existing.key }); if (payload.error) return res.status(400).json({ success: false, message: payload.error }); Object.assign(existing, payload.value); await existing.save(); res.json({ success: true, category: existing }); } catch (error) { next(error); } }
+
+export async function deleteCategory(req, res, next) { try { if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Only Super Admin can manage emergency categories.' }); if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Category not found.' }); const category = await EmergencyCategory.findById(req.params.id); if (!category) return res.status(404).json({ success: false, message: 'Category not found.' }); const usage = await Emergency.countDocuments({ category: category.key }); if (usage) return res.status(409).json({ success: false, message: `This category has ${usage} emergency record(s). Deactivate it instead of deleting historical data.` }); await category.deleteOne(); res.status(204).end(); } catch (error) { next(error); } }
 
 export async function listContacts(req, res, next) { try { res.json({ success: true, contacts: await EmergencyContact.find({ citizen: req.user._id }).sort({ createdAt: -1 }) }); } catch (error) { next(error); } }
 export async function createContact(req, res, next) { try { if (!clean(req.body.name, 100) || !clean(req.body.phone, 30)) return res.status(400).json({ success: false, message: 'Name and phone are required.' }); const contact = await EmergencyContact.create({ citizen: req.user._id, name: clean(req.body.name, 100), phone: clean(req.body.phone, 30), relationship: clean(req.body.relationship, 60), enabledForSos: req.body.enabledForSos !== false }); res.status(201).json({ success: true, contact }); } catch (error) { next(error); } }
 export async function updateContact(req, res, next) { try { if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Contact not found.' }); const contact = await EmergencyContact.findOneAndUpdate({ _id: req.params.id, citizen: req.user._id }, { name: clean(req.body.name, 100), phone: clean(req.body.phone, 30), relationship: clean(req.body.relationship, 60), enabledForSos: req.body.enabledForSos !== false }, { new: true, runValidators: true }); if (!contact) return res.status(404).json({ success: false, message: 'Contact not found.' }); res.json({ success: true, contact }); } catch (error) { next(error); } }
 export async function deleteContact(req, res, next) { try { if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Contact not found.' }); const result = await EmergencyContact.deleteOne({ _id: req.params.id, citizen: req.user._id }); if (!result.deletedCount) return res.status(404).json({ success: false, message: 'Contact not found.' }); res.status(204).end(); } catch (error) { next(error); } }
+
+function alertPayload(body = {}) {
+  const category = alertCategories.includes(body.category) ? body.category : 'public_safety';
+  const status = alertStatuses.includes(body.status) ? body.status : 'active';
+  const startAt = body.startAt ? new Date(body.startAt) : null;
+  const endAt = body.endAt ? new Date(body.endAt) : null;
+  if (startAt && Number.isNaN(startAt.getTime())) return { error: 'Alert start time is invalid.' };
+  if (endAt && Number.isNaN(endAt.getTime())) return { error: 'Alert end time is invalid.' };
+  if (startAt && endAt && endAt <= startAt) return { error: 'Alert end time must be after its start time.' };
+  const latitude = body.location?.latitude === undefined || body.location?.latitude === null || body.location?.latitude === '' ? null : Number(body.location.latitude);
+  const longitude = body.location?.longitude === undefined || body.location?.longitude === null || body.location?.longitude === '' ? null : Number(body.location.longitude);
+  if ((latitude === null) !== (longitude === null) || (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180))) return { error: 'Alert coordinates must be a valid latitude/longitude pair.' };
+  const radiusKm = body.radiusKm === undefined || body.radiusKm === null || body.radiusKm === '' ? null : Number(body.radiusKm);
+  if (radiusKm !== null && (!Number.isFinite(radiusKm) || radiusKm < 0.1 || radiusKm > 100)) return { error: 'Alert radius must be between 0.1 and 100 km.' };
+  return { value: { title: clean(body.title, 160), message: clean(body.message, 1000), category, severity: emergencySeverities.includes(body.severity) ? body.severity : 'medium', status, startAt, endAt, affectedArea: clean(body.affectedArea, 160), radiusKm, location: { address: clean(body.location?.address, 300), ...(latitude !== null ? { latitude, longitude } : {}) }, active: status === 'active' } };
+}
+
+
+function effectiveAlertState(payload, now = new Date()) {
+  let status = payload.status;
+  if (status === 'active' && payload.startAt && payload.startAt > now) status = 'scheduled';
+  if (status === 'active' && payload.endAt && payload.endAt <= now) status = 'expired';
+  return { ...payload, status, active: status === 'active' && (!payload.startAt || payload.startAt <= now) && (!payload.endAt || payload.endAt > now) };
+}
+
+async function deliverActiveAlert(alert) {
+  if (!alert.active) return;
+  const citizenRecipients = await User.find({ role: 'citizen', status: 'active' }).select('_id').lean();
+  if (citizenRecipients.length) await Notification.insertMany(citizenRecipients.map((recipient) => ({ recipient: recipient._id, relatedType: 'system', relatedId: alert._id, type: 'system', message: `${alert.title}: ${alert.message}`.slice(0, 300) })));
+}
+
+export async function createAlertManaged(req, res, next) {
+  try {
+    if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Emergency command access is required.' });
+    const payload = alertPayload(req.body);
+    if (payload.error) return res.status(400).json({ success: false, message: payload.error });
+    if (!payload.value.title || !payload.value.message) return res.status(400).json({ success: false, message: 'Alert title and message are required.' });
+    const alert = await EmergencyAlert.create({ ...effectiveAlertState(payload.value), createdBy: req.user._id });
+    await deliverActiveAlert(alert);
+    await audit(req.user, 'emergency_alert_created', alert, alert.title, 'system');
+    emitEmergencyEvent('EMERGENCY_ALERT_CREATED', { alertId: alert._id, title: alert.title, severity: alert.severity, status: alert.status }, { roles: ['citizen', ...staffRoles] });
+    return res.status(201).json({ success: true, alert, delivery: alert.active ? 'in_app' : 'not_yet_active' });
+  } catch (error) { next(error); }
+}
+
+export async function updateAlertManaged(req, res, next) {
+  try {
+    if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Emergency command access is required.' });
+    if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Alert not found.' });
+    const existing = await EmergencyAlert.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Alert not found.' });
+    const body = { ...existing.toObject(), ...req.body };
+    if (req.body.active !== undefined && req.body.status === undefined) body.status = req.body.active ? 'active' : 'cancelled';
+    const payload = alertPayload(body);
+    if (payload.error) return res.status(400).json({ success: false, message: payload.error });
+    const wasActive = existing.active;
+    Object.assign(existing, effectiveAlertState(payload.value));
+    await existing.save();
+    if (!wasActive && existing.active) await deliverActiveAlert(existing);
+    await audit(req.user, existing.status === 'cancelled' ? 'emergency_alert_cancelled' : 'emergency_alert_updated', existing, existing.title, 'system');
+    emitEmergencyEvent('EMERGENCY_ALERT_CREATED', { alertId: existing._id, title: existing.title, severity: existing.severity, status: existing.status }, { roles: ['citizen', ...staffRoles] });
+    return res.json({ success: true, alert: existing, delivery: existing.active ? 'in_app' : 'not_active' });
+  } catch (error) { next(error); }
+}
+
+export async function deleteAlertManaged(req, res, next) {
+  try {
+    if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Emergency command access is required.' });
+    if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Alert not found.' });
+    const alert = await EmergencyAlert.findById(req.params.id);
+    if (!alert) return res.status(404).json({ success: false, message: 'Alert not found.' });
+    await alert.deleteOne();
+    await audit(req.user, 'emergency_alert_deleted', { ...alert.toObject(), emergencyId: alert.title }, alert.title, 'system');
+    emitEmergencyEvent('EMERGENCY_ALERT_CREATED', { alertId: alert._id, title: alert.title, severity: alert.severity, status: 'deleted' }, { roles: ['citizen', ...staffRoles] });
+    res.status(204).end();
+  } catch (error) { next(error); }
+}
+
 export async function createAlert(req, res, next) { try { if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Emergency command access is required.' }); if (!clean(req.body.title, 160) || !clean(req.body.message, 1000)) return res.status(400).json({ success: false, message: 'Alert title and message are required.' }); const alertLatitude = Number(req.body.location?.latitude); const alertLongitude = Number(req.body.location?.longitude); const hasAlertLatitude = req.body.location?.latitude !== undefined && req.body.location?.latitude !== null && req.body.location?.latitude !== ''; const hasAlertLongitude = req.body.location?.longitude !== undefined && req.body.location?.longitude !== null && req.body.location?.longitude !== ''; if (hasAlertLatitude !== hasAlertLongitude || (hasAlertLatitude && (!Number.isFinite(alertLatitude) || alertLatitude < -90 || alertLatitude > 90 || !Number.isFinite(alertLongitude) || alertLongitude < -180 || alertLongitude > 180))) return res.status(400).json({ success: false, message: 'Alert coordinates must be a valid latitude/longitude pair.' }); const alert = await EmergencyAlert.create({ createdBy: req.user._id, title: clean(req.body.title, 160), message: clean(req.body.message, 1000), category: clean(req.body.category, 80), severity: emergencySeverities.includes(req.body.severity) ? req.body.severity : 'medium', location: { address: clean(req.body.location?.address, 300), ...(hasAlertLatitude ? { latitude: alertLatitude, longitude: alertLongitude } : {}) } }); const citizenRecipients = await User.find({ role: 'citizen', status: 'active' }).select('_id').lean(); if (citizenRecipients.length) await Notification.insertMany(citizenRecipients.map((recipient) => ({ recipient: recipient._id, relatedType: 'system', relatedId: alert._id, type: 'system', message: `${alert.title}: ${alert.message}`.slice(0, 300) }))); await audit(req.user, 'emergency_alert_created', alert, alert.title, 'system'); emitEmergencyEvent('EMERGENCY_ALERT_CREATED', { alertId: alert._id, title: alert.title, severity: alert.severity }, { roles: ['citizen', ...staffRoles] }); res.status(201).json({ success: true, alert }); } catch (error) { next(error); } }
 export async function updateAlert(req, res, next) { try { if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Emergency command access is required.' }); if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Alert not found.' }); if (typeof req.body.active !== 'boolean') return res.status(400).json({ success: false, message: 'Provide an active boolean value.' }); const alert = await EmergencyAlert.findByIdAndUpdate(req.params.id, { active: req.body.active }, { new: true, runValidators: true }); if (!alert) return res.status(404).json({ success: false, message: 'Alert not found.' }); await audit(req.user, req.body.active === false ? 'emergency_alert_closed' : 'emergency_alert_updated', alert, alert.title, 'system'); res.json({ success: true, alert }); } catch (error) { next(error); } }
-export async function listAlerts(req, res, next) { try { const filter = req.query.all === 'true' && commandAccess(req.user) ? {} : { active: true }; res.json({ success: true, alerts: await EmergencyAlert.find(filter).sort({ createdAt: -1 }).limit(50) }); } catch (error) { next(error); } }
+async function activateDueAlerts() {
+  const now = new Date();
+  const due = await EmergencyAlert.find({
+    status: 'scheduled',
+    startAt: { $ne: null, $lte: now },
+    $or: [{ endAt: null }, { endAt: { $gt: now } }]
+  }).select('_id');
+  for (const record of due) {
+    const activated = await EmergencyAlert.findOneAndUpdate(
+      { _id: record._id, status: 'scheduled' },
+      { $set: { status: 'active', active: true } },
+      { new: true }
+    );
+    if (activated) {
+      await deliverActiveAlert(activated);
+      emitEmergencyEvent('EMERGENCY_ALERT_CREATED', { alertId: activated._id, title: activated.title, severity: activated.severity, status: activated.status }, { roles: ['citizen', ...staffRoles] });
+    }
+  }
+  await EmergencyAlert.updateMany({ status: 'active', endAt: { $ne: null, $lte: now } }, { $set: { status: 'expired', active: false } });
+}
+
+export async function listAlerts(req, res, next) { try { await activateDueAlerts(); const filter = req.query.all === 'true' && commandAccess(req.user) ? {} : { active: true }; res.json({ success: true, alerts: await EmergencyAlert.find(filter).sort({ createdAt: -1 }).limit(50) }); } catch (error) { next(error); } }
 
 /** Advisory classification helper for the "I'm not sure what type this is" flow. */
 export async function classifyRequest(req, res, next) {

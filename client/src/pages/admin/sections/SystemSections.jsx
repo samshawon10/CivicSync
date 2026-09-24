@@ -7,21 +7,23 @@ import { SkeletonKpiGrid, SkeletonList } from '../../../components/ui/Skeleton.j
 import { useToast } from '../../../components/ui/Toaster.jsx';
 import { formatDateTime, formatNumber, labelize } from '../../../utils/format.js';
 
-const healthTone = { operational: 'success', degraded: 'medium', unavailable: 'critical', not_monitored: 'neutral', unknown: 'neutral' };
-const healthLabel = { operational: 'Operational', degraded: 'Degraded', unavailable: 'Unavailable', not_monitored: 'Not monitored', unknown: 'Unknown' };
+const healthTone = { operational: 'success', healthy: 'success', degraded: 'medium', unavailable: 'critical', unhealthy: 'critical', not_monitored: 'neutral', unknown: 'neutral' };
+const healthLabel = { operational: 'Operational', healthy: 'Healthy', degraded: 'Degraded', unavailable: 'Unavailable', unhealthy: 'Unhealthy', not_monitored: 'Not monitored', unknown: 'Unknown' };
 
 export function SystemHealthSection() {
-  const request = useAsync(() => adminApi.systemHealth().then((response) => response.data), []);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const request = useAsync(() => adminApi.systemHealth(refreshNonce > 0).then((response) => response.data), [refreshNonce]);
+  function refreshHealth() { setRefreshNonce((value) => value + 1); }
   const checks = request.data?.checks || [];
   const monitored = checks.filter((check) => check.status !== 'not_monitored' && check.status !== 'unknown');
-  const unavailable = monitored.filter((check) => check.status === 'unavailable').length;
+  const unavailable = monitored.filter((check) => check.status === 'unavailable' || check.status === 'unhealthy').length;
   const degraded = monitored.filter((check) => check.status === 'degraded').length;
   const notMonitored = checks.filter((check) => check.status === 'not_monitored' || check.status === 'unknown').length;
   if (request.loading) return <><SkeletonKpiGrid count={4} /><div className="mt-5"><SkeletonList rows={5} /></div></>;
   if (request.error) return <ErrorState message={request.error} onRetry={request.reload} />;
   return (
     <div className="space-y-5">
-      <SectionHeading title="System health" subtitle="Only services with an actual runtime probe are marked operational. Unprobed services remain explicitly unmonitored." action={<Button icon="refresh" onClick={request.reload}>Re-check</Button>} />
+      <SectionHeading title="System health" subtitle="Only services with an actual runtime probe are marked operational. Unprobed services remain explicitly unmonitored." action={<Button icon="refresh" onClick={refreshHealth}>Re-check</Button>} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Monitored services" value={formatNumber(monitored.length)} icon="server" tone="info" hint="runtime probes" />
         <StatCard label="Operational" value={formatNumber(monitored.length - unavailable - degraded)} icon="checkCircle" tone="success" />
@@ -33,7 +35,7 @@ export function SystemHealthSection() {
         <CardBody className="space-y-3">
           {!checks.length ? <EmptyState icon="server" title="No health checks returned" hint="The server did not return a check list. No operational claim has been made." /> : checks.map((check) => (
             <div key={check.key} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border p-3" style={{ borderColor: 'var(--line)' }}>
-              <div className="min-w-0"><p className="text-[13px] font-semibold text-fg">{check.label}</p><p className="mt-1 text-[12px] text-fg-muted">{check.detail || 'No detail supplied by the health probe.'}</p><p className="mt-1 text-[11px] text-fg-subtle">Source: {check.source || 'not supplied'}{check.latencyMs != null ? ` · ${check.latencyMs} ms` : ''}</p></div>
+              <div className="min-w-0"><p className="text-[13px] font-semibold text-fg">{check.label}</p><p className="mt-1 text-[12px] text-fg-muted">{check.detail || 'No detail supplied by the health probe.'}</p><p className="mt-1 text-[11px] text-fg-subtle">Source: {check.source || 'not supplied'}{check.latencyMs != null ? ` · ${check.latencyMs} ms` : ''}{check.checkedAt ? ` · checked ${formatDateTime(check.checkedAt)}` : ''}{check.provider ? ` · ${check.provider}` : ''}</p></div>
               <Badge tone={healthTone[check.status] || 'neutral'}>{healthLabel[check.status] || labelize(check.status || 'unknown')}</Badge>
             </div>
           ))}

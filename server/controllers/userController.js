@@ -1,13 +1,25 @@
 import mongoose from 'mongoose';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import User from '../models/User.js';
 import Report from '../models/Report.js';
 import Emergency from '../models/Emergency.js';
 import ActivityLog from '../models/ActivityLog.js';
+import { profileUploadDir } from '../middleware/uploadMiddleware.js';
 
 const roles = ['citizen', 'admin', 'department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker'];
 const statuses = ['active', 'suspended'];
 
 function safeUser(user) { return user.toSafeObject(); }
+function profilePhotoFilename(photoURL) {
+  if (typeof photoURL !== 'string' || !photoURL.startsWith('/api/users/me/photo/')) return null;
+  const filename = decodeURIComponent(photoURL.slice('/api/users/me/photo/'.length));
+  return filename && path.basename(filename) === filename ? filename : null;
+}
+async function removeProfilePhoto(photoURL) {
+  const filename = profilePhotoFilename(photoURL);
+  if (filename) await fs.unlink(path.join(profileUploadDir, filename)).catch(() => {});
+}
 
 function logActivity(admin, action, targetType, targetId, targetName, description, metadata = {}) {
   return ActivityLog.create({ admin, actorRole: admin.role || '', action, targetType, targetId, targetName, description, metadata, result: 'success' }).catch(() => {});
@@ -91,10 +103,29 @@ export async function deleteUser(req, res, next) {
 export async function getMyProfile(req, res) { return res.json({ success: true, user: safeUser(req.user), preferences: req.user.preferences || { emailNotifications: true } }); }
 export async function updateMyProfile(req, res, next) {
   try {
-    const { name, photoURL } = req.body;
+    const { name, phone, photoURL } = req.body;
     if (name !== undefined) { if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 80) return res.status(400).json({ success: false, message: 'Name must be between 2 and 80 characters.' }); req.user.name = name.trim(); }
-    if (photoURL !== undefined) { if (typeof photoURL !== 'string' || photoURL.length > 500) return res.status(400).json({ success: false, message: 'Profile photo URL is invalid.' }); req.user.photoURL = photoURL.trim(); }
-    await req.user.save(); res.json({ success: true, user: safeUser(req.user) });
+    if (phone !== undefined) { if (typeof phone !== 'string' || (phone.trim() && !/^[+()\-\s\d]{6,30}$/.test(phone.trim()))) return res.status(400).json({ success: false, message: 'Phone number is invalid.' }); req.user.phone = phone.trim(); }
+    if (photoURL !== undefined) { if (typeof photoURL !== 'string' || photoURL.length > 500 || (photoURL && !/^https?:\/\//i.test(photoURL) && !photoURL.startsWith('/api/users/me/photo/'))) return res.status(400).json({ success: false, message: 'Profile photo URL is invalid.' }); await removeProfilePhoto(req.user.photoURL); req.user.photoURL = photoURL.trim(); req.user.profilePhotoFilename = profilePhotoFilename(req.user.photoURL); }
+    await req.user.save(); await logActivity(req.user, 'profile_updated', 'user', req.user._id, req.user.name, 'Administrator updated their profile.'); res.json({ success: true, user: safeUser(req.user) });
+  } catch (error) { next(error); }
+}
+export async function uploadMyProfilePhoto(req, res, next) {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Choose a profile image first.' });
+    await removeProfilePhoto(req.user.photoURL);
+    req.user.profilePhotoFilename = req.file.filename;
+    req.user.photoURL = `/api/users/me/photo/${encodeURIComponent(req.file.filename)}`;
+    await req.user.save();
+    await logActivity(req.user, 'profile_photo_updated', 'user', req.user._id, req.user.name, 'Administrator updated their profile photo.');
+    return res.json({ success: true, message: 'Profile photo updated.', user: safeUser(req.user) });
+  } catch (error) { next(error); }
+}
+export async function getMyProfilePhoto(req, res, next) {
+  try {
+    const filename = path.basename(req.params.filename || '');
+    if (!filename || !req.user.profilePhotoFilename || filename !== req.user.profilePhotoFilename) return res.status(404).json({ success: false, message: 'Profile photo not found.' });
+    return res.sendFile(path.join(profileUploadDir, filename), (error) => { if (error && !res.headersSent) res.status(404).json({ success: false, message: 'Profile photo is unavailable.' }); });
   } catch (error) { next(error); }
 }
 export async function updateMyPreferences(req, res, next) { try { if (typeof req.body.emailNotifications !== 'boolean') return res.status(400).json({ success: false, message: 'Email notification preference must be true or false.' }); req.user.preferences = { ...(req.user.preferences || {}), emailNotifications: req.body.emailNotifications }; await req.user.save(); res.json({ success: true, preferences: req.user.preferences }); } catch (error) { next(error); } }

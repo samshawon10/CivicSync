@@ -21,6 +21,12 @@ function payload(body) {
       latitude,
       longitude,
       location: facilityPoint(latitude, longitude),
+      status: ['operational', 'degraded', 'offline'].includes(body.status) ? body.status : 'operational',
+      emergencyServiceAvailable: typeof body.emergencyServiceAvailable === 'boolean' ? body.emergencyServiceAvailable : true,
+      description: clean(body.description, 1000),
+      openingHours: clean(body.openingHours, 160),
+      email: clean(body.email, 120),
+      emergencyPhone: clean(body.emergencyPhone, 30),
       phone: clean(body.phone, 30),
       ...(typeof body.available === 'boolean' ? { available: body.available } : {}),
       ...(typeof body.active === 'boolean' ? { active: body.active } : {})

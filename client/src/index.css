@@ -289,6 +289,19 @@
   .skeleton::after { display: none; }
 }
 
+/* SweetAlert2 is shared by API failures, confirmations, and success feedback. */
+.swal2-container { z-index: 1000; }
+.civicsync-swal { border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-token); }
+.civicsync-swal .swal2-title { color: var(--fg); font-weight: 700; }
+.civicsync-swal .swal2-html-container { color: var(--fg-muted); }
+.civicsync-swal .swal2-confirm { background: var(--color-civic-600); border-radius: 8px; }
+.civicsync-swal .swal2-cancel { background: var(--surface-2); color: var(--fg-muted); border: 1px solid var(--line); border-radius: 8px; }
+.civicsync-swal-toast { box-shadow: var(--shadow-token); }
+
+@media (prefers-reduced-motion: reduce) {
+  .swal2-popup { animation: none !important; }
+}
+
 @media print {
   .no-print { display: none !important; }
   body { background: #fff; color: #000; }

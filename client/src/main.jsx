@@ -8,6 +8,7 @@ import { ToastProvider } from './components/ui/Toaster.jsx';
 import ErrorBoundary from './components/ui/ErrorBoundary.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { LocaleProvider } from './context/LocaleContext.jsx';
+import 'sweetalert2/dist/sweetalert2.min.css';
 import './index.css';
 
 createRoot(document.getElementById('root')).render(

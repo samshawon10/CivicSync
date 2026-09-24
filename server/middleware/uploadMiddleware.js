@@ -7,6 +7,7 @@ import multer from 'multer';
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 export const reportUploadDir = path.resolve(serverDir, '..', 'uploads', 'reports');
 export const emergencyUploadDir = path.resolve(serverDir, '..', 'storage', 'emergencies');
+export const profileUploadDir = path.resolve(serverDir, '..', 'storage', 'profiles');
 
 const allowedMimeTypes = new Set([
   'image/jpeg',
@@ -18,6 +19,7 @@ const allowedMimeTypes = new Set([
 ]);
 
 fs.mkdirSync(reportUploadDir, { recursive: true });
+fs.mkdirSync(profileUploadDir, { recursive: true });
 fs.mkdirSync(emergencyUploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -56,3 +58,14 @@ export const uploadEmergencyEvidence = multer({
   fileFilter: (req, file, callback) => emergencyMimeTypes.has(file.mimetype) ? callback(null, true) : callback(Object.assign(new Error('Only image, video, audio, and PDF evidence files are allowed.'), { statusCode: 400 })),
   limits: { fileSize: 25 * 1024 * 1024, files: 5 }
 }).array('evidence', 5);
+
+const profileMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const profileStorage = multer.diskStorage({
+  destination: (req, file, callback) => callback(null, profileUploadDir),
+  filename: (req, file, callback) => callback(null, `${Date.now()}-${randomUUID()}${path.extname(file.originalname || '').toLowerCase()}`)
+});
+export const uploadProfileImage = multer({
+  storage: profileStorage,
+  fileFilter: (req, file, callback) => profileMimeTypes.has(file.mimetype) ? callback(null, true) : callback(Object.assign(new Error('Only JPG, PNG, and WEBP profile images are allowed.'), { statusCode: 400 })),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 }
+}).single('photo');

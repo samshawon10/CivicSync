@@ -10,13 +10,14 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { useAdminRealtime } from '../../context/AdminRealtimeContext.jsx';
 import { adminApi } from '../../services/adminService.js';
+import api from '../../services/api.js';
 import { notificationsApi } from '../../services/notificationService.js';
 import { cx } from '../../utils/format.js';
 
 const SIDEBAR_KEY = 'civicsync.admin.sidebar';
 
-const healthTone = { operational: 'success', degraded: 'medium', unavailable: 'critical', not_monitored: 'neutral' };
-const statusLabel = { operational: 'Operational', degraded: 'Degraded', unavailable: 'Unavailable', not_monitored: 'Not monitored' };
+const healthTone = { operational: 'success', healthy: 'success', degraded: 'medium', unavailable: 'critical', unhealthy: 'critical', not_monitored: 'neutral', unknown: 'neutral' };
+const statusLabel = { operational: 'Operational', healthy: 'Healthy', degraded: 'Degraded', unavailable: 'Unavailable', unhealthy: 'Unhealthy', not_monitored: 'Not monitored', unknown: 'Unknown' };
 
 function readCollapsed() {
   try { return window.localStorage.getItem(SIDEBAR_KEY) === 'collapsed'; } catch { return false; }
@@ -77,9 +78,9 @@ export default function SuperAdminLayout({ section, title, subtitle, actions, br
 
   const healthSummary = useMemo(() => {
     if (!Array.isArray(health) || !health.length) return { tone: 'neutral', label: 'Health status unavailable' };
-    const monitored = health.filter((check) => check.status !== 'not_monitored');
+    const monitored = health.filter((check) => check.status !== 'not_monitored' && check.status !== 'unknown');
     if (!monitored.length) return { tone: 'neutral', label: 'No monitored services' };
-    const unavailable = monitored.filter((check) => check.status === 'unavailable').length;
+    const unavailable = monitored.filter((check) => check.status === 'unavailable' || check.status === 'unhealthy').length;
     const degraded = monitored.filter((check) => check.status === 'degraded').length;
     if (unavailable) return { tone: 'critical', label: `${unavailable} service${unavailable > 1 ? 's' : ''} unavailable` };
     if (degraded) return { tone: 'medium', label: `${degraded} service${degraded > 1 ? 's' : ''} degraded` };

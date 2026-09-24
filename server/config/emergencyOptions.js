@@ -23,6 +23,9 @@ export const assignmentStatuses = ['assigned', 'accepted', 'en_route', 'on_scene
 // Suggested response branch labels (free text is still allowed when dispatching).
 export const responseTypes = ['Medical', 'Fire', 'Security', 'Traffic', 'Disaster', 'Rescue', 'Infrastructure', 'Other'];
 
+export const alertCategories = ['emergency', 'public_safety', 'road', 'flood', 'fire', 'weather', 'infrastructure', 'announcement'];
+export const alertStatuses = ['draft', 'scheduled', 'active', 'expired', 'cancelled'];
+
 export const emergencyTypeCatalog = [
   { key: 'medical', label: 'Medical', subcategories: ['medical_emergency', 'serious_injury', 'unconscious_person', 'breathing_difficulty', 'heart_emergency', 'severe_bleeding', 'elderly_assistance', 'ambulance_request', 'public_medical_incident'] },
   { key: 'fire_disaster', label: 'Fire & Disaster', subcategories: ['building_fire', 'electrical_fire', 'vehicle_fire', 'gas_leak', 'explosion', 'smoke_hazard', 'flood', 'earthquake', 'storm', 'natural_disaster', 'building_collapse'] },

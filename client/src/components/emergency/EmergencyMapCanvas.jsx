@@ -10,6 +10,8 @@ import { FacilityIcon, createClusterIcon, createEmergencyIcon, createFacilityIco
 
 const DEFAULT_CENTER = [23.8103, 90.4125];
 const DEFAULT_ZOOM = 11;
+const TILE_URL = import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_PROVIDER = import.meta.env.VITE_MAP_TILE_PROVIDER || 'OpenStreetMap';
 const categoryChips = [
   ['all', 'All'], ['medical', 'Medical'], ['fire_disaster', 'Fire / disaster'], ['security_crime', 'Security'],
   ['women_safety', 'Women safety'], ['child_safety', 'Child safety'], ['missing_person', 'Missing'],
@@ -102,6 +104,13 @@ export default function EmergencyMap({
   const [showFacilities, setShowFacilities] = useState(true);
   const [showResponders, setShowResponders] = useState(true);
   const [criticalOnly, setCriticalOnly] = useState(false);
+  const [tileError, setTileError] = useState(false);
+  const [tileAttempt, setTileAttempt] = useState(0);
+
+  function retryTiles() {
+    setTileError(false);
+    setTileAttempt((value) => value + 1);
+  }
 
   const located = useMemo(() => emergencies.filter((item) => validPoint(item.location)), [emergencies]);
   const visible = useMemo(() => located.filter((item) => (category === 'all' || item.category === category) && (!criticalOnly || item.severity === 'critical')), [located, category, criticalOnly]);
@@ -130,7 +139,8 @@ export default function EmergencyMap({
   ) : <>{incidentMarkers}{facilityMarkers}</>;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      {tileError ? <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="alert"><span><strong>Map tiles are currently unavailable.</strong> Check your internet connection or try again.</span><button type="button" onClick={retryTiles} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100">Retry map</button></div> : null}
       {showControls ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
           {categoryChips.map(([key, text]) => <button key={key} type="button" aria-pressed={category === key} onClick={() => setCategory(key)} className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${category === key ? 'bg-ink text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>{text}</button>)}
@@ -144,7 +154,7 @@ export default function EmergencyMap({
         </div>
       ) : null}
       <MapContainer center={center} zoom={zoom} className={height} scrollWheelZoom style={{ height: '100%' }}>
-        <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <TileLayer key={`${TILE_URL}-${tileAttempt}`} attribution={TILE_PROVIDER === 'OpenStreetMap' ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' : `&copy; ${TILE_PROVIDER}`} url={TILE_URL} eventHandlers={{ tileerror: () => setTileError(true), load: () => setTileError(false) }} />
         <FitBounds points={points} enabled={autoFit} />
         <ClickCapture onMapClick={onMapClick} />
         {markers}

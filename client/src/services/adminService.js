@@ -10,12 +10,17 @@ export const adminApi = {
   analytics: (params) => api.get('/admin/analytics', { params }),
   governance: (params) => api.get('/admin/governance', { params }),
   operationsAnalytics: (params) => api.get('/admin/analytics/operations', { params }),
-  systemHealth: () => api.get('/admin/system-health'),
+  systemHealth: (refreshMap = false) => api.get('/admin/system-health', { params: refreshMap ? { refresh: 'true' } : undefined }),
+  mapTileHealth: (refresh = false) => api.get('/admin/system-health/map-tiles', { params: refresh ? { refresh: 'true' } : undefined }),
   permissions: () => api.get('/admin/permissions'),
   search: (q, config) => api.get('/admin/search', { params: { q }, ...config }),
   categoryGovernance: () => api.get('/admin/governance/categories'),
 
   // Users
+  profile: () => api.get('/users/me'),
+  updateProfile: (payload) => api.patch('/users/me', payload),
+  uploadProfilePhoto: (file, onProgress) => { const form = new FormData(); form.append('photo', file); return api.post('/users/me/photo', form, { headers: { 'Content-Type': 'multipart/form-data' }, onUploadProgress: (event) => { if (onProgress && event.total) onProgress(Math.round((event.loaded * 100) / event.total)); } }); },
+  removeProfilePhoto: () => api.patch('/users/me', { photoURL: '' }),
   users: (params) => api.get('/admin/users', { params }),
   user: (id) => api.get(`/admin/users/${id}`),
   selectUsers: (q) => api.get('/admin/users/select', { params: { q } }),

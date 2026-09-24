@@ -11,8 +11,8 @@ import { SkeletonChart, SkeletonKpiGrid, SkeletonList } from '../../../component
 import { DonutChart, HBarChart, LineChart, toChartRows } from '../../../components/ui/Charts.jsx';
 import { formatMinutes, formatNumber, formatRelative, labelize, severityTone, statusTone, trendLabel, trendTone } from '../../../utils/format.js';
 
-const healthTone = { operational: 'success', degraded: 'medium', unavailable: 'critical', not_monitored: 'neutral' };
-const healthLabel = { operational: 'Operational', degraded: 'Degraded', unavailable: 'Unavailable', not_monitored: 'Not monitored' };
+const healthTone = { operational: 'success', healthy: 'success', degraded: 'medium', unavailable: 'critical', unhealthy: 'critical', not_monitored: 'neutral' };
+const healthLabel = { operational: 'Operational', healthy: 'Healthy', degraded: 'Degraded', unavailable: 'Unavailable', unhealthy: 'Unhealthy', not_monitored: 'Not monitored' };
 const toTrendText = (trend) => (trend ? trendLabel(trend) : 'Trend unavailable');
 
 const ranges = [

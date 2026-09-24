@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { addAssignmentWorkers, analytics, assignEmergency, backupEmergency, classifyRequest, closeEmergency, communityVerify, createAlert, createCategory, createContact, createEmergency, dashboard, deleteContact, downloadEvidence, emergencyTypes, escalateEmergency, getEmergency, hotspots, listAlerts, listAssignableResponders, listContacts, listEmergencies, manageCategories, mapEmergencies, mergeEmergency, nearbyResponderTeams, responderLocations, responderPositions, resolveEmergency, safetyIntelligence, similarEmergencies, updateAlert, updateAssignmentStatus, updateCategory, updateContact, updateEmergency, updateResponderLocation, updateStatus, uploadEvidence } from '../controllers/emergencyController.js';
+import { addAssignmentWorkers, analytics, assignEmergency, backupEmergency, classifyRequest, closeEmergency, communityVerify, createAlert, createCategory, createContact, createEmergency, createAlertManaged, dashboard, deleteAlertManaged, deleteCategory, deleteContact, downloadEvidence, emergencyTypes, escalateEmergency, getEmergency, hotspots, listAlerts, listAssignableResponders, listContacts, listEmergencies, manageCategories, mapEmergencies, mergeEmergency, nearbyResponderTeams, responderLocations, responderPositions, resolveEmergency, safetyIntelligence, similarEmergencies, updateAlert, updateAlertManaged, updateAssignmentStatus, updateCategory, updateContact, updateEmergency, updateResponderLocation, updateStatus, uploadEvidence } from '../controllers/emergencyController.js';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 import { uploadEmergencyEvidence } from '../middleware/uploadMiddleware.js';
 
@@ -9,6 +9,7 @@ router.get('/types', emergencyTypes);
 router.get('/categories/manage', manageCategories);
 router.post('/categories', createCategory);
 router.patch('/categories/:id', updateCategory);
+router.delete('/categories/:id', deleteCategory);
 router.post('/classify', classifyRequest);
 router.get('/assignable-responders', listAssignableResponders);
 router.get('/map', mapEmergencies);
@@ -18,8 +19,9 @@ router.get('/safety-intelligence', safetyIntelligence);
 router.get('/analytics', analytics);
 router.get('/dashboard', dashboard);
 router.get('/alerts', listAlerts);
-router.post('/alerts', createAlert);
-router.patch('/alerts/:id', updateAlert);
+router.post('/alerts', createAlertManaged);
+router.patch('/alerts/:id', updateAlertManaged);
+router.delete('/alerts/:id', deleteAlertManaged);
 router.post('/', createEmergency);
 router.get('/', listEmergencies);
 router.get('/:id', getEmergency);

@@ -27,6 +27,7 @@ import { reportStatuses, reportPriorities, reportCategories, reportDepartments }
 import { permissionMatrix, roleMeta, roleOrder } from '../config/permissions.js';
 import { readFeatureFlags } from '../config/settingsDefaults.js';
 import { realtimeStatus } from '../realtime/emergencyRealtime.js';
+import { checkMapTileHealth } from '../services/mapTileHealth.js';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(serverDir, '..', 'uploads');
@@ -175,6 +176,14 @@ export async function getGovernanceOverview(req, res, next) {
   } catch (error) { next(error); }
 }
 
+export async function getMapTileHealth(req, res, next) {
+  try {
+    const result = await checkMapTileHealth({ force: req.query.refresh === 'true' });
+    res.set('Cache-Control', 'private, no-store');
+    return res.json({ success: true, ...result });
+  } catch (error) { return next(error); }
+}
+
 /** Real, observable infrastructure checks. Unknowns are reported as such. */
 export async function getSystemHealth(req, res, next) {
   try {
@@ -264,12 +273,18 @@ export async function getSystemHealth(req, res, next) {
       source: 'services/emergencyIntelligence.js'
     });
 
+    const mapTiles = await checkMapTileHealth({ force: req.query.refresh === 'true' });
     checks.push({
       key: 'map',
       label: 'Map Tiles',
-      status: 'not_monitored',
-      detail: 'Tile provider health is not probed server-side; the map client reports its own load failures.',
-      source: 'components/emergency/EmergencyMap.jsx'
+      status: mapTiles.status,
+      detail: `${mapTiles.provider}: ${mapTiles.message}`,
+      latencyMs: mapTiles.responseTimeMs,
+      source: 'server-side HEAD probe',
+      provider: mapTiles.provider,
+      checkedAt: mapTiles.checkedAt,
+      cacheExpiresAt: mapTiles.cacheExpiresAt,
+      statusCode: mapTiles.statusCode
     });
 
     res.json({ success: true, checkedAt: new Date(), checks });
@@ -417,7 +432,7 @@ export async function getPermissions(req, res, next) {
  */
 export async function getCategoryGovernance(req, res, next) {
   try {
-    const [configured, usageRows, subcategoryRows, reportUsageRows, reportDepartmentRows] = await Promise.all([
+    const [configured, usageRows, subcategoryRows, reportUsageRows, reportDepartmentRows, responseRows] = await Promise.all([
       EmergencyCategory.find().sort({ label: 1 }).lean(),
       Emergency.aggregate([{
         $group: {
@@ -429,9 +444,16 @@ export async function getCategoryGovernance(req, res, next) {
       }]),
       Emergency.aggregate([{ $group: { _id: { category: '$category', subcategory: '$subcategory' }, count: { $sum: 1 } } }]),
       Report.aggregate([{ $group: { _id: '$category', count: { $sum: 1 }, lastAt: { $max: '$createdAt' } } }]),
-      Report.aggregate([{ $group: { _id: '$departmentName', count: { $sum: 1 } } }])
+      Report.aggregate([{ $group: { _id: '$departmentName', count: { $sum: 1 } } }]),
+      Emergency.aggregate([
+        { $match: { responseTimeMinutes: { $ne: null } } },
+        { $lookup: { from: 'emergencycategories', localField: 'category', foreignField: 'key', as: 'categoryConfig' } },
+        { $set: { responseTarget: { $ifNull: [{ $arrayElemAt: ['$categoryConfig.responseTargetMinutes', 0] }, 30] }, responseRulesActive: { $ne: [{ $arrayElemAt: ['$categoryConfig.responseTimeActive', 0] }, false] } } },
+        { $group: { _id: '$category', measuredCount: { $sum: 1 }, averageResponseMinutes: { $avg: '$responseTimeMinutes' }, eligibleCount: { $sum: { $cond: ['$responseRulesActive', 1, 0] } }, withinTargetCount: { $sum: { $cond: [{ $cond: ['$responseRulesActive', { $lte: ['$responseTimeMinutes', '$responseTarget'] }, false] }, 1, 0] } } } }
+      ])
     ]);
     const usage = Object.fromEntries(usageRows.map((row) => [row._id, row]));
+    const response = Object.fromEntries(responseRows.map((row) => [row._id, row]));
     const reportUsage = Object.fromEntries(reportUsageRows.map((row) => [row._id, row]));
     const reportDepartmentUsage = Object.fromEntries(reportDepartmentRows.map((row) => [row._id, row.count]));
     const subUsage = Object.fromEntries(subcategoryRows.map((row) => [`${row._id.category}::${row._id.subcategory}`, row.count]));
@@ -440,6 +462,8 @@ export async function getCategoryGovernance(req, res, next) {
     const rows = keys.map((key) => {
       const record = configured.find((item) => item.key === key);
       const catalog = emergencyTypeCatalog.find((item) => item.key === key);
+      const responseTargetMinutes = record?.responseTargetMinutes ?? 30;
+      const measured = response[key];
       const subcategories = record?.subcategories?.length
         ? record.subcategories.map((item) => ({ key: item.key, label: item.label || item.key, active: item.active !== false, usage: count(subUsage[`${key}::${item.key}`]) }))
         : (catalog?.subcategories || []).map((subKey) => ({ key: subKey, label: subKey.replaceAll('_', ' '), active: true, usage: count(subUsage[`${key}::${subKey}`]) }));
@@ -451,6 +475,13 @@ export async function getCategoryGovernance(req, res, next) {
         editable: Boolean(record),
         updatedAt: record?.updatedAt || null,
         subcategories,
+        responseTargetMinutes,
+        responseWarningMinutes: record?.responseWarningMinutes ?? 20,
+        responseCriticalMinutes: record?.responseCriticalMinutes ?? 30,
+        responseTimeActive: record ? record.responseTimeActive !== false : true,
+        averageResponseMinutes: measured?.averageResponseMinutes ?? null,
+        measuredResponseCount: measured?.measuredCount || 0,
+        withinTargetPercent: measured?.eligibleCount ? Math.round((measured.withinTargetCount / measured.eligibleCount) * 1000) / 10 : null,
         usage: count(usage[key]?.count),
         restrictedCount: count(usage[key]?.restricted),
         lastReportedAt: usage[key]?.lastAt || null

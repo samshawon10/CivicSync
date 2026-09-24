@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminApi } from '../../../services/adminService.js';
+import EmergencyMap from '../../../components/emergency/EmergencyMap.jsx';
 import { emergencyApi, facilitiesApi, facilityTypes, responseTeamsApi } from '../../../services/emergencyService.js';
 import useAsync from '../../../hooks/useAsync.js';
 import { apiMessage } from '../../../services/api.js';
@@ -9,11 +10,12 @@ import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Fiel
 import { SkeletonKpiGrid, SkeletonList } from '../../../components/ui/Skeleton.jsx';
 import { ConfirmDialog, Modal } from '../../../components/ui/Overlays.jsx';
 import { useToast } from '../../../components/ui/Toaster.jsx';
-import { availabilityTone, cx, formatDate, formatNumber, formatRelative, labelize, statusTone } from '../../../utils/format.js';
+import { availabilityTone, cx, formatDate, formatMinutes, formatNumber, formatRelative, labelize, statusTone } from '../../../utils/format.js';
 
 const teamTypes = ['medical', 'fire', 'security', 'traffic', 'disaster', 'rescue', 'infrastructure', 'other'];
 const emergencyTypes = ['police', 'fire', 'medical', 'accident', 'disaster', 'other'];
-const blankFacility = { name: '', type: 'hospital', address: '', latitude: '', longitude: '', phone: '', available: true, active: true };
+const blankFacility = { name: '', type: 'hospital', description: '', address: '', latitude: '', longitude: '', phone: '', emergencyPhone: '', email: '', openingHours: '', emergencyServiceAvailable: true, status: 'operational', available: true, active: true };
+const blankCategory = { key: '', label: '', description: '', icon: 'siren', priority: 'medium', color: '#2563eb', subcategories: '', responseTargetMinutes: 30, responseWarningMinutes: 20, responseCriticalMinutes: 30, responseTimeActive: true, active: true };
 
 /* ------------------------------------------------------------- Facilities */
 
@@ -39,9 +41,10 @@ export function FacilitiesSection() {
   function openEdit(facility) {
     setFormError('');
     setForm({
-      name: facility.name || '', type: facility.type || 'hospital', address: facility.address || '',
-      latitude: facility.latitude ?? '', longitude: facility.longitude ?? '', phone: facility.phone || '',
-      available: facility.available !== false, active: facility.active !== false
+      name: facility.name || '', type: facility.type || 'hospital', description: facility.description || '', address: facility.address || '',
+      latitude: facility.latitude ?? '', longitude: facility.longitude ?? '', phone: facility.phone || '', emergencyPhone: facility.emergencyPhone || '',
+      email: facility.email || '', openingHours: facility.openingHours || '', emergencyServiceAvailable: facility.emergencyServiceAvailable !== false,
+      status: facility.status || 'operational', available: facility.available !== false, active: facility.active !== false
     });
     setEditTarget(facility);
     setCreateOpen(true);
@@ -61,7 +64,15 @@ export function FacilitiesSection() {
   async function saveFacility() {
     setBusy(true); setFormError('');
     try {
-      const payload = { ...form, latitude: Number(form.latitude), longitude: Number(form.longitude) };
+      const latitude = Number(form.latitude);
+      const longitude = Number(form.longitude);
+      if (!form.name.trim()) throw new Error('Facility name is required.');
+      if (!form.latitude.trim() || !form.longitude.trim() || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error('Enter valid latitude and longitude values.');
+      const payload = {
+        ...form,
+        latitude,
+        longitude
+      };
       if (editTarget) {
         await facilitiesApi.update(editTarget._id, payload);
         toast.success(`Facility “${form.name}” updated.`);
@@ -96,7 +107,8 @@ export function FacilitiesSection() {
       )
     },
     { key: 'phone', label: 'Phone', render: (row) => <span className="text-[13px] text-fg-muted">{row.phone || '—'}</span> },
-    { key: 'available', label: 'Availability', render: (row) => <Badge tone={row.available ? 'success' : 'muted'}>{row.available ? 'Available' : 'Unavailable'}</Badge> },
+    { key: 'emergencyServiceAvailable', label: 'Emergency service', render: (row) => <Badge tone={row.emergencyServiceAvailable ? 'info' : 'muted'}>{row.emergencyServiceAvailable ? 'Yes' : 'No'}</Badge> },
+    { key: 'status', label: 'Status', render: (row) => <Badge tone={row.status === 'operational' ? 'success' : row.status === 'degraded' ? 'medium' : 'muted'}>{labelize(row.status)}</Badge> },
     { key: 'active', label: 'State', render: (row) => <Badge tone={row.active ? 'info' : 'critical'}>{row.active ? 'Active' : 'Inactive'}</Badge> },
     {
       key: 'coordinates', label: 'Coordinates',
@@ -160,9 +172,18 @@ export function FacilitiesSection() {
               {facilityTypes.map((value) => <option key={value} value={value}>{labelize(value)}</option>)}
             </select>
           </Field>
-          <Field label="Phone">
-            <input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} maxLength={30} />
+          <Field label="Status">
+            <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
+              {['operational', 'degraded', 'offline'].map((value) => <option key={value} value={value}>{labelize(value)}</option>)}
+            </select>
           </Field>
+          <Field label="Description" className="sm:col-span-2">
+            <textarea rows={2} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={1000} />
+          </Field>
+          <Field label="Phone"><input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} maxLength={30} /></Field>
+          <Field label="Emergency phone"><input value={form.emergencyPhone} onChange={(event) => setForm((current) => ({ ...current, emergencyPhone: event.target.value }))} maxLength={30} /></Field>
+          <Field label="Email"><input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} maxLength={120} /></Field>
+          <Field label="Opening hours"><input value={form.openingHours} onChange={(event) => setForm((current) => ({ ...current, openingHours: event.target.value }))} maxLength={160} placeholder="e.g. 24 hours" /></Field>
           <Field label="Address" className="sm:col-span-2">
             <input value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} maxLength={300} />
           </Field>
@@ -172,8 +193,14 @@ export function FacilitiesSection() {
           <Field label="Longitude" required hint="-180 to 180">
             <input value={form.longitude} onChange={(event) => setForm((current) => ({ ...current, longitude: event.target.value }))} inputMode="decimal" />
           </Field>
+          <Toggle checked={form.emergencyServiceAvailable} onChange={(value) => setForm((current) => ({ ...current, emergencyServiceAvailable: value }))} label="Emergency service available" hint="Shown to citizens when selecting urgent help." />
           <Toggle checked={form.available} onChange={(value) => setForm((current) => ({ ...current, available: value }))} label="Currently available" hint="Receiving patients, callers or visitors right now." />
           <Toggle checked={form.active} onChange={(value) => setForm((current) => ({ ...current, active: value }))} label="Active listing" hint="Shown on citizen nearby-services screens." />
+        </div>
+        <div className="mt-4 rounded-xl border border-line p-3">
+          <p className="mb-2 text-[12px] font-semibold text-fg">Choose on map</p>
+          <EmergencyMap showControls={false} cluster={false} autoFit={false} height="h-48" onMapClick={(point) => setForm((current) => ({ ...current, latitude: String(point.latitude), longitude: String(point.longitude) }))} center={form.latitude !== '' && form.longitude !== '' ? [Number(form.latitude), Number(form.longitude)] : undefined} />
+          <p className="mt-2 text-[11px] text-fg-subtle">Click the map to replace the coordinates. Manual latitude and longitude remain available above.</p>
         </div>
         {formError ? <div className="mt-4"><ErrorState message={formError} /></div> : null}
       </Modal>
@@ -197,9 +224,10 @@ export function CategoriesSection() {
   const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ key: '', label: '', subcategories: '' });
+  const [form, setForm] = useState(blankCategory);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const governance = useAsync(() => adminApi.categoryGovernance().then((response) => response.data), []);
   const managed = useAsync(() => emergencyApi.manageTypes().then((response) => response.data.categories), []);
@@ -207,13 +235,13 @@ export function CategoriesSection() {
   const managedByKey = Object.fromEntries((managed.data || []).map((category) => [category.key, category]));
   const rows = governance.data?.rows || [];
 
-  function openCreate() { setForm({ key: '', label: '', subcategories: '' }); setEditTarget(null); setFormError(''); setCreateOpen(true); }
+  function openCreate() { setForm({ ...blankCategory }); setEditTarget(null); setFormError(''); setCreateOpen(true); }
 
   function openEdit(row) {
     const doc = managedByKey[row.key];
     if (!doc) return;
     setFormError('');
-    setForm({ key: doc.key, label: doc.label, subcategories: (doc.subcategories || []).map((item) => `${item.key}:${item.label}`).join('\n') });
+    setForm({ key: doc.key, label: doc.label, description: doc.description || '', icon: doc.icon || 'siren', priority: doc.priority || 'medium', color: doc.color || '#2563eb', subcategories: (doc.subcategories || []).map((item) => `${item.key}:${item.label}`).join('\n'), responseTargetMinutes: doc.responseTargetMinutes ?? 30, responseWarningMinutes: doc.responseWarningMinutes ?? 20, responseCriticalMinutes: doc.responseCriticalMinutes ?? 30, responseTimeActive: doc.responseTimeActive !== false, active: doc.active !== false });
     setEditTarget(doc);
     setCreateOpen(true);
   }
@@ -221,18 +249,19 @@ export function CategoriesSection() {
   async function saveCategory() {
     setBusy(true); setFormError('');
     try {
+      const subcategories = form.subcategories
+        .split('\n')
+        .map((line) => {
+          const [key, label] = line.split(':');
+          return key && key.trim() ? { key: key.trim(), label: (label || key).trim() } : null;
+        })
+        .filter(Boolean);
+      const payload = { key: form.key, label: form.label, description: form.description, icon: form.icon, priority: form.priority, color: form.color, subcategories, responseTargetMinutes: Number(form.responseTargetMinutes), responseWarningMinutes: Number(form.responseWarningMinutes), responseCriticalMinutes: Number(form.responseCriticalMinutes), responseTimeActive: form.responseTimeActive, active: form.active };
       if (editTarget) {
-        await emergencyApi.updateType(editTarget._id, { label: form.label });
+        await emergencyApi.updateType(editTarget._id, payload);
         toast.success(`Category “${form.label}” updated.`);
       } else {
-        const subcategories = form.subcategories
-          .split('\n')
-          .map((line) => {
-            const [key, label] = line.split(':');
-            return key && key.trim() ? { key: key.trim(), label: (label || key).trim() } : null;
-          })
-          .filter(Boolean);
-        await emergencyApi.createType({ key: form.key, label: form.label, subcategories });
+        await emergencyApi.createType(payload);
         toast.success(`Category “${form.label}” created.`);
       }
       setCreateOpen(false);
@@ -249,6 +278,17 @@ export function CategoriesSection() {
       governance.reload();
       managed.reload();
     } catch (error) { toast.error(apiMessage(error)); }
+  }
+
+  async function removeCategory() {
+    setBusy(true);
+    try {
+      await emergencyApi.deleteType(deleteTarget._id);
+      toast.success(`Category “${deleteTarget.label}” deleted.`);
+      setDeleteTarget(null);
+      governance.reload();
+      managed.reload();
+    } catch (error) { toast.error(apiMessage(error)); } finally { setBusy(false); }
   }
   if (governance.loading || managed.loading) {
     return (
@@ -293,6 +333,8 @@ export function CategoriesSection() {
                 <span><span className="tabular font-semibold text-fg">{formatNumber(row.usage)}</span> reports</span>
                 <span><span className="tabular font-semibold text-fg">{formatNumber(row.restrictedCount)}</span> restricted</span>
                 <span>Last reported {row.lastReportedAt ? formatRelative(row.lastReportedAt) : 'never'}</span>
+                <span>Response target {row.responseTargetMinutes} min · {row.responseTimeActive ? 'enabled' : 'paused'}</span>
+                <span>Measured response {row.measuredResponseCount ? `${formatNumber(row.measuredResponseCount)} incident(s) · ${formatMinutes(row.averageResponseMinutes)} average` : 'No response-time data available yet.'}</span>
               </div>
               {row.subcategories?.length ? (
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -306,10 +348,11 @@ export function CategoriesSection() {
                 <p className="mt-3 text-[12px] text-fg-subtle">No subcategories configured.</p>
               )}
               <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
-                <Button size="sm" icon="pencil" disabled={!doc || !row.editable} onClick={() => openEdit(row)}>Rename</Button>
+                <Button size="sm" icon="pencil" disabled={!doc || !row.editable} onClick={() => openEdit(row)}>Edit</Button>
                 <Button size="sm" icon={row.active ? 'close' : 'check'} disabled={!doc} onClick={() => toggleActive(doc)}>
                   {row.active ? 'Deactivate' : 'Activate'}
                 </Button>
+                <Button size="sm" variant="danger" icon="trash" disabled={!doc || row.usage > 0} onClick={() => setDeleteTarget(doc)}>Delete</Button>
                 {!row.editable && <span className="self-center text-[11px] text-fg-subtle">Catalog entry — create a database override to customise it.</span>}
               </div>
             </article>
@@ -330,7 +373,7 @@ export function CategoriesSection() {
               disabled={editTarget ? !form.label.trim() : (!form.key.trim() || !form.label.trim())}
               onClick={saveCategory}
             >
-              {editTarget ? 'Save label' : 'Create category'}
+              {editTarget ? 'Save changes' : 'Create category'}
             </Button>
           </>
         }
@@ -344,22 +387,44 @@ export function CategoriesSection() {
           <Field label="Label" required>
             <input value={form.label} onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))} maxLength={80} />
           </Field>
-          {!editTarget && (
-            <Field label="Subcategories (optional)" hint="One per line in the format key: Label.">
-              <textarea
-                rows={4}
-                value={form.subcategories}
-                onChange={(event) => setForm((current) => ({ ...current, subcategories: event.target.value }))}
-                placeholder={'crash: Traffic crash\njam: Traffic jam'}
-              />
-            </Field>
-          )}
+          <Field label="Description" className="sm:col-span-2">
+            <textarea rows={2} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={300} />
+          </Field>
+          <Field label="Icon key"><input value={form.icon} onChange={(event) => setForm((current) => ({ ...current, icon: event.target.value }))} maxLength={60} placeholder="siren" /></Field>
+          <Field label="Priority">
+            <select value={form.priority} onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value }))}>{['low', 'medium', 'high', 'critical'].map((value) => <option key={value} value={value}>{labelize(value)}</option>)}</select>
+          </Field>
+          <Field label="Response target (minutes)" required hint="1–1440"><input type="number" min="1" max="1440" value={form.responseTargetMinutes} onChange={(event) => setForm((current) => ({ ...current, responseTargetMinutes: event.target.value }))} /></Field>
+          <Field label="Warning threshold" required hint="Must not exceed target"><input type="number" min="1" max="1440" value={form.responseWarningMinutes} onChange={(event) => setForm((current) => ({ ...current, responseWarningMinutes: event.target.value }))} /></Field>
+          <Field label="Critical threshold" required hint="Must not exceed target"><input type="number" min="1" max="1440" value={form.responseCriticalMinutes} onChange={(event) => setForm((current) => ({ ...current, responseCriticalMinutes: event.target.value }))} /></Field>
+          <Field label="Status color"><input type="color" value={form.color} onChange={(event) => setForm((current) => ({ ...current, color: event.target.value }))} className="h-10 w-20 p-1" /></Field>
+          <Toggle checked={form.responseTimeActive} onChange={(value) => setForm((current) => ({ ...current, responseTimeActive: value }))} label="Response-time rules active" hint="This configuration is used for operational SLA reporting." />
+          <Toggle checked={form.active} onChange={(value) => setForm((current) => ({ ...current, active: value }))} label="Category active" hint="Inactive categories are hidden from new citizen reports." />
+          <Field label="Subcategories" hint="One per line in the format key: Label.">
+            <textarea
+              rows={4}
+              value={form.subcategories}
+              onChange={(event) => setForm((current) => ({ ...current, subcategories: event.target.value }))}
+              placeholder={'crash: Traffic crash\njam: Traffic jam'}
+            />
+          </Field>
           {formError ? <ErrorState message={formError} /> : null}
           <p className="text-[12px] text-fg-subtle">
             The key never changes after creation, so historical incidents keep grouping correctly. Renaming only updates the display label.
           </p>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title={`Delete ${deleteTarget?.label || 'category'}?`}
+        message="Deletion is only allowed when no emergency records use this category. Historical incidents are never deleted."
+        confirmLabel="Delete category"
+        danger
+        busy={busy}
+        onConfirm={removeCategory}
+      />
+
     </div>
   );
 }

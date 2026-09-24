@@ -41,6 +41,7 @@ export const adminNav = [
     items: [
       { key: 'facilities', label: 'Facilities', path: '/admin/facilities', icon: 'hospital' },
       { key: 'categories', label: 'Emergency Categories', path: '/admin/categories', icon: 'layers' },
+      { key: 'response-time', label: 'Response Time', path: '/admin/response-time', icon: 'clock' },
       { key: 'service-config', label: 'Service Configuration', path: '/admin/service-config', icon: 'sliders' }
     ]
   },

@@ -13,6 +13,7 @@ import { useAuth } from './context/AuthContext.jsx';
 import { dashboardPathFor } from './utils/roles.js';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import NotFound from './pages/NotFound.jsx';
 const AdminPortal = lazy(() => import('./pages/admin/AdminPortal.jsx'));
 const CitizenEmergency = lazy(() => import('./pages/citizen/CitizenEmergency.jsx'));
 const CreateEmergency = lazy(() => import('./pages/citizen/CreateEmergency.jsx'));
@@ -78,7 +79,7 @@ export default function App() {
         <Route path="/dashboard/admin" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/:section" element={<AdminPortal />} />
       </Route>
-      <Route path="*" element={roleRedirect} />
+      <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

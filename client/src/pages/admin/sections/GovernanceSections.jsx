@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { adminApi } from '../../../services/adminService.js';
 import { notificationsApi } from '../../../services/notificationService.js';
 import useAsync from '../../../hooks/useAsync.js';
-import { apiMessage } from '../../../services/api.js';
+import api, { apiMessage } from '../../../services/api.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import DataTable from '../../../components/ui/DataTable.jsx';
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Field, KeyValue, Pagination, SectionHeading, StatCard, Toggle } from '../../../components/ui/primitives.jsx';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Field, KeyValue, Pagination, SectionHeading, StatCard, StatusDot, Toggle } from '../../../components/ui/primitives.jsx';
 import { Modal } from '../../../components/ui/Overlays.jsx';
 import { SkeletonKpiGrid, SkeletonList } from '../../../components/ui/Skeleton.jsx';
 import { useToast } from '../../../components/ui/Toaster.jsx';
 import { cx, formatDateTime, formatNumber, formatRelative, labelize, statusTone } from '../../../utils/format.js';
 import { roleLabels } from '../../../utils/roles.js';
+import { confirmAction } from '../../../utils/sweetAlert.js';
 
 const resultTone = (result) => (result === 'success' ? 'success' : result === 'failure' ? 'critical' : 'neutral');
 
@@ -330,39 +331,9 @@ export function SettingsSection() {
   );
 }
 
+export { default as ProfileSection } from './ProfileSection.jsx';
+
 /* ------------------------------------------------------- Profile + notifs */
-
-export function ProfileSection() {
-  const { user } = useAuth();
-
-  return (
-    <div className="space-y-5">
-      <SectionHeading title="Admin profile" subtitle="Your account, session security and how your activity is audited." />
-      <Card>
-        <CardHeader icon="user" title={user?.name || 'Administrator'} subtitle={user?.email || ''} />
-        <CardBody>
-          <KeyValue
-            items={[
-              { label: 'Role', value: user?.role ? roleLabels[user.role] || labelize(user.role) : '—' },
-              { label: 'Department', value: user?.departmentName || '—' },
-              { label: 'Status', value: user?.status ? labelize(user.status) : '—' },
-              { label: 'Phone', value: user?.phone || '—' }
-            ]}
-          />
-        </CardBody>
-      </Card>
-      <Card>
-        <CardHeader icon="shieldCheck" title="Session security" subtitle="Password and session management stay with Firebase auth — this console never handles credentials." />
-        <CardBody>
-          <p className="text-[13px] text-fg-muted">
-            Every action you take here is written to the audit trail with your account as the actor. Use the Audit
-            Logs page to review recent administrative actions taken under this account.
-          </p>
-        </CardBody>
-      </Card>
-    </div>
-  );
-}
 
 export function NotificationsSection() {
   const toast = useToast();
@@ -388,6 +359,7 @@ export function NotificationsSection() {
   }
 
   async function removeOne(id) {
+    if (!await confirmAction({ title: 'Delete notification?', text: 'This notification will be permanently removed from your feed.', confirmLabel: 'Delete notification' })) return;
     try {
       await notificationsApi.remove(id);
       feed.reload();

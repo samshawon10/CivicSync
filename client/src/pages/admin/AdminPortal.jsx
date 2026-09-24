@@ -1,4 +1,5 @@
 import PageHead from '../../components/ui/PageHead.jsx';
+import NotFound from '../NotFound.jsx';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import SuperAdminLayout from '../../components/admin/SuperAdminLayout.jsx';
 import { AdminRealtimeProvider } from '../../context/AdminRealtimeContext.jsx';
@@ -31,6 +32,7 @@ const registry = {
   'safety-heatmap': { Component: SafetyHeatmapSection, title: 'Safety Heatmap', subtitle: 'Reported incident density by period and category. Restricted incidents are never plotted.' },
   facilities: { Component: FacilitiesSection, title: 'Facilities', subtitle: 'Manage real emergency, safety, healthcare and civic service locations used by the public map and nearest-help search.' },
   categories: { Component: CategoriesSection, title: 'Emergency Categories', subtitle: 'Configured and built-in categories joined with real usage counts.' },
+  'response-time': { Component: CategoriesSection, title: 'Response Time Management', subtitle: 'Configure response targets, warning thresholds and measured response-time rules using the existing emergency category records.' },
   'service-config': { Component: ServiceConfigSection, title: 'Service Configuration', subtitle: 'Emergency routing per department and the report categories citizens can choose.' },
   analytics: { Component: AnalyticsSection, title: 'System Analytics', subtitle: 'Platform growth, role distribution and complaint throughput.' },
   'emergency-analytics': { Component: AnalyticsSection, title: 'Emergency Analytics', subtitle: 'Incident volume, severity and response-time metrics from the emergency collection.' },
@@ -51,7 +53,8 @@ export default function AdminPortal() {
   const [searchParams] = useSearchParams();
   const sectionKey = location.pathname.replace('/admin/', '') || 'dashboard';
   const key = legacySections[sectionKey] || sectionKey;
-  const entry = registry[key] || registry.dashboard;
+  const entry = registry[key];
+  if (!entry) return <NotFound />;
   const Component = entry.Component;
 
   return (
