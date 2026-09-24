@@ -4,6 +4,7 @@ import Report from '../models/Report.js';
 import User from '../models/User.js';
 import { canReviewReportCompletion, canTransitionReport } from '../services/reportLifecycle.js';
 import { reportCategories, reportPriorities, reportStatuses } from '../config/reportOptions.js';
+import { getReportNextAction } from '../services/nextAction.js';
 
 const headRoles = ['department_head'];
 const managementRoles = ['department_head', 'department_officer'];
@@ -34,11 +35,13 @@ async function loadScopedReport(req, res) {
     res.status(404).json({ success: false, message: 'Report not found.' });
     return null;
   }
-  const report = await Report.findById(req.params.id)
-    .populate('createdBy', 'name email')
-    .populate('assignedOfficer', 'name email role departmentName')
-    .populate('assignedFieldWorker', 'name email role departmentName')
-    .populate('completionReport.submittedBy', 'name email role');
+  const reportQuery = Report.findById(req.params.id)
+    .populate('assignedOfficer', 'name role')
+    .populate('assignedFieldWorker', 'name role')
+    .populate('completionReport.submittedBy', 'name role');
+  if (managementRoles.includes(req.user.role)) reportQuery.populate('createdBy', 'name');
+  else reportQuery.select('-createdBy');
+  const report = await reportQuery;
   if (!report || !canAccessReport(req.user, report)) {
     res.status(404).json({ success: false, message: 'Report not found.' });
     return null;
@@ -58,14 +61,22 @@ export async function dashboard(req, res, next) {
   try {
     const filter = scopedFilter(req);
     if (!filter) return res.status(403).json({ success: false, message: 'Department assignment is required.' });
-    const [statusRows, priorityRows, recent, unreadCount] = await Promise.all([
+    const departmentName = departmentNameFor(req.user);
+    const activeStatuses = ['assigned', 'in_progress', 'under_review'];
+    const now = new Date();
+    const [statusRows, priorityRows, recent, unreadCount, overdueCount, staffRows] = await Promise.all([
       Report.aggregate([{ $match: filter }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
       Report.aggregate([{ $match: filter }, { $group: { _id: '$priority', count: { $sum: 1 } } }]),
-      Report.find(filter).populate('createdBy', 'name email').populate('assignedOfficer', 'name email').sort({ priority: -1, updatedAt: -1 }).limit(8).lean(),
-      Notification.countDocuments({ recipient: req.user._id, readAt: null })
+      Report.find(filter).select('-createdBy').populate('assignedOfficer', 'name').sort({ updatedAt: -1 }).limit(8).lean(),
+      Notification.countDocuments({ recipient: req.user._id, readAt: null }),
+      Report.countDocuments({ ...filter, dueAt: { $lt: now, $ne: null }, status: { $nin: ['completed', 'closed'] } }),
+      managementRoles.includes(req.user.role)
+        ? User.aggregate([{ $match: { departmentName, status: 'active', role: { $in: ['department_officer', 'officer', 'field_worker'] } } }, { $group: { _id: '$role', count: { $sum: 1 } } }])
+        : Promise.resolve([])
     ]);
     const byStatus = Object.fromEntries(statusRows.map((row) => [row._id, row.count]));
     const byPriority = Object.fromEntries(priorityRows.map((row) => [row._id, row.count]));
+    const recentWithNextAction = recent.map((report) => ({ ...report, nextAction: getReportNextAction(report) }));
     res.json({ success: true, stats: {
       total: statusRows.reduce((sum, row) => sum + row.count, 0),
       pending: byStatus.pending || 0,
@@ -74,9 +85,13 @@ export async function dashboard(req, res, next) {
       inProgress: byStatus.in_progress || 0,
       completed: byStatus.completed || 0,
       closed: byStatus.closed || 0,
+      active: activeStatuses.reduce((sum, status) => sum + (byStatus[status] || 0), 0),
+      overdue: overdueCount,
+      activeOfficers: staffRows.filter((row) => ['department_officer', 'officer'].includes(row._id)).reduce((sum, row) => sum + row.count, 0),
+      fieldWorkers: staffRows.find((row) => row._id === 'field_worker')?.count || 0,
       critical: byPriority.urgent || 0,
       unreadNotifications: unreadCount
-    }, recent });
+    }, recent: recentWithNextAction });
   } catch (error) { next(error); }
 }
 
@@ -84,31 +99,51 @@ export async function listReports(req, res, next) {
   try {
     const filter = scopedFilter(req);
     if (!filter) return res.status(403).json({ success: false, message: 'Department assignment is required.' });
-    const { search = '', status = '', priority = '', category = '', officer = '', fieldWorker = '', page = 1, limit = 10, sort = 'updated' } = req.query;
+    const { search = '', status = '', priority = '', category = '', officer = '', fieldWorker = '', overdue = '', page = 1, limit = 10, sort = 'updated' } = req.query;
     if (reportStatuses.includes(status)) filter.status = status;
     if (reportPriorities.includes(priority)) filter.priority = priority;
     if (reportCategories.includes(category)) filter.category = category;
     if (mongoose.Types.ObjectId.isValid(officer)) filter.assignedOfficer = officer;
     if (mongoose.Types.ObjectId.isValid(fieldWorker)) filter.assignedFieldWorker = fieldWorker;
+    if (overdue === 'true') {
+      filter.dueAt = { $lt: new Date(), $ne: null };
+      filter.$and = [...(filter.$and || []), { status: { $nin: ['completed', 'closed'] } }];
+    }
     if (search.trim()) {
       const expression = new RegExp(escapeRegex(search), 'i');
-      filter.$and = [{ $or: [{ title: expression }, { description: expression }, { category: expression }] }];
+      filter.$and = [...(filter.$and || []), { $or: [{ title: expression }, { description: expression }, { category: expression }] }];
     }
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
-    const order = sort === 'oldest' ? { createdAt: 1 } : sort === 'priority' ? { priority: -1, updatedAt: -1 } : { updatedAt: -1 };
-    const [reports, total] = await Promise.all([
-      Report.find(filter).populate('createdBy', 'name email').populate('assignedOfficer', 'name email').populate('assignedFieldWorker', 'name email').sort(order).skip((safePage - 1) * safeLimit).limit(safeLimit).lean(),
+    const order = sort === 'oldest' ? { createdAt: 1 } : sort === 'priority' ? { priorityRank: -1, dueAt: 1, createdAt: 1 } : { updatedAt: -1 };
+    const [reportRows, total] = await Promise.all([
+      Report.aggregate([
+        { $match: filter },
+        { $addFields: { priorityRank: { $switch: { branches: [
+          { case: { $eq: ['$priority', 'urgent'] }, then: 4 },
+          { case: { $eq: ['$priority', 'high'] }, then: 3 },
+          { case: { $eq: ['$priority', 'medium'] }, then: 2 },
+          { case: { $eq: ['$priority', 'low'] }, then: 1 }
+        ], default: 0 } } } },
+        { $sort: order },
+        { $skip: (safePage - 1) * safeLimit },
+        { $limit: safeLimit },
+        { $project: { priorityRank: 0, createdBy: 0 } }
+      ]),
       Report.countDocuments(filter)
     ]);
-    res.json({ success: true, reports, pagination: { page: safePage, limit: safeLimit, total, pages: Math.ceil(total / safeLimit) } });
+    const reports = await Report.populate(reportRows, [
+      { path: 'assignedOfficer', select: 'name' },
+      { path: 'assignedFieldWorker', select: 'name' }
+    ]);
+    res.json({ success: true, reports: reports.map((report) => ({ ...report.toObject(), nextAction: getReportNextAction(report) })), pagination: { page: safePage, limit: safeLimit, total, pages: Math.ceil(total / safeLimit) } });
   } catch (error) { next(error); }
 }
 
 export async function getReport(req, res, next) {
   try {
     const report = await loadScopedReport(req, res);
-    if (report) res.json({ success: true, report });
+    if (report) res.json({ success: true, report: { ...report.toObject(), nextAction: getReportNextAction(report) } });
   } catch (error) { next(error); }
 }
 
@@ -117,13 +152,32 @@ export async function listStaff(req, res, next) {
     if (!managementRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only department management can view the department staff directory.' });
     const departmentName = departmentNameFor(req.user);
     if (!departmentName) return res.status(403).json({ success: false, message: 'Department assignment is required.' });
-    const staff = await User.find({ departmentName, role: { $in: ['department_officer', 'officer', 'field_worker'] }, status: 'active' }).select('name email role departmentName').lean();
-    const workloads = await Report.aggregate([{ $match: { departmentName, status: { $in: ['assigned', 'in_progress'] } } }, { $facet: {
+    const staff = await User.find({ departmentName, role: { $in: ['department_officer', 'officer', 'field_worker'] }, status: 'active' }).select('name role departmentName').lean();
+    const workloads = await Report.aggregate([{ $match: { departmentName, status: { $in: ['assigned', 'in_progress', 'under_review'] } } }, { $facet: {
       officers: [{ $match: { assignedOfficer: { $ne: null } } }, { $group: { _id: '$assignedOfficer', count: { $sum: 1 } } }],
       workers: [{ $match: { assignedFieldWorker: { $ne: null } } }, { $group: { _id: '$assignedFieldWorker', count: { $sum: 1 } } }]
     } }]);
-    const counts = new Map([...(workloads[0]?.officers || []), ...(workloads[0]?.workers || [])].map((row) => [String(row._id), row.count]));
-    res.json({ success: true, staff: staff.map((person) => ({ ...person, id: person._id, workload: counts.get(String(person._id)) || 0, availability: 'available' })) });
+    const counts = new Map();
+    for (const row of [...(workloads[0]?.officers || []), ...(workloads[0]?.workers || [])]) {
+      const id = String(row._id);
+      counts.set(id, (counts.get(id) || 0) + row.count);
+    }
+    res.json({ success: true, staff: staff.map((person) => ({ ...person, id: person._id, workload: counts.get(String(person._id)) || 0 })) });
+  } catch (error) { next(error); }
+}
+
+export async function departmentActivity(req, res, next) {
+  try {
+    if (!headRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only department heads can view department activity.' });
+    const filter = scopedFilter(req);
+    if (!filter) return res.status(403).json({ success: false, message: 'Department assignment is required.' });
+    const reports = await Report.find(filter).select('title activity').sort({ updatedAt: -1 }).limit(100).lean();
+    const activity = reports.flatMap((report) => (report.activity || []).map((entry) => ({
+      ...entry,
+      caseId: report._id,
+      caseLabel: report.title
+    }))).sort((left, right) => new Date(right.timestamp) - new Date(left.timestamp)).slice(0, 100);
+    res.json({ success: true, activity });
   } catch (error) { next(error); }
 }
 
@@ -145,6 +199,8 @@ export async function assignReport(req, res, next) {
   try {
     if (!managementRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only department heads and department officers can assign reports.' });
     const { officerId, fieldWorkerId } = req.body;
+    if (officerId === undefined && fieldWorkerId === undefined) return res.status(400).json({ success: false, message: 'Select an officer or field worker assignment to update.' });
+    if ([officerId, fieldWorkerId].some((id) => id && !mongoose.Types.ObjectId.isValid(id))) return res.status(400).json({ success: false, message: 'Select valid department staff.' });
     const report = await loadScopedReport(req, res);
     if (!report) return;
     const departmentName = departmentNameFor(req.user);
@@ -154,15 +210,30 @@ export async function assignReport(req, res, next) {
     ]);
     if (officerId && !officer) return res.status(400).json({ success: false, message: 'Selected officer is not in this department.' });
     if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Selected field worker is not in this department.' });
-    if (officer) report.assignedOfficer = officer._id;
-    if (worker) report.assignedFieldWorker = worker._id;
-    if (['pending', 'verified'].includes(report.status)) report.status = 'assigned';
-    report.activity.push({ action: 'Assignment updated', actorRole: req.user.role, note: [officer && `Officer: ${officer.name}`, worker && `Field worker: ${worker.name}`].filter(Boolean).join(', ') });
+    if (officerId !== undefined) report.assignedOfficer = officer?._id || null;
+    if (fieldWorkerId !== undefined) report.assignedFieldWorker = worker?._id || null;
+    if ((officer || worker) && ['pending', 'verified'].includes(report.status)) report.status = 'assigned';
+    const changes = [];
+    if (officerId !== undefined) changes.push(`Officer: ${officer?.name || 'Unassigned'}`);
+    if (fieldWorkerId !== undefined) changes.push(`Field worker: ${worker?.name || 'Unassigned'}`);
+    report.activity.push({ action: 'Assignment updated', actorRole: req.user.role, note: changes.join(', ') });
     await report.save();
     await Promise.all([officer, worker].filter(Boolean).map((person) => Notification.create({ recipient: person._id, report: report._id, type: 'report_status', message: `You were assigned to "${report.title}".` })));
-    await report.populate('assignedOfficer', 'name email role departmentName');
-    await report.populate('assignedFieldWorker', 'name email role departmentName');
+    await report.populate('assignedOfficer', 'name role');
+    await report.populate('assignedFieldWorker', 'name role');
     res.json({ success: true, message: 'Assignment updated.', report });
+  } catch (error) { next(error); }
+}
+
+export async function addReportNote(req, res, next) {
+  try {
+    const report = await loadScopedReport(req, res);
+    if (!report) return;
+    const note = typeof req.body.note === 'string' ? req.body.note.trim() : '';
+    if (note.length < 3 || note.length > 1000) return res.status(400).json({ success: false, message: 'Notes must be between 3 and 1000 characters.' });
+    report.activity.push({ action: 'Operational note added', actorRole: req.user.role, note });
+    await report.save();
+    res.json({ success: true, message: 'Note added.', report });
   } catch (error) { next(error); }
 }
 
@@ -179,7 +250,8 @@ export async function updateStatus(req, res, next) {
     report.status = req.body.status;
     report.activity.push({ action: `Status changed from ${label(previous)} to ${label(report.status)}`, actorRole: req.user.role, note: req.body.note || '' });
     await report.save();
-    await Notification.create({ recipient: report.createdBy._id || report.createdBy, report: report._id, message: `Your report "${report.title}" is now ${label(report.status)}.` });
+    const citizenId = report.createdBy?._id || report.createdBy || (await Report.findById(report._id).select('createdBy').lean())?.createdBy;
+    if (citizenId) await Notification.create({ recipient: citizenId, report: report._id, message: `Your report "${report.title}" is now ${label(report.status)}.` });
     res.json({ success: true, message: 'Status updated.', report });
   } catch (error) { next(error); }
 }

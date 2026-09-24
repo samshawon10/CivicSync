@@ -18,6 +18,7 @@ import { evaluateEmergencySla } from '../services/emergencySla.js';
 import { sanitizeSettings } from '../config/settingsDefaults.js';
 import { activeEmergencyStatuses, alertCategories, alertStatuses, assignmentStatuses, emergencyCategories, emergencyRoleGroups, emergencySeverities, emergencyStatuses, emergencyTypeCatalog, responseTypes, sensitiveCategories } from '../config/emergencyOptions.js';
 import { haversineKm, isSensitiveCategory, suggestEmergencyClassification, suggestedTeamTypes } from '../services/emergencyIntelligence.js';
+import { getEmergencyNextAction } from '../services/nextAction.js';
 
 const commandRoles = emergencyRoleGroups.command;
 const staffRoles = emergencyRoleGroups.allStaff;
@@ -72,6 +73,7 @@ async function emergencyWithSla(emergency, viewer, summary = false, settingsOver
   const value = emergencyForViewer(emergency, viewer, summary);
   const settings = settingsOverride || await loadEmergencySettings();
   value.sla = evaluateEmergencySla(emergency, settings);
+  value.nextAction = getEmergencyNextAction(value, value.sla);
   return value;
 }
 function emergencyForViewer(emergency, viewer, summary = false) {
@@ -374,8 +376,20 @@ export async function updateStatus(req, res, next) {
     }
     if (status === 'resolved') { emergency.resolvedAt = new Date(); emergency.resolutionNotes = clean(note, 2000); }
     if (status === 'closed') emergency.closedAt = new Date();
-    emergency.activity.push({ action: `Status changed from ${title(previous)} to ${title(status)}`, actorRole: req.user.role, note: clean(note, 500) });
-    await emergency.save();
+    const activityEntry = { action: `Status changed from ${title(previous)} to ${title(status)}`, actorRole: req.user.role, note: clean(note, 500) };
+    const statusUpdate = {
+      status: emergency.status,
+      ...(emergency.acknowledgedAt ? { acknowledgedAt: emergency.acknowledgedAt } : {}),
+      ...(emergency.dispatchedAt ? { dispatchedAt: emergency.dispatchedAt } : {}),
+      ...(emergency.enRouteAt ? { enRouteAt: emergency.enRouteAt } : {}),
+      ...(emergency.arrivalAt ? { arrivalAt: emergency.arrivalAt } : {}),
+      ...(emergency.responseTimeMinutes != null ? { responseTimeMinutes: emergency.responseTimeMinutes } : {}),
+      ...(status === 'resolved' ? { resolvedAt: emergency.resolvedAt, resolutionNotes: emergency.resolutionNotes } : {}),
+      ...(status === 'closed' ? { closedAt: emergency.closedAt } : {})
+    };
+    const changed = await Emergency.updateOne({ _id: emergency._id, status: previous }, { $set: statusUpdate, $push: { activity: activityEntry } });
+    if (changed.modifiedCount !== 1) return res.status(409).json({ success: false, message: 'The incident changed while this update was being saved. Refresh and try again.' });
+    emergency.activity.push(activityEntry);
     const citizenId = emergency.citizen?._id || emergency.citizen;
     await notify(citizenId, emergency, `Emergency ${emergency.emergencyId} is now ${title(status)}.`);
     await audit(req.user, 'emergency_status_changed', emergency, `${previous} → ${status}`);
@@ -818,7 +832,7 @@ export async function safetyIntelligence(req, res, next) {
 export async function updateAssignmentStatus(req, res, next) {
   try {
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
-    const assignment = emergency.responseAssignments.find((item) => String(item._id) === req.params.assignmentId);
+    let assignment = emergency.responseAssignments.find((item) => String(item._id) === req.params.assignmentId);
     if (!assignment) return res.status(404).json({ success: false, message: 'Assignment not found.' });
     const command = commandAccess(req.user);
     const isOfficer = sameId(assignment.emergencyOfficer, req.user._id);
@@ -831,22 +845,28 @@ export async function updateAssignmentStatus(req, res, next) {
     if (status === 'cancelled' && !command) return res.status(403).json({ success: false, message: 'Only emergency command can cancel an assignment.' });
     if (etaMinutes !== undefined && etaMinutes !== null && (!Number.isFinite(Number(etaMinutes)) || Number(etaMinutes) < 0 || Number(etaMinutes) > 999)) return res.status(400).json({ success: false, message: 'ETA must be between 0 and 999 minutes.' });
     const previous = assignment.status;
-    assignment.status = status;
+    const assignmentUpdate = { status };
     const now = new Date();
-    if (status === 'accepted' && !assignment.acceptedAt) { assignment.acceptedAt = now; if (!emergency.acknowledgedAt) emergency.acknowledgedAt = now; }
-    if (['en_route', 'on_scene', 'responding', 'completed'].includes(status) && !assignment.acceptedAt) assignment.acceptedAt = now;
+    if (status === 'accepted' && !assignment.acceptedAt) { assignmentUpdate.acceptedAt = now; if (!emergency.acknowledgedAt) emergency.acknowledgedAt = now; }
+    if (['en_route', 'on_scene', 'responding', 'completed'].includes(status) && !assignment.acceptedAt) assignmentUpdate.acceptedAt = now;
     if (status === 'en_route') { if (!emergency.enRouteAt) emergency.enRouteAt = now; if (['dispatched', 'requires_backup'].includes(emergency.status)) emergency.status = 'en_route'; }
     if (status === 'on_scene') {
-      if (!assignment.arrivedAt) assignment.arrivedAt = now;
+      if (!assignment.arrivedAt) assignmentUpdate.arrivedAt = now;
       if (!emergency.arrivalAt) { emergency.arrivalAt = now; if (emergency.responseTimeMinutes == null) emergency.responseTimeMinutes = Math.round((now.getTime() - emergency.createdAt.getTime()) / 60000); }
       if (['dispatched', 'en_route', 'requires_backup'].includes(emergency.status)) emergency.status = 'on_scene';
     }
     if (status === 'responding' && ['dispatched', 'en_route', 'on_scene', 'requires_backup'].includes(emergency.status)) emergency.status = 'responding';
-    if (status === 'completed' && !assignment.completedAt) assignment.completedAt = now;
+    if (status === 'completed' && !assignment.completedAt) assignmentUpdate.completedAt = now;
     if (status === 'accepted' && emergency.status === 'reported') emergency.status = 'received';
-    if (etaMinutes !== undefined && etaMinutes !== null) assignment.etaMinutes = Number(etaMinutes);
+    if (etaMinutes !== undefined && etaMinutes !== null) assignmentUpdate.etaMinutes = Number(etaMinutes);
+    const updatedAssignment = await EmergencyResponseAssignment.findOneAndUpdate(
+      { _id: assignment._id, emergency: emergency._id, status: previous },
+      { $set: assignmentUpdate },
+      { new: true, runValidators: true }
+    );
+    if (!updatedAssignment) return res.status(409).json({ success: false, message: 'This response assignment changed while the update was being saved. Refresh and try again.' });
+    assignment = updatedAssignment;
     emergency.activity.push({ action: `${assignment.responseType} team status changed from ${title(previous)} to ${title(status)}`, actorRole: req.user.role, note: clean(note, 500) });
-    await assignment.save();
     if (['completed', 'cancelled'].includes(status) && assignment.team) {
       const team = await ResponseTeam.findById(assignment.team);
       const otherActiveAssignments = await EmergencyResponseAssignment.countDocuments({ team: assignment.team, _id: { $ne: assignment._id }, status: { $in: ['assigned', 'accepted', 'en_route', 'on_scene', 'responding'] } });

@@ -6,9 +6,11 @@ export const departmentApi = {
   report: (id) => api.get(`/departments/reports/${id}`),
   staff: () => api.get('/departments/staff'),
   analytics: () => api.get('/departments/analytics'),
+  activity: () => api.get('/departments/activity'),
   priority: (id, priority, note = '') => api.patch(`/departments/reports/${id}/priority`, { priority, note }),
   assign: (id, payload) => api.patch(`/departments/reports/${id}/assign`, payload),
   status: (id, status, note = '') => api.patch(`/departments/reports/${id}/status`, { status, note }),
+  note: (id, note) => api.post(`/departments/reports/${id}/notes`, { note }),
   complete: (id, payload) => api.post(`/departments/reports/${id}/completion-report`, payload),
   reviewCompletion: (id, payload) => api.patch(`/departments/reports/${id}/completion-review`, payload)
 };
