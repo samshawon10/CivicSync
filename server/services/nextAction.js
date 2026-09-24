@@ -32,6 +32,60 @@ function decorate(action, deadline, priority) {
 }
 
 export function getReportNextAction(report) {
+  if (report?.escalation?.isEscalated && !report.escalation.resolvedAt) {
+    return decorate(
+      { action: 'Review SLA / Critical Escalation', responsibleRole: 'department_head', reason: report.escalation.reason || 'Case has been escalated.' },
+      report.dueAt,
+      report.priority
+    );
+  }
+
+  if (report?.activeTask && typeof report.activeTask === 'object') {
+    const task = report.activeTask;
+    if (task.status === 'assigned') {
+      return decorate(
+        { action: 'Accept Assigned Task', responsibleRole: 'field_worker', responsibleUser: asId(task.assignedWorker), reason: 'Task dispatched to field worker' },
+        task.targetDueAt || report.dueAt,
+        report.priority
+      );
+    }
+    if (task.status === 'accepted') {
+      return decorate(
+        { action: 'Start Travel to Site', responsibleRole: 'field_worker', responsibleUser: asId(task.assignedWorker), reason: 'Task accepted; worker ready to depart' },
+        task.targetDueAt || report.dueAt,
+        report.priority
+      );
+    }
+    if (task.status === 'traveling') {
+      return decorate(
+        { action: 'Confirm Arrival on Site', responsibleRole: 'field_worker', responsibleUser: asId(task.assignedWorker), reason: 'Worker is en route to site' },
+        task.targetDueAt || report.dueAt,
+        report.priority
+      );
+    }
+    if (task.status === 'arrived') {
+      return decorate(
+        { action: 'Start Field Work', responsibleRole: 'field_worker', responsibleUser: asId(task.assignedWorker), reason: 'Worker arrived at location' },
+        task.targetDueAt || report.dueAt,
+        report.priority
+      );
+    }
+    if (task.status === 'in_progress') {
+      return decorate(
+        { action: 'Upload Evidence & Complete Task', responsibleRole: 'field_worker', responsibleUser: asId(task.assignedWorker), reason: 'Work underway at location' },
+        task.targetDueAt || report.dueAt,
+        report.priority
+      );
+    }
+    if (task.status === 'blocked') {
+      return decorate(
+        { action: 'Resolve Blocked Field Task', responsibleRole: 'department_officer', reason: `Worker reported block: ${task.blockedInfo?.reason || 'unspecified'}` },
+        task.targetDueAt || report.dueAt,
+        report.priority
+      );
+    }
+  }
+
   const action = reportActions[report?.status];
   if (!action) return null;
   const responsibleUser = report.status === 'assigned' || report.status === 'in_progress'

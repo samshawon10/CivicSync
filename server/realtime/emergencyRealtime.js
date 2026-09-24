@@ -12,7 +12,7 @@ export function initializeRealtime(httpServer) {
       const token = socket.handshake.auth?.token || cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith('civicsync_token='))?.split('=')[1];
       if (!token) return next(new Error('Authentication is required.'));
       const payload = jwt.verify(decodeURIComponent(token), process.env.JWT_SECRET);
-      const user = await User.findById(payload.userId).select('_id role status');
+      const user = await User.findById(payload.userId).select('_id role status departmentName');
       if (!user || user.status !== 'active') return next(new Error('Account is unavailable.'));
       socket.user = user;
       return next();
@@ -21,6 +21,9 @@ export function initializeRealtime(httpServer) {
   io.on('connection', (socket) => {
     socket.join(`user:${socket.user._id}`);
     socket.join(`role:${socket.user.role}`);
+    if (socket.user.departmentName) {
+      socket.join(`dept:${socket.user.departmentName}`);
+    }
   });
   return io;
 }
@@ -30,6 +33,14 @@ export function emitEmergencyEvent(event, payload, { userIds = [], roles = [] } 
   const normalizeId = (value) => value?._id || value;
   for (const userId of userIds.map(normalizeId).filter(Boolean)) io.to(`user:${userId}`).emit(event, payload);
   for (const role of roles.filter(Boolean)) io.to(`role:${role}`).emit(event, payload);
+}
+
+export function emitDepartmentEvent(event, payload, { userIds = [], roles = [], department = '' } = {}) {
+  if (!io) return;
+  const normalizeId = (value) => value?._id || value;
+  for (const userId of userIds.map(normalizeId).filter(Boolean)) io.to(`user:${userId}`).emit(event, payload);
+  for (const role of roles.filter(Boolean)) io.to(`role:${role}`).emit(event, payload);
+  if (department) io.to(`dept:${department}`).emit(event, payload);
 }
 
 /**
@@ -46,3 +57,4 @@ export function realtimeStatus() {
     rooms: io.sockets?.adapter?.rooms?.size ?? null
   };
 }
+
