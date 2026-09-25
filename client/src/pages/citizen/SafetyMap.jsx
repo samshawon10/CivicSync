@@ -7,6 +7,7 @@ import PageHead from '../../components/ui/PageHead.jsx';
 import { emergencyApi, facilitiesApi, facilityGroups, facilityTypeLabels, nearestHelpTypes } from '../../services/emergencyService.js';
 import { apiMessage } from '../../services/api.js';
 import useGeolocation from '../../hooks/useGeolocation.js';
+import AIBriefingCard from '../../components/ai/AIBriefingCard.jsx';
 
 const densityRanges = [[7, '7 days'], [30, '30 days'], [90, '3 months'], [180, '6 months'], [365, '1 year']];
 const incidentCategories = [
@@ -141,6 +142,7 @@ export default function SafetyMap() {
   return (
     <CitizenLayout title="Safety Map">
       <PageHead title="Smart Safety Map" description="Interactive civic safety map with real public services, aggregated incident density, and nearest emergency help." />
+      <section className="mt-4"><AIBriefingCard presetKey="map" context={{ areaLabel: location ? 'Current map area' : 'All areas' }} title="Ask about this map" subtitle="Safety information for what you're looking at" description="Ask about nearby safety facilities, active emergencies or services in this area. CivicSync Intelligence answers from real CivicSync data for your location." actionLabel="Ask About This Map" className="border-civic-200 bg-civic-50/50 dark:border-civic-900 dark:bg-surface-2" /></section>
       <div className="space-y-4">
         <section className="civic-card overflow-hidden">
           <div className="grid lg:grid-cols-[19rem_1fr]">

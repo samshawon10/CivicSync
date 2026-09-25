@@ -7,6 +7,7 @@ import { ErrorState, LoadingState } from '../../components/emergency/EmergencyCa
 import { facilitiesApi, label } from '../../services/emergencyService.js';
 import { apiMessage } from '../../services/api.js';
 import useGeolocation from '../../hooks/useGeolocation.js';
+import AIBriefingCard from '../../components/ai/AIBriefingCard.jsx';
 
 const types = ['', 'emergency_center', 'ambulance', 'fire_station', 'police', 'safe_point', 'shelter', 'flood_shelter', 'hazard', 'road_blockage', 'hospital', 'pharmacy', 'clinic', 'first_aid_center', 'mosque', 'school', 'government_office', 'help_center', 'safe_water_point', 'public_toilet'];
 

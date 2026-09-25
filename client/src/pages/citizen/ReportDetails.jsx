@@ -6,6 +6,7 @@ import { mediaUrl, reportsApi } from '../../services/reportService.js';
 import { apiMessage } from '../../services/api.js';
 import { SkeletonCard, SkeletonList } from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/Toaster.jsx';
+import AIBriefingCard from '../../components/ai/AIBriefingCard.jsx';
 
 const label = (value = '') => value.replaceAll('_', ' ').replace(/\b\w/g, (x) => x.toUpperCase());
 
@@ -128,6 +129,22 @@ export default function ReportDetails() {
             </dl>
             <h2 className="mt-6 font-bold text-ink">Description</h2>
             <p className="mt-2 whitespace-pre-wrap leading-7 text-slate-600">{report.description}</p>
+            {/* Contextual AI. Only the report id/title are sent; the gateway re-authorizes
+                and loads the case server-side, so no case data travels through the client. */}
+            <AIBriefingCard
+              className="mt-6"
+              presetKey="case"
+              context={{ caseId: report._id, caseRef: report.reportId || report._id, caseTitle: report.title, caseStatus: report.status, caseCategory: report.category }}
+              title="✦ Ask CivicSync AI"
+              subtitle="Get a grounded explanation of this case."
+              description="Ask for a summary, the timeline, SLA status, or help drafting a citizen update."
+              stats={[
+                { label: 'Status', value: label(report.status) },
+                { label: 'Priority', value: label(report.priority) },
+                { label: 'Activity entries', value: report.activity?.length || 0 }
+              ]}
+              actionLabel="Ask about this case"
+            />
             {(report.location?.area || report.location?.address || report.location?.landmark) && <section className="mt-6"><h2 className="font-bold text-ink">Location</h2><p className="mt-2 text-sm text-slate-600">{[report.location.area, report.location.address, report.location.landmark].filter(Boolean).join(' · ')}</p></section>}
             <AttachmentGallery attachments={report.attachments} />
             <ResolutionVerification report={report} busy={busy} reopenNote={reopenNote} setReopenNote={setReopenNote} feedback={feedback} setFeedback={setFeedback} verify={verify} submitFeedback={submitFeedback} />

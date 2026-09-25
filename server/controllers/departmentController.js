@@ -8,6 +8,7 @@ import DepartmentTask from '../models/DepartmentTask.js';
 import DepartmentResource from '../models/DepartmentResource.js';
 import Department from '../models/Department.js';
 import { calculateDepartmentSla, departmentSlaTargets } from '../services/departmentSla.js';
+import { activeTaskStatuses, scoreTeamsForCase, taskCountsByTeam } from '../services/departmentTeamScoring.js';
 import { emitDepartmentEvent } from '../realtime/emergencyRealtime.js';
 
 import { canReviewReportCompletion, canTransitionReport } from '../services/reportLifecycle.js';
@@ -535,59 +536,20 @@ export async function recommendTeams(req, res, next) {
       .lean();
 
     const activeTasks = await DepartmentTask.aggregate([
-      { $match: { team: { $in: teams.map((t) => t._id) }, status: { $in: ['assigned', 'accepted', 'traveling', 'arrived', 'in_progress', 'blocked'] } } },
+      { $match: { team: { $in: teams.map((t) => t._id) }, status: { $in: activeTaskStatuses } } },
       { $group: { _id: '$team', count: { $sum: 1 } } }
     ]);
-    const taskCountMap = Object.fromEntries(activeTasks.map((t) => [String(t._id), t.count]));
 
-    const scored = teams.map((team) => {
-      let score = 50;
-      const reasons = [];
-
-      // Availability check
-      if (team.status === 'available') {
-        score += 30;
-        reasons.push('Team status is Available');
-      } else if (team.status === 'busy') {
-        score -= 20;
-        reasons.push('Team is currently busy with ongoing tasks');
-      } else {
-        score -= 40;
-        reasons.push(`Team status is ${team.status}`);
-      }
-
-      // Workload check
-      const currentTasks = taskCountMap[String(team._id)] || 0;
-      const capacity = team.capacity || 5;
-      if (currentTasks === 0) {
-        score += 20;
-        reasons.push('Low workload (0 active tasks)');
-      } else if (currentTasks < capacity) {
-        score += 10;
-        reasons.push(`Available capacity (${currentTasks}/${capacity} tasks)`);
-      } else {
-        score -= 30;
-        reasons.push(`At or above capacity (${currentTasks}/${capacity})`);
-      }
-
-      // Category / Skill match
-      const reportCategory = (report.category || '').toLowerCase();
-      const hasSkill = (team.skills || []).some((s) => reportCategory.includes(s.toLowerCase()) || s.toLowerCase().includes(reportCategory));
-      if (hasSkill) {
-        score += 25;
-        reasons.push('Matches required category skills');
-      }
-
-      return {
-        ...team,
-        score: Math.max(0, Math.min(100, score)),
-        reasons,
-        currentWorkload: currentTasks
-      };
+    // One shared, deterministic scoring implementation (services/departmentTeamScoring.js)
+    // is used here and by the CivicSync AI Gateway, so the recommendation an
+    // officer sees on screen and the one the assistant quotes can never diverge.
+    const recommendations = scoreTeamsForCase({
+      teams,
+      taskCounts: taskCountsByTeam(activeTasks),
+      category: report.category
     });
 
-    scored.sort((a, b) => b.score - a.score);
-    res.json({ success: true, recommendations: scored });
+    res.json({ success: true, recommendations });
   } catch (error) { next(error); }
 }
 // --- Tasks Management (Field Worker & Officer Execution) ---

@@ -1,0 +1,348 @@
+/* ============================================================================
+   CivicSync Intelligence
+   The copilot is a native surface, so it reuses the tokens in index.css
+   (--surface, --line, --fg-muted, --color-civic-*) instead of owning a palette.
+   Only genuinely bespoke pieces (the ✦ mark, panel shell, skeletons) live here.
+   ========================================================================== */
+
+.ai-spark {
+  color: var(--color-civic-500);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.ai-spark--live { animation: ai-twinkle 3.4s ease-in-out infinite; }
+
+@keyframes ai-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+.ai-launcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--shadow-token);
+}
+
+.ai-launcher__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1px solid var(--color-civic-400);
+  opacity: 0;
+  pointer-events: none;
+  animation: ai-pulse 2.8s var(--ease-standard) infinite;
+}
+
+@keyframes ai-pulse {
+  0% { opacity: .55; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(1.18); }
+}
+
+/* Mobile: floating action button clear of the safe area and within thumb reach. */
+.ai-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 45;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background-color: var(--color-civic-600);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(15, 39, 71, .28);
+  border: none;
+  cursor: pointer;
+}
+
+.ai-fab:active { transform: scale(.96); }
+
+/* Copilot shell. Desktop = right drawer; mobile = full screen sheet. */
+.ai-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background-color: var(--surface);
+}
+
+.ai-panel__head {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+}
+
+.ai-panel__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ai-panel__foot {
+  flex-shrink: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px 12px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  background-color: var(--surface);
+}
+
+@media (max-width: 767px) {
+  .ai-panel { border-left: none; }
+  .ai-panel__scroll { padding: 14px 12px; }
+}
+
+/* Messages ----------------------------------------------------------------- */
+
+.ai-msg { display: flex; gap: 10px; max-width: 100%; }
+.ai-msg--user { justify-content: flex-end; }
+
+.ai-msg__bubble {
+  max-width: 88%;
+  border-radius: 14px;
+  padding: 10px 13px;
+  font-size: .875rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ai-msg--user .ai-msg__bubble {
+  background-color: var(--color-civic-600);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.ai-msg--ai .ai-msg__bubble {
+  background-color: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  border-bottom-left-radius: 4px;
+}
+
+
+/* Structured data card rendered from a verified tool result. */
+.ai-datacard {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background-color: var(--surface);
+  overflow: hidden;
+}
+
+.ai-datacard__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  background-color: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.ai-datacard__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 11px;
+  font-size: .8125rem;
+  border-top: 1px solid var(--line);
+}
+.ai-datacard__row:first-child { border-top: none; }
+.ai-datacard__label { color: var(--fg-muted); }
+.ai-datacard__value { color: var(--fg); font-weight: 600; text-align: right; }
+
+/* Suggestion chips --------------------------------------------------------- */
+
+.ai-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: .8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 36px;
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+
+.ai-chip:hover:not(:disabled) { background-color: var(--surface-2); border-color: var(--color-civic-300); }
+.ai-chip:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Quick-action tiles in the empty state. */
+.ai-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+.ai-tile {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+  border-radius: 12px;
+  padding: 12px;
+  min-height: 56px;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard);
+}
+
+.ai-tile:hover:not(:disabled) { border-color: var(--color-civic-300); background-color: var(--surface-2); }
+
+/* Tool execution trace ----------------------------------------------------- */
+
+.ai-tools {
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background-color: var(--surface-2);
+}
+
+.ai-tools__step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: .75rem;
+  color: var(--fg-muted);
+  padding: 2px 0;
+}
+
+/* Input -------------------------------------------------------------------- */
+
+.ai-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background-color: var(--surface);
+  padding: 6px 6px 6px 12px;
+}
+
+.ai-input:focus-within { border-color: var(--color-civic-500); box-shadow: 0 0 0 3px rgba(59, 130, 246, .18); }
+
+.ai-input__field {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: .875rem;
+  line-height: 1.5;
+  resize: none;
+  padding: 8px 0;
+  max-height: 120px;
+  font-family: inherit;
+}
+
+.ai-input__field::placeholder { color: var(--fg-subtle); }
+
+.ai-send {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  border: none;
+  cursor: pointer;
+  background-color: var(--color-civic-600);
+  color: #fff;
+}
+
+.ai-send:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Streaming caret. The backend is non-streaming today, so this is the only
+   "in progress" affordance beyond the skeleton — kept cheap and one-tone. */
+.ai-caret::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background-color: var(--color-civic-500);
+  animation: ai-blink 1s steps(2, start) infinite;
+}
+
+@keyframes ai-blink { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-spark--live,
+  .ai-caret::after,
+  .ai-skeleton-line,
+  .ai-launcher__pulse { animation: none !important; }
+  .ai-launcher__pulse { display: none; }
+  .ai-skeleton-line { background-color: var(--surface-2); }
+}
+
+@media print {
+  .ai-launcher, .ai-fab, .ai-panel__foot { display: none !important; }
+}
+
+/* Action confirmation ------------------------------------------------------ */
+
+.ai-action {
+  margin-top: 12px;
+  border: 1px solid var(--color-civic-200);
+  border-radius: 12px;
+  background-color: color-mix(in oklab, var(--color-civic-500) 6%, var(--surface));
+  padding: 13px;
+}
+
+.ai-action--critical { border-color: #fca5a5; background-color: color-mix(in oklab, #ef4444 7%, var(--surface)); }
+
+.ai-action__title { display: flex; align-items: center; gap: 7px; font-size: .8125rem; font-weight: 700; }
+
+/* Skeletons ---------------------------------------------------------------- */
+
+.ai-skeleton-line {
+  height: 10px;
+  border-radius: 6px;
+  background-color: var(--surface-2);
+  background-image: linear-gradient(90deg, transparent, color-mix(in oklab, var(--fg) 9%, transparent), transparent);
+  background-size: 220% 100%;
+  animation: ai-shimmer 1.5s linear infinite;
+}
+
+@keyframes ai-shimmer {
+  0% { background-position: 180% 0; }
+  100% { background-position: -60% 0; }
+}
+
+/* Bulleted CivicSync data inside a response. */
+.ai-list { margin: 6px 0 0; padding-left: 0; list-style: none; }
+.ai-list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+  font-size: .8125rem;
+}
+.ai-list li:first-child { border-top: none; }

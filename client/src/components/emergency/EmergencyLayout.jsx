@@ -1,8 +1,10 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Search, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { roleLabels } from '../../utils/roles.js';
 import { useGlobalSearch } from '../search/GlobalSearch.jsx';
+import { useCivicAIContext } from '../ai/CivicAIProvider.jsx';
+import { presetFor } from '../ai/aiPrompts.js';
 
 const linksByRole = {
   emergency_department_head: [['/dashboard/emergency-head', 'Command center'], ['/dashboard/emergency-head/analytics', 'Analytics']],
@@ -17,6 +19,7 @@ export default function EmergencyLayout({ title, children }) {
   const navigate = useNavigate();
   const links = linksByRole[user?.role] || linksByRole.emergency_department_head;
   const search = useGlobalSearch();
+  const ai = useCivicAIContext();
 
   async function signOut() {
     await logout();
@@ -29,6 +32,6 @@ export default function EmergencyLayout({ title, children }) {
       <nav className="mt-8 space-y-1" aria-label="Emergency navigation">{links.map(([to, text]) => <NavLink key={to} to={to} end className={({ isActive }) => `flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold transition ${isActive || (to === '/dashboard/emergency-head' && location.pathname.startsWith(to)) ? 'bg-civic-600 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}>{text}</NavLink>)}</nav>
       <div className="mt-auto border-t border-white/10 pt-4"><p className="truncate text-sm font-semibold">{user?.name}</p><p className="mt-1 text-xs text-slate-400">{roleLabels[user?.role] || 'Emergency staff'}</p><button onClick={signOut} className="mt-4 min-h-11 w-full rounded-lg border border-white/20 px-3 text-sm font-bold text-white hover:bg-white/10">Log out</button></div>
     </aside>
-    <div className="min-w-0"><header className="flex min-h-16 items-center border-b border-slate-200 bg-white px-4 sm:px-8"><div><p className="text-xs font-bold tracking-[.14em] text-civic-600">EMERGENCY OPERATIONS</p><h1 className="text-lg font-black text-ink">{title}</h1></div><button type="button" onClick={() => search.open()} className="ml-auto grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Search CivicSync"><Search size={18} /></button></header><main className="p-4 sm:p-7">{children}</main></div>
+    <div className="min-w-0"><header className="flex min-h-16 items-center border-b border-slate-200 bg-white px-4 sm:px-8 dark:border-slate-800 dark:bg-slate-900"><div><p className="text-xs font-bold tracking-[.14em] text-civic-600">EMERGENCY OPERATIONS</p><h1 className="text-lg font-black text-ink dark:text-white">{title}</h1></div><button type="button" onClick={() => search.open()} className="ml-auto grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Search CivicSync"><Search size={18} /></button><button type="button" onClick={() => ai?.openGeneral(presetFor('emergency_dashboard'))} className="ml-2 inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-civic-500/40 bg-civic-500/10 px-3 text-sm font-bold text-civic-700 transition hover:bg-civic-500/20 dark:text-civic-300" aria-label="Open Emergency Intelligence briefing"><Sparkles size={16} /><span className="hidden sm:inline">AI</span></button></header><main className="p-4 sm:p-7">{children}</main></div>
   </div>;
 }

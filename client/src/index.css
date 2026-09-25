@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./ai.css";
 
 /* ---------------------------------------------------------------------------
    CivicSync design tokens
@@ -306,3 +307,168 @@
   .no-print { display: none !important; }
   body { background: #fff; color: #000; }
 }
+/* ============================================================================
+   CivicSync Intelligence
+   Every rule is built from the existing CivicSync tokens (--surface, --line,
+   --fg, --color-civic-600), so the assistant inherits the active theme in both
+   light and dark mode with no separate palette and no hard-coded colours.
+   ========================================================================== */
+
+.ai-surface {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+/* The "✦" mark. A single restrained accent, deliberately not a glow. */
+.ai-mark {
+  display: grid;
+  place-items: center;
+  border-radius: 0.6rem;
+  background: color-mix(in oklab, var(--color-civic-600) 13%, var(--surface));
+  color: var(--color-civic-600);
+  flex-shrink: 0;
+}
+
+.ai-drawer { width: 100%; }
+/* Desktop: right-side drawer. Mobile: full-screen sheet with safe-area padding. */
+@media (min-width: 768px) {
+  .ai-drawer { width: min(28rem, 100vw); }
+}
+@media (max-width: 767px) {
+  .ai-drawer { border-left: 0; }
+  .ai-drawer-head { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+  .ai-composer { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+}
+
+.ai-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  /* Prevents the iOS rubber-band from revealing the page behind the sheet. */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Bubbles. User is right-aligned and accent-tinted; assistant is a plain card. */
+.ai-bubble-user {
+  margin-left: auto;
+  max-width: 85%;
+  border-radius: 0.9rem 0.9rem 0.25rem 0.9rem;
+  background: var(--color-civic-600);
+  color: #fff;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.ai-bubble-ai {
+  max-width: 100%;
+  border-radius: 0.9rem 0.9rem 0.9rem 0.25rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  padding: 0.8rem 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.ai-bubble-user ul { margin: 0.3rem 0 0; padding-left: 1.1rem; list-style: disc; }
+.ai-bubble-ai ul { margin: 0.5rem 0 0; padding-left: 1.15rem; list-style: disc; }
+.ai-bubble-ai li { margin-top: 0.25rem; }
+.ai-bubble-ai li::marker { color: var(--color-civic-600); }
+
+/* Structured data blocks inside a response. */
+.ai-datablock {
+  margin-top: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--surface);
+  overflow: hidden;
+}
+.ai-datablock pre {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--fg-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.ai-chip:hover:not(:disabled) { border-color: var(--color-civic-600); color: var(--color-civic-600); }
+.ai-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Visible keyboard focus across every AI control. */
+.ai-focus:focus-visible,
+.ai-scroll button:focus-visible,
+.ai-scroll a:focus-visible,
+.ai-chip:focus-visible,
+.ai-suggestion:focus-visible {
+  outline: 2px solid var(--color-civic-600);
+  outline-offset: 2px;
+  border-radius: 0.4rem;
+}
+
+/* Thinking indicator: three dots, gently pulsing. */
+.ai-thinking-dot {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--color-civic-600);
+  animation: ai-pulse 1.2s var(--ease-standard) infinite;
+}
+.ai-thinking-dot:nth-child(2) { animation-delay: 0.15s; }
+.ai-thinking-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes ai-pulse {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* Tool-step reveal, animated in as each CivicSync tool completes. */
+@keyframes ai-step-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ai-step { animation: ai-step-in var(--dur-normal) var(--ease-standard) both; }
+
+/* Entry point: the floating launcher, and the inline Navbar trigger. */
+.ai-launcher {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--color-civic-600);
+  box-shadow: var(--shadow-token);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.ai-launcher:hover { transform: translateY(-2px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-thinking-dot { animation: none; opacity: 0.6; }
+  .ai-step { animation: none; }
+  .ai-launcher:hover { transform: none; }
+}
+

@@ -25,6 +25,7 @@ import communityRoutes from './routes/communityRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import civicServiceRoutes from './routes/civicServiceRoutes.js';
 import intelligenceRoutes from './routes/intelligenceRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
 
 import { initializeRealtime } from './realtime/emergencyRealtime.js';
 
@@ -55,6 +56,8 @@ app.use('/api/response-teams', responseTeamRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/services', civicServiceRoutes);
+app.use('/api/intelligence', intelligenceRoutes);
+app.use('/api/ai', aiRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

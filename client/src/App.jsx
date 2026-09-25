@@ -26,12 +26,14 @@ import EmergencyContacts from './pages/citizen/EmergencyContacts.jsx';
 import WomenSafety from './pages/citizen/WomenSafety.jsx';
 import EmergencyAnalytics from './pages/emergency/EmergencyAnalytics.jsx';
 import EmergencyDashboard from './pages/emergency/EmergencyDashboard.jsx';
+import CivicAIProvider from './components/ai/CivicAIProvider.jsx';
 
 export default function App() {
   const { user, loading } = useAuth();
   const roleRedirect = loading ? <div className="grid min-h-screen place-items-center text-civic-600">Loading CivicSync…</div> : <Navigate to={user ? dashboardPathFor(user.role) : '/login'} replace />;
   return (
-    <Suspense fallback={<div className="grid min-h-screen place-items-center bg-slate-50 text-sm font-semibold text-civic-600" aria-live="polite">Loading CivicSync…</div>}>
+    <CivicAIProvider>
+      <Suspense fallback={<div className="grid min-h-screen place-items-center bg-slate-50 text-sm font-semibold text-civic-600" aria-live="polite">Loading CivicSync…</div>}>
       <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
@@ -83,6 +85,7 @@ export default function App() {
       </Route>
       <Route path="*" element={<NotFound />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </CivicAIProvider>
   );
 }

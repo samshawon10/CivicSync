@@ -7,7 +7,9 @@ const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://loca
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (!error.response || error.response.status >= 500) showCriticalError('CivicSync service unavailable', 'The server could not complete this request. Check your connection or try again shortly.');
+    // AI requests render their own inline error state, so they opt out of the
+    // global blocking modal via `skipGlobalErrorToast`.
+    if (!error.config?.skipGlobalErrorToast && (!error.response || error.response.status >= 500)) showCriticalError('CivicSync service unavailable', 'The server could not complete this request. Check your connection or try again shortly.');
     return Promise.reject(error);
   }
 );

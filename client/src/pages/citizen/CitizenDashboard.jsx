@@ -7,6 +7,7 @@ import { emergencyApi, facilitiesApi, label } from '../../services/emergencyServ
 import { notificationsApi } from '../../services/notificationService.js';
 import { apiMessage } from '../../services/api.js';
 import { SkeletonPage } from '../../components/ui/Skeleton.jsx';
+import AIBriefingCard from '../../components/ai/AIBriefingCard.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import useEmergencyEvents from '../../hooks/useEmergencyEvents.js';
 
@@ -36,7 +37,22 @@ export default function CitizenDashboard() {
   const activeReports = useMemo(() => data.reports.filter((report) => activeReportStatuses.has(report.status)), [data.reports]);
   const activeEmergencies = useMemo(() => data.emergencies.filter((item) => activeEmergencyStatuses.has(item.status)), [data.emergencies]);
   const attention = useMemo(() => data.reports.filter((report) => report.status === 'completed' && report.citizenResolution?.status !== 'confirmed'), [data.reports]); const unread = data.notifications.filter((item) => !item.readAt).length;
+  // Figures for the AI card come from this page's own authorized fetches — never invented.
+  const aiStats = useMemo(() => [
+    { label: 'Active cases', value: activeReports.length },
+    { label: 'Unread notifications', value: unread },
+    { label: 'Nearby services', value: data.facilities.length }
+  ], [activeReports.length, unread, data.facilities.length]);
   return <CitizenLayout title="Dashboard" unreadCount={unread}>{loading ? <SkeletonPage kpis={4} blocks={2} /> : <div className="space-y-6">
+    <AIBriefingCard
+      presetKey="citizen_dashboard"
+      title="✦ CivicSync Intelligence"
+      subtitle={`Hello ${firstName} — what needs your attention today?`}
+      description="Ask about your cases, CivicSync services, safety information or notifications."
+      stats={aiStats}
+      actionLabel="Ask CivicSync AI"
+      loading={loading}
+    />
     {!online && <div role="status" className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900"><TriangleAlert size={17} /> You are offline. Information shown may be out of date until your connection returns.</div>}
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}<button onClick={() => load()} className="ml-3 font-bold underline">Retry</button></div>}
     <section className="relative overflow-hidden rounded-3xl bg-ink px-6 py-7 text-white shadow-lg sm:px-8"><div className="relative max-w-2xl"><p className="text-sm font-semibold text-civic-200">{greeting}, {firstName}</p><h2 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Your community, in view.</h2><p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">Track your reports, find nearby help, and get important local safety updates in one protected place.</p><div className="mt-5 flex items-center gap-2 text-xs text-slate-300"><span className={`h-2 w-2 rounded-full ${live ? 'bg-emerald-400' : 'bg-slate-400'}`} /> {live ? 'Live updates connected' : 'Updates will refresh automatically'}</div></div><div className="pointer-events-none absolute -right-16 -top-20 h-60 w-60 rounded-full bg-civic-500/20 blur-3xl" /></section>
