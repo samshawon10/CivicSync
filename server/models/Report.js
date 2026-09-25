@@ -9,6 +9,15 @@ const reportSchema = new mongoose.Schema({
   departmentName: { type: String, required: true, trim: true, enum: reportDepartments },
   priority: { type: String, enum: reportPriorities, default: 'medium' },
   location: { area: { type: String, trim: true, maxlength: 100, default: '' }, address: { type: String, trim: true, maxlength: 300, default: '' }, landmark: { type: String, trim: true, maxlength: 150, default: '' }, latitude: { type: Number, min: -90, max: 90 }, longitude: { type: Number, min: -180, max: 180 } },
+  // Where a case came from. Set only when the citizen explicitly confirms a
+  // hand-off (service request or "report this community post as a civic
+  // issue"); community content never becomes an official case on its own.
+  origin: {
+    type: { type: String, enum: ['citizen', 'service', 'community'], default: 'citizen' },
+    serviceId: { type: mongoose.Schema.Types.ObjectId, ref: 'CivicService', default: null },
+    communityPostId: { type: mongoose.Schema.Types.ObjectId, ref: 'CommunityPost', default: null },
+    label: { type: String, trim: true, maxlength: 160, default: '' }
+  },
   additionalInfo: { type: String, trim: true, maxlength: 1000, default: '' },
   status: { type: String, enum: reportStatuses, default: 'pending' },
   assignedOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
