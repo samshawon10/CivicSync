@@ -1,7 +1,7 @@
 /**
  * Super Admin governance API.
  *
- * Everything in this controller is derived from real CivicSync collections —
+ * Everything in this controller is derived from real CivicSync collections â€”
  * no sample data, no estimated numbers. Trend percentages are only produced
  * when a real comparison window exists; otherwise the API reports
  * `changePercent: null` with a basis of `no_prior_data` and the UI says so.
@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
+import { searchForUser } from '../services/civicSearch.js';
 import User from '../models/User.js';
 import Department from '../models/Department.js';
 import Report from '../models/Report.js';
@@ -44,7 +45,6 @@ function rangeWindow(value) {
   return { key: ranges[value] ? value : '30d', days, start, end, previousStart };
 }
 
-function escapeRegex(value = '') { return value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function pageOf(value) { return Math.max(1, Number(value) || 1); }
 function limitOf(value) { return Math.min(100, Math.max(1, Number(value) || 20)); }
 function count(value) { return Number.isFinite(Number(value)) ? Number(value) : 0; }
@@ -235,7 +235,7 @@ export async function getSystemHealth(req, res, next) {
       status: process.env.JWT_SECRET ? 'operational' : 'degraded',
       detail: process.env.JWT_SECRET
         ? 'Firebase-issued identity tokens are exchanged for signed, httpOnly CivicSync sessions.'
-        : 'JWT_SECRET is not configured — session issuance will fail.',
+        : 'JWT_SECRET is not configured â€” session issuance will fail.',
       source: 'middleware/authMiddleware.js + config/firebaseAdmin.js'
     });
 
@@ -245,7 +245,7 @@ export async function getSystemHealth(req, res, next) {
         key: 'notifications',
         label: 'Notification Delivery',
         status: 'operational',
-        detail: `${total} notification(s) stored, ${unread} unread. In-app delivery only — no external email/SMS provider is configured.`,
+        detail: `${total} notification(s) stored, ${unread} unread. In-app delivery only â€” no external email/SMS provider is configured.`,
         source: 'models/Notification.js'
       });
     } catch (error) {
@@ -298,108 +298,11 @@ export async function getSystemHealth(req, res, next) {
 export async function globalSearch(req, res, next) {
   try {
     const query = String(req.query.q || '').trim();
-    if (query.length < 2) return res.json({ success: true, query, groups: [] });
-    const expression = new RegExp(escapeRegex(query), 'i');
-    const [users, emergencies, departments, teams, facilities, alerts, logs] = await Promise.all([
-      User.find({ $or: [{ name: expression }, { email: expression }, { phone: expression }] })
-        .select('name email role departmentName photoURL status').sort({ name: 1 }).limit(5).lean(),
-      Emergency.find({ $or: [{ emergencyId: expression }, { title: expression }, { category: expression }] })
-        .select('emergencyId title category severity status visibility createdAt').sort({ createdAt: -1 }).limit(5).lean(),
-      Department.find({ $or: [{ name: expression }, { type: expression }] })
-        .select('name type scope status email').sort({ name: 1 }).limit(5).lean(),
-      ResponseTeam.find({ $or: [{ name: expression }, { type: expression }] })
-        .select('name type availability active baseLocation').sort({ name: 1 }).limit(5).lean(),
-      SafetyFacility.find({ $or: [{ name: expression }, { type: expression }, { address: expression }] })
-        .select('name type address active available').sort({ name: 1 }).limit(5).lean(),
-      EmergencyAlert.find({ $or: [{ title: expression }, { message: expression }, { category: expression }] })
-        .select('title severity category active createdAt').sort({ createdAt: -1 }).limit(5).lean(),
-      ActivityLog.find({ $or: [{ action: expression }, { description: expression }, { targetName: expression }] })
-        .select('action targetType targetName description actorRole result createdAt').sort({ createdAt: -1 }).limit(5).lean()
-    ]);
-
-    const groups = [
-      {
-        key: 'users',
-        label: 'Users',
-        items: users.map((user) => ({
-          id: user._id,
-          title: user.name,
-          subtitle: `${user.email} · ${roleMeta[user.role]?.label || user.role}${user.status === 'suspended' ? ' · Suspended' : ''}`,
-          tone: user.status === 'suspended' ? 'critical' : 'neutral',
-          path: `/admin/users?user=${user._id}`
-        }))
-      },
-      {
-        key: 'emergencies',
-        label: 'Emergencies',
-        items: emergencies.map((item) => ({
-          id: item._id,
-          title: `${item.emergencyId || 'Unnumbered'} · ${item.title}`,
-          subtitle: `${roleMeta[item.category] ? item.category.replaceAll('_', ' ') : String(item.category || '').replaceAll('_', ' ')} · ${item.severity} · ${String(item.status).replaceAll('_', ' ')}${item.visibility === 'restricted' ? ' · Restricted (location withheld)' : ''}`,
-          tone: item.severity === 'critical' ? 'critical' : item.severity === 'high' ? 'high' : 'neutral',
-          path: `/admin/emergencies?focus=${item._id}`
-        }))
-      },
-      {
-        key: 'departments',
-        label: 'Departments',
-        items: departments.map((item) => ({
-          id: item._id,
-          title: item.name,
-          subtitle: `${item.scope || 'civic'} scope · ${item.status || 'active'}`,
-          tone: item.status === 'inactive' ? 'muted' : 'neutral',
-          path: `/admin/departments?focus=${item._id}`
-        }))
-      },
-      {
-        key: 'teams',
-        label: 'Response Teams',
-        items: teams.map((item) => ({
-          id: item._id,
-          title: item.name,
-          subtitle: `${String(item.type).replaceAll('_', ' ')} · ${item.active === false ? 'archived' : item.availability}`,
-          tone: item.active === false ? 'muted' : item.availability === 'available' ? 'success' : 'info',
-          path: `/admin/response-teams?focus=${item._id}`
-        }))
-      },
-      {
-        key: 'facilities',
-        label: 'Facilities',
-        items: facilities.map((item) => ({
-          id: item._id,
-          title: item.name,
-          subtitle: `${String(item.type).replaceAll('_', ' ')} · ${item.address || 'No address recorded'}${item.active === false ? ' · inactive' : ''}`,
-          tone: item.active === false ? 'muted' : 'neutral',
-          path: `/admin/facilities?focus=${item._id}`
-        }))
-      },
-      {
-        key: 'alerts',
-        label: 'Alerts',
-        items: alerts.map((item) => ({
-          id: item._id,
-          title: item.title,
-          subtitle: `${String(item.category || 'alert').replaceAll('_', ' ')} · ${item.severity} · ${item.active ? 'active' : 'expired'}`,
-          tone: item.severity === 'critical' ? 'critical' : item.active ? 'info' : 'muted',
-          path: `/admin/alerts?focus=${item._id}`
-        }))
-      },
-      {
-        key: 'audit',
-        label: 'Audit Events',
-        items: logs.map((item) => ({
-          id: item._id,
-          title: String(item.action).replaceAll('_', ' '),
-          subtitle: `${item.description || item.targetName || item.targetType} · ${new Date(item.createdAt).toLocaleString()}`,
-          tone: item.result === 'failure' ? 'critical' : 'neutral',
-          path: `/admin/audit-logs?focus=${item._id}`
-        }))
-      }
-    ].filter((group) => group.items.length);
-
-    res.json({ success: true, query, groups });
+    const { groups, total, took } = await searchForUser({ user: req.user, query });
+    res.json({ success: true, query, groups, total, took });
   } catch (error) { next(error); }
 }
+
 
 /**
  * Role/permission governance. The matrix comes from config/permissions.js,
@@ -427,7 +330,7 @@ export async function getPermissions(req, res, next) {
 /**
  * Emergency category governance: configured categories joined with real usage
  * counts from the emergency collection. Built-in catalog entries that were
- * never overridden appear with source: 'catalog' — that is exactly how the
+ * never overridden appear with source: 'catalog' â€” that is exactly how the
  * citizen reporting API composes its type list.
  */
 export async function getCategoryGovernance(req, res, next) {

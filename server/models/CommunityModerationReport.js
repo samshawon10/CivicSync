@@ -1,0 +1,4 @@
+import mongoose from 'mongoose';
+const schema = new mongoose.Schema({ reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, targetType: { type: String, enum: ['post', 'comment', 'user'], required: true }, target: { type: mongoose.Schema.Types.ObjectId, required: true }, reason: { type: String, enum: ['spam', 'harassment', 'hate_abuse', 'misinformation', 'violence', 'sexual_content', 'scam_fraud', 'privacy_violation', 'dangerous_content', 'other'], required: true }, description: { type: String, trim: true, maxlength: 800, default: '' }, status: { type: String, enum: ['open', 'reviewed', 'dismissed'], default: 'open', index: true }, reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, reviewedAt: { type: Date, default: null } }, { timestamps: true });
+schema.index({ reporter: 1, targetType: 1, target: 1 }, { unique: true });
+export default mongoose.model('CommunityModerationReport', schema);
