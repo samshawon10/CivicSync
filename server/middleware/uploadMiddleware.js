@@ -8,6 +8,7 @@ const serverDir = path.dirname(fileURLToPath(import.meta.url));
 export const reportUploadDir = path.resolve(serverDir, '..', 'uploads', 'reports');
 export const emergencyUploadDir = path.resolve(serverDir, '..', 'storage', 'emergencies');
 export const profileUploadDir = path.resolve(serverDir, '..', 'storage', 'profiles');
+export const communityUploadDir = path.resolve(serverDir, '..', 'storage', 'community');
 
 const allowedMimeTypes = new Set([
   'image/jpeg',
@@ -21,6 +22,7 @@ const allowedMimeTypes = new Set([
 fs.mkdirSync(reportUploadDir, { recursive: true });
 fs.mkdirSync(profileUploadDir, { recursive: true });
 fs.mkdirSync(emergencyUploadDir, { recursive: true });
+fs.mkdirSync(communityUploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (req, file, callback) => callback(null, reportUploadDir),
@@ -47,6 +49,12 @@ export const uploadReportMedia = multer({
     files: 5
   }
 }).array('media', 5);
+
+const communityStorage = multer.diskStorage({
+  destination: (req, file, callback) => callback(null, communityUploadDir),
+  filename: (req, file, callback) => callback(null, `${Date.now()}-${randomUUID()}${path.extname(file.originalname || '').toLowerCase()}`)
+});
+export const uploadCommunityMedia = multer({ storage: communityStorage, fileFilter, limits: { fileSize: 25 * 1024 * 1024, files: 4 } }).array('media', 4);
 
 const emergencyStorage = multer.diskStorage({
   destination: (req, file, callback) => callback(null, emergencyUploadDir),
