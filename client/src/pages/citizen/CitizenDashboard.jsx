@@ -1,159 +1,51 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ReportForm from '../../components/reports/ReportForm.jsx';
+import { Bell, CheckCircle2, ChevronRight, ClipboardList, Clock3, Hospital, MapPinned, Plus, ShieldAlert, Siren, TriangleAlert } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import CitizenLayout from '../../components/citizen/CitizenLayout.jsx';
-import { mediaUrl, reportsApi } from '../../services/reportService.js';
+import { reportsApi } from '../../services/reportService.js';
+import { emergencyApi, facilitiesApi, label } from '../../services/emergencyService.js';
+import { notificationsApi } from '../../services/notificationService.js';
 import { apiMessage } from '../../services/api.js';
+import { SkeletonPage } from '../../components/ui/Skeleton.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import useEmergencyEvents from '../../hooks/useEmergencyEvents.js';
 
-const label = (value = '') => value.replaceAll('_', ' ').replace(/\b\w/g, (x) => x.toUpperCase());
-const editable = (report) => ['pending', 'verified'].includes(report.status);
+const activeReportStatuses = new Set(['pending', 'verified', 'assigned', 'in_progress', 'under_review']);
+const activeEmergencyStatuses = new Set(['reported', 'received', 'assessing', 'verified', 'dispatched', 'en_route', 'on_scene', 'responding', 'requires_backup']);
+const dateTime = (value) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Recently updated';
+const reportTone = (status) => status === 'completed' || status === 'closed' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : status === 'in_progress' || status === 'assigned' ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-amber-50 text-amber-800 ring-amber-200';
 
-function MediaPreview({ attachment }) {
-  if (!attachment) return null;
-  const src = mediaUrl(attachment);
-  if (attachment.mediaType === 'video') return <video src={src} className="h-20 w-28 rounded-lg object-cover" muted preload="metadata" />;
-  return <img src={src} alt={attachment.originalName || 'Report media'} className="h-20 w-28 rounded-lg object-cover" />;
-}
+function Status({ status }) { return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${reportTone(status)}`}>{label(status)}</span>; }
+function ActionCard({ icon: Icon, title, description, to, critical = false }) { return <Link to={to} className={`group rounded-2xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md ${critical ? 'border-red-200 bg-red-50/70 hover:border-red-300' : 'border-slate-200 bg-white hover:border-civic-300'}`}><div className="flex gap-3"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${critical ? 'bg-red-600 text-white' : 'bg-civic-50 text-civic-700'}`}><Icon size={21} /></span><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><h2 className="font-bold text-ink">{title}</h2><ChevronRight size={17} className="text-slate-400 transition group-hover:translate-x-0.5" /></div><p className="mt-1 text-sm leading-5 text-slate-500">{description}</p></div></div></Link>; }
+function Empty({ title, detail, action, to }) { return <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center"><p className="font-semibold text-ink">{title}</p><p className="mt-1 text-sm text-slate-500">{detail}</p>{action && <Link to={to} className="mt-3 inline-block text-sm font-bold text-civic-700 hover:text-civic-800">{action}</Link>}</div>; }
 
 export default function CitizenDashboard() {
-  const [reports, setReports] = useState([]); const [stats, setStats] = useState({ total: 0, pending: 0, inProgress: 0, completed: 0, closed: 0 });
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [deleting, setDeleting] = useState(null);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [serviceDepartments, setServiceDepartments] = useState([]);
-  const navigate = useNavigate();
-
-  async function load() {
-    setLoading(true);
+  const { user } = useAuth(); const navigate = useNavigate();
+  const [data, setData] = useState({ reports: [], stats: null, emergencies: [], alerts: [], notifications: [], facilities: [] });
+  const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [refreshing, setRefreshing] = useState(false);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (silent) setRefreshing(true); else setLoading(true);
     try {
-      const [reportResponse, statsResponse, departmentResponse] = await Promise.all([
-        reportsApi.mine({ limit: 5 }),
-        reportsApi.stats(),
-        reportsApi.departments().catch(() => ({ data: { departments: [] } }))
-      ]);
-      setReports(reportResponse.data.reports); setStats(statsResponse.data.stats);
-      setServiceDepartments(departmentResponse.data.departments || []);
-    } catch (err) {
-      setError(apiMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { load(); }, []);
-
-
-  async function save(values) {
-    setBusy(true);
-    setError('');
-    try {
-      if (editing) {
-        const { data } = await reportsApi.update(editing._id, values);
-        setReports((items) => items.map((item) => item._id === data.report._id ? data.report : item));
-        setMessage('Report updated successfully.');
-        setEditing(null);
-      } else {
-        const { data } = await reportsApi.create(values);
-        setReports((items) => [data.report, ...items]);
-        setMessage('Report submitted successfully.');
-      }
-    } catch (err) {
-      setError(apiMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function remove(report) {
-    setError('');
-    try {
-      await reportsApi.remove(report._id);
-      setReports((items) => items.filter((item) => item._id !== report._id));
-      setMessage('Report deleted successfully.');
-      setDeleting(null);
-    } catch (err) {
-      setError(apiMessage(err));
-    }
-  }
-
-  return (
-    <CitizenLayout title="Dashboard">
-      <section className="rounded-2xl bg-ink p-6 text-white"><p className="text-civic-100">Welcome back,</p><h2 className="mt-1 text-3xl font-bold">Your civic reports at a glance</h2><p className="mt-2 text-sm text-slate-300">Follow the progress of the issues you’ve raised in your community.</p></section>
-      {serviceDepartments.length > 0 && (
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="font-bold text-ink">City service departments</h2>
-          <p className="mt-1 text-sm text-slate-500">Choose the right department when you raise a new issue.</p>
-          <div className="mt-4 flex flex-wrap gap-2">{serviceDepartments.map((department) => <span key={department._id} className="rounded-full bg-civic-50 px-3 py-1.5 text-xs font-bold text-civic-700">{department.name}</span>)}</div>
-        </section>
-      )}
-      <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          ['Total Reports', stats.total],
-          ['Pending Reports', stats.pending],
-          ['In Progress', stats.inProgress], ['Completed', stats.completed], ['Closed', stats.closed]
-        ].map(([name, value]) => (
-          <div key={name} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm text-slate-500">{name}</p>
-            <p className="mt-2 text-3xl font-bold text-ink">{value}</p>
-          </div>
-        ))}
-      </div>
-      <div className="mt-7 grid gap-7 lg:grid-cols-[minmax(320px,.8fr)_minmax(0,1.4fr)]">
-        <ReportForm report={editing} onSave={save} onCancel={() => setEditing(null)} busy={busy} />
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4">
-            <h2 className="font-bold text-ink">My Reports</h2>
-            <p className="mt-1 text-sm text-slate-500">Track every civic issue you submit.</p>
-          </div>
-          {message && <p className="mb-3 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-700">{message}</p>}
-          {error && <p className="mb-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
-          {loading ? <p className="py-10 text-center text-slate-500">Loading reports...</p> : reports.length ? (
-            <div className="space-y-3">
-              {reports.map((report) => {
-                const attachments = report.attachments || [];
-                return (
-                  <article key={report._id} className="rounded-lg border border-slate-200 p-4">
-                    <div className="flex flex-wrap justify-between gap-3">
-                      <div className="flex min-w-0 gap-3">
-                        <MediaPreview attachment={attachments[0]} />
-                        <div>
-                          <h3 className="font-bold text-ink">{report.title}</h3>
-                          <p className="mt-1 text-sm text-slate-500">{label(report.category)} · {label(report.priority)} priority</p>
-                          <p className="mt-1 text-sm text-slate-500">Department: {report.departmentName || 'Not assigned'}</p>
-                        </div>
-                      </div>
-                      <span className="h-fit rounded-full bg-civic-50 px-2.5 py-1 text-xs font-bold text-civic-700">{label(report.status)}</span>
-                    </div>
-                    <p className="mt-3 line-clamp-2 text-sm text-slate-600">{report.description}</p>
-                    <p className="mt-3 text-xs text-slate-400">
-                      Submitted {new Date(report.createdAt).toLocaleDateString()} · Updated {new Date(report.updatedAt).toLocaleDateString()}
-                      {attachments.length ? ` · ${attachments.length} media file${attachments.length === 1 ? '' : 's'}` : ''}
-                    </p>
-                    <div className="mt-3 flex gap-3 text-sm font-bold">
-                      <button onClick={() => navigate(`/dashboard/citizen/reports/${report._id}`)} className="text-civic-600">View</button>
-                      {editable(report) && (
-                        <>
-                          <button onClick={() => setEditing(report)} className="text-civic-600">Edit</button>
-                          <button onClick={() => setDeleting(report)} className="text-red-600">Delete</button>
-                        </>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-10 text-center">
-              <p className="font-semibold text-ink">You haven't submitted any civic reports yet.</p>
-              <p className="mt-2 text-sm text-slate-500">Help improve your community by reporting a civic issue.</p>
-            </div>
-          )}
-        </section>
-      </div>
-      {deleting && <div role="dialog" aria-modal="true" aria-labelledby="delete-report-title" className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-5"><div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"><h2 id="delete-report-title" className="text-lg font-bold text-ink">Delete this report?</h2><p className="mt-2 text-sm text-slate-600">This cannot be undone. Any uploaded media will also be removed.</p><div className="mt-5 flex justify-end gap-3"><button onClick={() => setDeleting(null)} className="rounded-lg border px-4 py-2 font-bold">Cancel</button><button onClick={() => remove(deleting)} className="rounded-lg bg-red-600 px-4 py-2 font-bold text-white">Delete report</button></div></div></div>}
-    </CitizenLayout>
-  );
+      const [reports, stats, emergencies, alerts, notifications, facilities] = await Promise.all([reportsApi.mine({ limit: 5, sort: 'updated' }), reportsApi.stats(), emergencyApi.list({ limit: 3 }), emergencyApi.alerts({ limit: 3 }), notificationsApi.list(), facilitiesApi.list({ limit: 3 })]);
+      setData({ reports: reports.data.reports || [], stats: stats.data.stats || {}, emergencies: emergencies.data.emergencies || [], alerts: alerts.data.alerts || [], notifications: notifications.data.notifications || [], facilities: facilities.data.facilities || [] }); setError('');
+    } catch (loadError) { setError(apiMessage(loadError)); } finally { setLoading(false); setRefreshing(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const { online, live } = useEmergencyEvents(() => load({ silent: true }));
+  const firstName = user?.name?.trim()?.split(/\s+/)[0] || 'there'; const hour = new Date().getHours(); const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const activeReports = useMemo(() => data.reports.filter((report) => activeReportStatuses.has(report.status)), [data.reports]);
+  const activeEmergencies = useMemo(() => data.emergencies.filter((item) => activeEmergencyStatuses.has(item.status)), [data.emergencies]);
+  const attention = useMemo(() => data.reports.filter((report) => report.status === 'completed' && report.citizenResolution?.status !== 'confirmed'), [data.reports]); const unread = data.notifications.filter((item) => !item.readAt).length;
+  return <CitizenLayout title="Dashboard" unreadCount={unread}>{loading ? <SkeletonPage kpis={4} blocks={2} /> : <div className="space-y-6">
+    {!online && <div role="status" className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900"><TriangleAlert size={17} /> You are offline. Information shown may be out of date until your connection returns.</div>}
+    {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}<button onClick={() => load()} className="ml-3 font-bold underline">Retry</button></div>}
+    <section className="relative overflow-hidden rounded-3xl bg-ink px-6 py-7 text-white shadow-lg sm:px-8"><div className="relative max-w-2xl"><p className="text-sm font-semibold text-civic-200">{greeting}, {firstName}</p><h2 className="mt-2 text-3xl font-extrabold tracking-tight sm:text-4xl">Your community, in view.</h2><p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">Track your reports, find nearby help, and get important local safety updates in one protected place.</p><div className="mt-5 flex items-center gap-2 text-xs text-slate-300"><span className={`h-2 w-2 rounded-full ${live ? 'bg-emerald-400' : 'bg-slate-400'}`} /> {live ? 'Live updates connected' : 'Updates will refresh automatically'}</div></div><div className="pointer-events-none absolute -right-16 -top-20 h-60 w-60 rounded-full bg-civic-500/20 blur-3xl" /></section>
+    <section aria-label="Quick actions" className="grid gap-3 md:grid-cols-3"><ActionCard icon={Plus} title="Report an issue" description="Submit a civic concern with location and evidence." to="/dashboard/citizen/reports/new" /><ActionCard icon={Siren} title="Emergency help" description="Request immediate assistance. Use only for emergencies." to="/dashboard/citizen/emergency/new" critical /><ActionCard icon={MapPinned} title="Nearby services" description="Find registered hospitals, police, fire and safety services." to="/dashboard/citizen/nearby-services" /></section>
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[[ClipboardList, 'Active reports', (data.stats?.pending || 0) + (data.stats?.inProgress || 0)], [Clock3, 'Awaiting review', data.stats?.pending || 0], [CheckCircle2, 'Resolved', data.stats?.completed || 0], [Bell, 'Unread updates', unread]].map(([Icon, title, value]) => <div key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-sm font-medium text-slate-500">{title}</p><span className="grid h-9 w-9 place-items-center rounded-xl bg-civic-50 text-civic-700"><Icon size={18} /></span></div><p className="mt-4 text-3xl font-extrabold text-ink">{value}</p></div>)}</section>
+    {activeEmergencies.length > 0 && <section className="rounded-2xl border border-red-200 bg-red-50 p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div className="flex gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-red-600 text-white"><Siren size={20} /></span><div><h2 className="font-bold text-red-950">Emergency status</h2><p className="mt-1 text-sm text-red-800">You have an active emergency request. Follow its live status for the latest response information.</p></div></div><Link to={`/dashboard/citizen/emergency/${activeEmergencies[0]._id}`} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">View emergency</Link></div></section>}
+    {attention.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><div className="flex items-start gap-3"><TriangleAlert className="mt-0.5 text-amber-700" size={20} /><div className="min-w-0 flex-1"><h2 className="font-bold text-amber-950">Needs your attention</h2>{attention.slice(0, 2).map((report) => <div key={report._id} className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/70 px-3 py-2"><span className="min-w-0 text-sm text-amber-950"><b>{report.title}</b> is awaiting your resolution review.</span><Link className="text-sm font-bold text-amber-800" to={`/dashboard/citizen/reports/${report._id}`}>Review</Link></div>)}</div></div></section>}
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.8fr)]"><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><div><h2 className="font-bold text-ink">My active reports</h2><p className="mt-1 text-sm text-slate-500">The latest status of reports you submitted.</p></div><Link to="/dashboard/citizen/reports" className="text-sm font-bold text-civic-700">View all</Link></div><div className="mt-5 space-y-3">{activeReports.length ? activeReports.map((report) => <button key={report._id} onClick={() => navigate(`/dashboard/citizen/reports/${report._id}`)} className="w-full rounded-xl border border-slate-200 p-4 text-left transition hover:border-civic-300 hover:bg-civic-50/30"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-bold text-ink">{report.title}</p><p className="mt-1 text-sm text-slate-500">{label(report.category)} · {report.departmentName || 'Assignment pending'}</p></div><Status status={report.status} /></div><p className="mt-3 text-xs text-slate-500">Updated {dateTime(report.updatedAt)}</p></button>) : <Empty title="No active reports" detail="You have not submitted any active civic reports." action="Report an issue" to="/dashboard/citizen/reports/new" />}</div></section><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-bold text-ink">Safety alerts</h2><p className="mt-1 text-sm text-slate-500">Authorized public advisories.</p></div><Link to="/dashboard/citizen/alerts" className="text-sm font-bold text-civic-700">All alerts</Link></div><div className="mt-5 space-y-3">{data.alerts.length ? data.alerts.slice(0, 3).map((alert) => <Link key={alert._id} to="/dashboard/citizen/alerts" className="block rounded-xl border border-slate-200 p-3 transition hover:border-civic-300"><div className="flex items-start gap-3"><ShieldAlert size={18} className="mt-0.5 text-civic-700" /><div><p className="font-semibold text-ink">{alert.title}</p><p className="mt-1 line-clamp-2 text-sm text-slate-500">{alert.description}</p><p className="mt-2 text-xs text-slate-400">Issued {dateTime(alert.createdAt)}</p></div></div></Link>) : <Empty title="No active safety alerts" detail="You are all caught up with current public alerts." />}</div></section></div>
+    <div className="grid gap-6 lg:grid-cols-2"><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex justify-between gap-3"><div><h2 className="font-bold text-ink">Nearby services</h2><p className="mt-1 text-sm text-slate-500">Registered facilities only. Share location to sort by distance.</p></div><Link to="/dashboard/citizen/nearby-services" className="text-sm font-bold text-civic-700">Explore</Link></div><div className="mt-4">{data.facilities.length ? data.facilities.map((facility) => <Link key={facility._id} to="/dashboard/citizen/nearby-services" className="flex items-center gap-3 border-t border-slate-100 py-3 first:border-t-0 first:pt-0"><Hospital size={18} className="text-civic-700" /><div><p className="font-semibold text-ink">{facility.name}</p><p className="text-xs text-slate-500">{label(facility.type)}{facility.address ? ` · ${facility.address}` : ''}</p></div></Link>) : <Empty title="Services are not available yet" detail="The directory will show registered locations when they are published." />}</div></section><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex justify-between gap-3"><div><h2 className="font-bold text-ink">Recent updates</h2><p className="mt-1 text-sm text-slate-500">Your case, emergency and system notifications.</p></div><Link to="/dashboard/citizen/notifications" className="text-sm font-bold text-civic-700">View all</Link></div><div className="mt-4">{data.notifications.length ? data.notifications.slice(0, 4).map((item) => <Link key={item._id} to="/dashboard/citizen/notifications" className="block border-t border-slate-100 py-3 first:border-t-0 first:pt-0"><p className={`text-sm ${item.readAt ? 'text-slate-600' : 'font-semibold text-ink'}`}>{item.message}</p><p className="mt-1 text-xs text-slate-400">{dateTime(item.createdAt)}</p></Link>) : <Empty title="You're all caught up" detail="No new notifications right now." />}</div></section></div>
+    <div className="flex justify-end"><button onClick={() => load({ silent: true })} disabled={refreshing} className="text-sm font-semibold text-slate-500 hover:text-civic-700 disabled:opacity-50">{refreshing ? 'Refreshing...' : 'Refresh dashboard'}</button></div>
+  </div>}</CitizenLayout>;
 }

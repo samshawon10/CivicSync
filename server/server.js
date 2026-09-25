@@ -21,6 +21,11 @@ import adminRoutes from './routes/adminRoutes.js';
 import emergencyRoutes, { contactRouter } from './routes/emergencyRoutes.js';
 import emergencyServiceRoutes from './routes/emergencyServiceRoutes.js';
 import responseTeamRoutes from './routes/responseTeamRoutes.js';
+import communityRoutes from './routes/communityRoutes.js';
+import searchRoutes from './routes/searchRoutes.js';
+import civicServiceRoutes from './routes/civicServiceRoutes.js';
+import intelligenceRoutes from './routes/intelligenceRoutes.js';
+
 import { initializeRealtime } from './realtime/emergencyRealtime.js';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
@@ -47,6 +52,9 @@ app.use('/api/emergencies', emergencyRoutes);
 app.use('/api/emergency-contacts', contactRouter);
 app.use('/api/emergency-services', emergencyServiceRoutes);
 app.use('/api/response-teams', responseTeamRoutes);
+app.use('/api/community', communityRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/services', civicServiceRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

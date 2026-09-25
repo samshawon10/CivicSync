@@ -161,6 +161,28 @@ export const permissionMatrix = [
     }
   },
   {
+    key: 'services',
+    label: 'Civic Service Hub',
+    enforcement: "routes/civicServiceRoutes.js (requireRole('admin') for catalogue writes); citizens read published services only",
+    actions: {
+      view: { roles: ['citizen', 'admin', 'department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker'], note: 'Everyone reads published service information; drafts are admin-only.' },
+      create: { roles: ['admin'], note: 'Service information is official civic data and is never invented by the platform.' },
+      edit: { roles: ['admin'] },
+      manage: { roles: ['admin'], note: 'Publish, archive and enable service request hand-off into the existing case workflow.' },
+      delete: { roles: [], note: 'Services are archived so saved services and request history stay valid.' }
+    }
+  },
+  {
+    key: 'verification',
+    label: 'Trust & Verification',
+    enforcement: 'controllers/verificationController.js (requireRole(\'admin\'))',
+    actions: {
+      view: { roles: ['citizen', 'admin', 'department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker'], note: 'Verification badges are public; the audit trail behind them is admin-only.' },
+      create: { roles: ['admin'], note: 'Only the Super Admin grants official verification.' },
+      manage: { roles: ['admin'], note: 'Revoke a verification with a recorded reason.' }
+    }
+  },
+  {
     key: 'audit',
     label: 'Audit & Activity Logs',
     enforcement: 'controllers/adminController.js (listActivityLogs)',
