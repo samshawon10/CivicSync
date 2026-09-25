@@ -66,9 +66,6 @@ export default function CaseDirectory({ onOpenCase, title = 'Case workspace dire
         </div>
       </div>
       <div className="mt-4"><OpsError message={error} onRetry={load} /></div>
-
-
-
       {loading ? (
         <div className="mt-4 space-y-2">{[0, 1, 2, 3].map((index) => <div key={index} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div>
       ) : reports.length ? (
@@ -121,6 +118,3 @@ export default function CaseDirectory({ onOpenCase, title = 'Case workspace dire
     </Panel>
   );
 }
-
-
-      <div className="mt-4"><OpsError message={error} onRetry={load} /></div>

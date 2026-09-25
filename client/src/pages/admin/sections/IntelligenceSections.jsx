@@ -415,7 +415,7 @@ export function SafetyHeatmapSection() {
             <MapContainer center={center} zoom={12} style={{ height: 420, width: '100%' }} scrollWheelZoom>
               <TileLayer
                 key={`admin-safety-map-${tileAttempt}`}
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                attribution={(import.meta.env.VITE_MAP_TILE_PROVIDER || 'OpenStreetMap') === 'OpenStreetMap' ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' : `&copy; ${import.meta.env.VITE_MAP_TILE_PROVIDER}`}
                 url={import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
                 eventHandlers={{ tileerror: () => setTileError(true), load: () => setTileError(false) }}
               />

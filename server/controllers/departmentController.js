@@ -13,10 +13,12 @@ import { emitDepartmentEvent } from '../realtime/emergencyRealtime.js';
 import { canReviewReportCompletion, canTransitionReport } from '../services/reportLifecycle.js';
 import { reportCategories, reportPriorities, reportStatuses } from '../config/reportOptions.js';
 import { getReportNextAction } from '../services/nextAction.js';
+import { departmentTaskAccess } from '../services/departmentTaskAccess.js';
 
 const headRoles = ['department_head'];
 const managementRoles = ['department_head', 'department_officer'];
 const departmentRoles = ['department_head', 'department_officer', 'officer', 'field_worker'];
+
 const completionStatuses = ['submitted', 'approved', 'rejected'];
 
 function label(value = '') {
@@ -506,7 +508,9 @@ export async function createTeam(req, res, next) {
 export async function updateTeam(req, res, next) {
   try {
     if (!headRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only Department Head can modify teams.' });
-    const team = await DepartmentTeam.findById(req.params.id);
+    const departmentName = departmentNameFor(req.user);
+    if (!departmentName) return res.status(403).json({ success: false, message: 'Department assignment required.' });
+    const team = await DepartmentTeam.findOne({ _id: req.params.id, departmentName });
     if (!team) return res.status(404).json({ success: false, message: 'Team not found.' });
 
     const allowed = ['name', 'leader', 'members', 'skills', 'serviceArea', 'capacity', 'status', 'phone', 'notes', 'active'];
@@ -615,30 +619,48 @@ export async function listTasks(req, res, next) {
   } catch (error) { next(error); }
 }
 
+async function loadScopedTask(req, res) {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    res.status(404).json({ success: false, message: 'Task not found.' });
+    return null;
+  }
+  const task = await DepartmentTask.findById(req.params.id)
+    .populate('report', 'title category priority location dueAt status sla')
+    .populate('team', 'name serviceArea')
+    .populate('assignedWorker', 'name phone')
+    .populate('teamLeader', 'name phone')
+    .populate('timeline.actor', 'name role');
+  if (!task || !departmentTaskAccess.canAccess(req.user, task)) {
+    res.status(404).json({ success: false, message: 'Task not found.' });
+    return null;
+  }
+  return task;
+}
+
+function validateTaskLocation(latitude, longitude) {
+  const hasLatitude = latitude !== undefined && latitude !== null && latitude !== '';
+  const hasLongitude = longitude !== undefined && longitude !== null && longitude !== '';
+  if (!hasLatitude && !hasLongitude) return { ok: true, value: { latitude: null, longitude: null } };
+  if (hasLatitude !== hasLongitude) return { ok: false, message: 'Provide both latitude and longitude, or neither.' };
+  const nextLatitude = Number(latitude);
+  const nextLongitude = Number(longitude);
+  if (!Number.isFinite(nextLatitude) || nextLatitude < -90 || nextLatitude > 90 || !Number.isFinite(nextLongitude) || nextLongitude < -180 || nextLongitude > 180) return { ok: false, message: 'Task location coordinates are invalid.' };
+  return { ok: true, value: { latitude: nextLatitude, longitude: nextLongitude } };
+}
+
 export async function getTask(req, res, next) {
   try {
-    const task = await DepartmentTask.findById(req.params.id)
-      .populate('report')
-      .populate('team')
-      .populate('assignedWorker', 'name phone')
-      .populate('teamLeader', 'name phone')
-      .populate('timeline.actor', 'name role');
-
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found.' });
-    res.json({ success: true, task });
+    const task = await loadScopedTask(req, res);
+    if (task) res.json({ success: true, task });
   } catch (error) { next(error); }
 }
 
 export async function updateTaskStatus(req, res, next) {
   try {
     const { status, note = '', reason = '', description = '', resourceNeeded = '', latitude, longitude } = req.body;
-    const task = await DepartmentTask.findById(req.params.id);
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found.' });
-
-    const isWorker = task.assignedWorker?.equals?.(req.user._id);
-    if (!isWorker && !managementRoles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'You are not authorized to update this task.' });
-    }
+    const task = await loadScopedTask(req, res);
+    if (!task) return;
+    if (!departmentTaskAccess.canManage(req.user, task)) return res.status(403).json({ success: false, message: 'You are not authorized to update this task.' });
 
     const validTransitions = {
       assigned: ['accepted', 'rejected', 'cancelled'],
@@ -657,9 +679,11 @@ export async function updateTaskStatus(req, res, next) {
       return res.json({ success: true, message: `Task is already ${status}.`, task });
     }
 
-    if (!validTransitions[task.status]?.includes(status) && !managementRoles.includes(req.user.role)) {
+    if (!validTransitions[task.status]?.includes(status)) {
       return res.status(409).json({ success: false, message: `Cannot transition task from ${task.status} to ${status}.` });
     }
+    const location = validateTaskLocation(latitude, longitude);
+    if (!location.ok) return res.status(400).json({ success: false, message: location.message });
 
     const previousStatus = task.status;
     task.status = status;
@@ -689,10 +713,7 @@ export async function updateTaskStatus(req, res, next) {
       actor: req.user._id,
       actorRole: req.user.role,
       note: note || reason || description || '',
-      location: {
-        latitude: Number(latitude) || null,
-        longitude: Number(longitude) || null
-      }
+      location: location.value
     });
 
     await task.save();
@@ -731,17 +752,13 @@ export async function updateTaskStatus(req, res, next) {
 export async function completeTask(req, res, next) {
   try {
     const { summary = '', result = '', materialsUsed = '', remainingIssues = '', evidenceUrls = [] } = req.body;
-    const task = await DepartmentTask.findById(req.params.id);
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found.' });
-
-    const isWorker = task.assignedWorker?.equals?.(req.user._id);
-    if (!isWorker && !managementRoles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Not authorized to complete this task.' });
-    }
-
+    const task = await loadScopedTask(req, res);
+    if (!task) return;
+    if (!departmentTaskAccess.canManage(req.user, task)) return res.status(403).json({ success: false, message: 'Not authorized to complete this task.' });
     if (task.status === 'completed') {
       return res.json({ success: true, message: 'Task already completed.', task });
     }
+    if (task.status !== 'in_progress') return res.status(409).json({ success: false, message: 'A task must be in progress before it can be completed.' });
 
     task.status = 'completed';
     task.completion = {
