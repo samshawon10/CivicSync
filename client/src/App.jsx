@@ -19,6 +19,7 @@ const CitizenEmergency = lazy(() => import('./pages/citizen/CitizenEmergency.jsx
 const CreateEmergency = lazy(() => import('./pages/citizen/CreateEmergency.jsx'));
 const EmergencyTracking = lazy(() => import('./pages/citizen/EmergencyTracking.jsx'));
 const SafetyMap = lazy(() => import('./pages/citizen/SafetyMap.jsx'));
+const Community = lazy(() => import('./pages/citizen/Community.jsx'));
 const NearbyServices = lazy(() => import('./pages/citizen/NearbyServices.jsx'));
 import SafetyAlerts from './pages/citizen/SafetyAlerts.jsx';
 import EmergencyContacts from './pages/citizen/EmergencyContacts.jsx';
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/dashboard/citizen/emergency/:id" element={<EmergencyTracking />} />
         <Route path="/dashboard/citizen/women-safety" element={<WomenSafety />} />
         <Route path="/dashboard/citizen/safety-map" element={<SafetyMap />} />
+        <Route path="/dashboard/citizen/community" element={<Community />} />
         <Route path="/dashboard/citizen/alerts" element={<SafetyAlerts />} />
         <Route path="/dashboard/citizen/nearby-services" element={<NearbyServices />} />
         <Route path="/dashboard/citizen/emergency-contacts" element={<EmergencyContacts />} />

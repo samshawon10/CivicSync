@@ -1,0 +1,9 @@
+import api from './api.js';
+const form = (payload) => { const data = new FormData(); Object.entries(payload).forEach(([key, value]) => { if (key === 'media') [...(value || [])].forEach((file) => data.append('media', file)); else if (value !== undefined && value !== null) data.append(key, value); }); return data; };
+const multipart = { transformRequest: [(data, headers) => { if (headers) { delete headers['Content-Type']; delete headers['content-type']; } return data; }] };
+export const communityApi = {
+  posts: (params) => api.get('/community/posts', { params }), get: (id) => api.get(`/community/posts/${id}`), create: (payload) => api.post('/community/posts', form(payload), multipart), update: (id, payload) => api.patch(`/community/posts/${id}`, form(payload), multipart), remove: (id) => api.delete(`/community/posts/${id}`),
+  react: (id, type) => api.post(`/community/posts/${id}/reactions`, { type }), save: (id) => api.post(`/community/posts/${id}/save`), comments: (id) => api.get(`/community/posts/${id}/comments`), comment: (id, payload) => api.post(`/community/posts/${id}/comments`, payload), saved: () => api.get('/community/saved'), draft: () => api.get('/community/draft'), saveDraft: (payload) => api.put('/community/draft', payload), deleteDraft: () => api.delete('/community/draft'), follow: (id) => api.post(`/community/users/${id}/follow`), block: (id) => api.post(`/community/users/${id}/block`), report: (payload) => api.post('/community/reports', payload),
+  updateComment: (postId, commentId, payload) => api.patch(`/community/posts/${postId}/comments/${commentId}`, payload), removeComment: (postId, commentId) => api.delete(`/community/posts/${postId}/comments/${commentId}`)
+};
+export const communityMediaUrl = (url) => url?.startsWith('http') ? url : `${api.defaults.baseURL.replace(/\/api\/?$/, '')}${url || ''}`;
