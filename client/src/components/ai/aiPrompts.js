@@ -109,6 +109,17 @@ export const PAGE_PRESETS = {
     title: 'Emergency Intelligence',
     context: { route: 'emergency_dashboard' },
     prompts: ['Brief me on active emergencies', 'Show responder availability', 'Summarize emergency workload', 'Show unresolved incidents']
+  },
+  admin: {
+    title: 'Platform Intelligence',
+    context: { route: 'admin' },
+    prompts: [
+      'Give me a platform overview',
+      'How are departments performing?',
+      'Summarise active emergencies across the platform',
+      'Explain what needs attention first',
+      'Where is SLA risk highest?'
+    ]
   }
 };
 

@@ -71,6 +71,7 @@ export async function getGovernanceOverview(req, res, next) {
       roleRows, userStatusRows, departmentRows, reportStatusRows, reportPriorityRows,
       emergencyStatusRows, emergencySeverityRows, emergencyCategoryRows, assignmentRows,
       teamRows, facilityRows, activeAlerts, categoryCount,
+      departmentList, departmentMemberRows, departmentReportRows,
       userCurrent, userPrevious, reportCurrent, reportPrevious, emergencyCurrent, emergencyPrevious,
       activeResponders, restrictedActive, recentActivity, recentEmergencies, recentAlerts, settings
     ] = await Promise.all([
@@ -87,6 +88,18 @@ export async function getGovernanceOverview(req, res, next) {
       SafetyFacility.aggregate([{ $group: { _id: { type: '$type', active: '$active' }, count: { $sum: 1 } } }]),
       EmergencyAlert.countDocuments({ active: true }),
       EmergencyCategory.countDocuments({ active: true }),
+      Department.find()
+        .populate('head', 'name email photoURL')
+        .populate('emergencyHead', 'name email photoURL')
+        .sort({ name: 1 })
+        .lean(),
+      User.aggregate([
+        { $match: { department: { $type: 'objectId' } } },
+        { $group: { _id: { department: '$department', role: '$role' }, count: { $sum: 1 } } }
+      ]),
+      Report.aggregate([
+        { $group: { _id: { department: '$departmentName', status: '$status' }, count: { $sum: 1 } } }
+      ]),
       User.countDocuments(currentWindow),
       User.countDocuments(previousWindow),
       Report.countDocuments(currentWindow),
@@ -125,6 +138,84 @@ export async function getGovernanceOverview(req, res, next) {
       accumulator[row._id.type] = count(accumulator[row._id.type]) + row.count;
       return accumulator;
     }, {});
+    // Live department register for the dashboard: every department that exists,
+    // with its assigned heads and real workload derived from the users and
+    // reports collections.
+    const memberTally = {};
+    for (const row of departmentMemberRows) {
+      const key = String(row._id.department);
+      memberTally[key] = memberTally[key] || { members: 0, byRole: {} };
+      memberTally[key].members += count(row.count);
+      memberTally[key].byRole[row._id.role || 'unknown'] = count(row.count);
+    }
+    const reportTally = {};
+    for (const row of departmentReportRows) {
+      const key = row._id.department || 'unassigned';
+      reportTally[key] = reportTally[key] || { total: 0, open: 0 };
+      reportTally[key].total += count(row.count);
+      if (openComplaintStatuses.includes(row._id.status)) reportTally[key].open += count(row.count);
+    }
+    const departments = departmentList.map((department) => {
+      const key = String(department._id);
+      const members = memberTally[key] || { members: 0, byRole: {} };
+      const workload = reportTally[department.name] || { total: 0, open: 0 };
+      const scope = department.scope || 'civic';
+      // Complaints are routed by an exact name match against the fixed
+      // `reportDepartments` catalog, so a department whose name is not in that
+      // catalog can never receive a citizen complaint. That is reported
+      // explicitly instead of being shown as a silent zero.
+      const acceptsComplaints = reportDepartments.includes(department.name);
+      const needsHead = scope === 'civic' || scope === 'hybrid';
+      const needsEmergencyHead = scope === 'emergency' || scope === 'hybrid';
+      return {
+        id: key,
+        name: department.name,
+        type: department.type || '',
+        description: department.description || '',
+        scope,
+        status: department.status || 'active',
+        emergencyTypes: department.emergencyTypes || [],
+        contactNumber: department.contactNumber || '',
+        email: department.email || '',
+        address: department.address || '',
+        head: department.head ? { id: String(department.head._id), name: department.head.name, email: department.head.email || '', photoURL: department.head.photoURL || '' } : null,
+        emergencyHead: department.emergencyHead ? { id: String(department.emergencyHead._id), name: department.emergencyHead.name, email: department.emergencyHead.email || '', photoURL: department.emergencyHead.photoURL || '' } : null,
+        members: members.members,
+        membersByRole: members.byRole,
+        complaints: { total: workload.total, open: workload.open },
+        acceptsComplaints,
+        acceptsEmergencies: (department.emergencyTypes || []).length > 0,
+        // A gap only matters when this department's scope actually requires it.
+        needsHead,
+        needsEmergencyHead,
+        missingHead: needsHead && !department.head,
+        missingEmergencyHead: needsEmergencyHead && !department.emergencyHead,
+        createdAt: department.createdAt
+      };
+    });
+    const departmentNames = new Set(departments.map((department) => department.name));
+    // Complaints that no registered department can claim, so the register totals
+    // always reconcile against the platform complaint count.
+    const unroutedComplaints = Object.entries(reportTally)
+      .filter(([name]) => !departmentNames.has(name))
+      .reduce((sum, [, value]) => sum + value.total, 0);
+    const unroutedOpenComplaints = Object.entries(reportTally)
+      .filter(([name]) => !departmentNames.has(name))
+      .reduce((sum, [, value]) => sum + value.open, 0);
+    const missingHeadCount = departments.filter((department) => department.missingHead).length;
+    const missingEmergencyHeadCount = departments.filter((department) => department.missingEmergencyHead).length;
+
+    // The citizen report form builds its department dropdown from the ACTIVE
+    // department records (GET /api/reports/departments), but the report API only
+    // accepts a name from the fixed `reportDepartments` catalog. That is a real
+    // mismatch, so it is reported explicitly instead of being left to fail on
+    // submit: `acceptedByReportApi` marks the names that can actually be filed.
+    const activeDepartments = departments.filter((department) => department.status === 'active');
+    const citizenDepartmentNames = [
+      ...new Set([...activeDepartments.map((department) => department.name), ...reportDepartments])
+    ].sort((a, b) => a.localeCompare(b));
+    const complaintDestinationGaps = reportDepartments.filter((name) => !departments.some((department) => department.name === name));
+
     res.json({
       success: true,
       generatedAt: new Date(),
@@ -166,6 +257,32 @@ export async function getGovernanceOverview(req, res, next) {
       workforce: { byRole: roleOrder.map((role) => ({ key: role, count: count(roleCounts[role]) })), teams: teamTally },
       resources: {
         departmentsByScope: departmentRows.map((row) => ({ key: row._id || 'civic', count: row.count })),
+        // Every department currently registered, in name order.
+        departments: {
+          total: departments.length,
+          active: departments.filter((department) => department.status === 'active').length,
+          inactive: departments.filter((department) => department.status !== 'active').length,
+          missingHeads: missingHeadCount,
+          missingEmergencyHeads: missingEmergencyHeadCount,
+          // Any head this department's scope requires but does not have.
+          unassignedHeads: departments.filter((department) => department.missingHead || department.missingEmergencyHead).length,
+          // Departments that can never receive a citizen complaint because their
+          // name is not one of the configured complaint destinations.
+          notComplaintRoutable: departments.filter((department) => !department.acceptsComplaints).length,
+          complaintDestinations: reportDepartments,
+          // Exactly the department names a citizen can see in the report form.
+          citizenDepartmentNames: citizenDepartmentNames.map((name) => ({
+            name,
+            acceptedByReportApi: reportDepartments.includes(name),
+            hasActiveDepartment: activeDepartments.some((department) => department.name === name),
+            isActiveDepartment: Boolean(activeDepartments.find((department) => department.name === name))
+          })),
+          // Catalog destinations with no active department behind them.
+          complaintDestinationGaps,
+          unroutedComplaints,
+          unroutedOpenComplaints,
+          list: departments
+        },
         facilitiesByType: Object.entries(facilityTally).map(([key, value]) => ({ key, count: value })),
         categories: { configured: categoryCount, catalog: emergencyTypeCatalog.length }
       },

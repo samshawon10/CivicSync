@@ -76,21 +76,25 @@ export function ColumnChart({ data = [], height = 200, valueLabel = 'Count', ton
   );
 }
 
-export function LineChart({ data = [], height = 180, valueLabel = 'Count', emptyText = 'Not enough data to plot a trend.' }) {
+export function LineChart({ data = [], height = 180, valueLabel = 'Count', tone = 'info', emptyText = 'Not enough data to plot a trend.' }) {
   if (data.length < 2) return <p className="py-4 text-[13px] text-fg-muted">{emptyText}</p>;
   const values = data.map((row) => Number(row.count) || 0);
   const max = Math.max(1, ...values);
   const step = 100 / (data.length - 1);
   const points = values.map((value, index) => `${index * step},${100 - (value / max) * 92}`).join(' ');
   const areaPoints = `0,100 ${points} 100,100`;
+  const color = toneColor[tone] || toneColor.info;
   return (
     <div>
-      <div style={{ height }} role="img" aria-label={`${valueLabel} trend across ${data.length} periods`}>
+      <div className="overflow-hidden rounded-xl border px-2 pt-2" style={{ height, borderColor: 'var(--line)', background: 'linear-gradient(180deg, color-mix(in oklab, var(--surface-2) 72%, transparent), transparent)' }} role="img" aria-label={`${valueLabel} trend across ${data.length} periods`}>
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full overflow-visible">
-          <polygon points={areaPoints} fill="color-mix(in oklab, var(--color-civic-600) 16%, transparent)" />
-          <polyline points={points} fill="none" stroke="var(--color-civic-600)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+          <line x1="0" y1="25" x2="100" y2="25" stroke="var(--line)" strokeWidth=".5" vectorEffect="non-scaling-stroke" />
+          <line x1="0" y1="50" x2="100" y2="50" stroke="var(--line)" strokeWidth=".5" vectorEffect="non-scaling-stroke" />
+          <line x1="0" y1="75" x2="100" y2="75" stroke="var(--line)" strokeWidth=".5" vectorEffect="non-scaling-stroke" />
+          <polygon points={areaPoints} fill={`color-mix(in oklab, ${color} 16%, transparent)`} />
+          <polyline points={points} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
           {values.map((value, index) => (
-            <circle key={index} cx={index * step} cy={100 - (value / max) * 92} r="1.6" fill="var(--surface)" stroke="var(--color-civic-600)" strokeWidth="1.2" vectorEffect="non-scaling-stroke">
+            <circle key={index} cx={index * step} cy={100 - (value / max) * 92} r="1.6" fill="var(--surface)" stroke={color} strokeWidth="1.2" vectorEffect="non-scaling-stroke">
               <title>{`${data[index].label}: ${formatNumber(value)}`}</title>
             </circle>
           ))}
@@ -159,6 +163,9 @@ export function DonutChart({ data = [], size = 168, thickness = 22, centerLabel 
 
 /** Convert MongoDB `[{ _id, count }]` aggregates into chart rows. */
 export const toChartRows = (rows = [], mapKey = (key) => labelize(key)) => rows
-  .filter((row) => row && row._id !== undefined)
-  .map((row) => ({ key: String(row._id ?? 'unknown'), label: mapKey(row._id), count: Number(row.count) || 0 }));
+  .filter((row) => row && (row._id !== undefined || row.key !== undefined))
+  .map((row) => {
+    const key = row._id ?? row.key;
+    return { key: String(key ?? 'unknown'), label: row.label || mapKey(key), count: Number(row.count) || 0 };
+  });
 

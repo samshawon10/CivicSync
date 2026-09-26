@@ -11,7 +11,7 @@ import ActivityLog from '../models/ActivityLog.js';
 import { normalizeReportLocation } from '../services/reportLocation.js';
 
 const editableStatuses = ['pending', 'verified'];
-const fields = ['title', 'description', 'category', 'priority', 'departmentName'];
+const fields = ['title', 'description', 'category', 'priority', 'departmentName', 'additionalInfo'];
 const statuses = reportStatuses;
 
 async function ownedReport(id, userId) {
@@ -128,7 +128,24 @@ export async function listMyReports(req, res, next) {
 }
 
 export async function reportStats(req, res, next) {
-  try { const rows = await Report.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: '$status', count: { $sum: 1 } } }]); const byStatus = Object.fromEntries(rows.map((row) => [row._id, row.count])); return res.json({ success: true, stats: { total: rows.reduce((sum, row) => sum + row.count, 0), pending: byStatus.pending || 0, verified: byStatus.verified || 0, inProgress: (byStatus.assigned || 0) + (byStatus.in_progress || 0), completed: byStatus.completed || 0, closed: byStatus.closed || 0 } }); } catch (error) { next(error); }
+  try {
+    const rows = await Report.aggregate([{ $match: { createdBy: req.user._id } }, { $group: { _id: '$status', count: { $sum: 1 } } }]);
+    const byStatus = Object.fromEntries(rows.map((row) => [row._id, row.count]));
+    const pending = byStatus.pending || 0;
+    const verified = byStatus.verified || 0;
+    const inProgress = (byStatus.assigned || 0) + (byStatus.in_progress || 0);
+    const underReview = byStatus.under_review || 0;
+    const completed = byStatus.completed || 0;
+    const closed = byStatus.closed || 0;
+    return res.json({
+      success: true,
+      stats: {
+        total: rows.reduce((sum, row) => sum + row.count, 0), pending, verified, inProgress, underReview, completed, closed,
+        active: pending + verified + inProgress + underReview,
+        resolved: completed + closed
+      }
+    });
+  } catch (error) { next(error); }
 }
 
 export async function getReport(req, res, next) {
@@ -150,6 +167,9 @@ export async function updateReport(req, res, next) {
       await removeFiles(req.files);
       return res.status(403).json({ success: false, message: 'This report can no longer be edited.' });
     }
+    if (req.body.title !== undefined && (typeof req.body.title !== 'string' || req.body.title.trim().length < 3)) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Title must be at least 3 characters.' }); }
+    if (req.body.description !== undefined && (typeof req.body.description !== 'string' || req.body.description.trim().length < 10)) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Description must be at least 10 characters.' }); }
+    if (req.body.additionalInfo !== undefined && String(req.body.additionalInfo).trim().length > 1000) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Additional information must be 1,000 characters or fewer.' }); }
     if (req.body.category && !reportCategories.includes(req.body.category) || req.body.priority && !reportPriorities.includes(req.body.priority) || req.body.departmentName && !reportDepartments.includes(req.body.departmentName.trim())) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Category, department, or priority is invalid.' }); }
     for (const field of fields) if (req.body[field] !== undefined) report[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
     if (req.body.location !== undefined) {

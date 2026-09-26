@@ -7,7 +7,7 @@ import { breadcrumbFor, legacySections } from '../../components/admin/adminNav.j
 import OverviewSection from './sections/OverviewSection.jsx';
 import { DepartmentsSection, RolesPermissionsSection, UsersSection } from './sections/PeopleSections.jsx';
 import { AlertsSection, ComplaintsSection, EmergenciesSection } from './sections/OperationsSections.jsx';
-import { CategoriesSection, FacilitiesSection, ResponseTeamsSection, ServiceConfigSection } from './sections/ResourceSections.jsx';
+import { CategoriesSection, FacilitiesSection, ResponseTeamsSection, ResponseTimeSection, ServiceConfigSection } from './sections/ResourceSections.jsx';
 import { AnalyticsSection, EmergencyMapSection, SafetyHeatmapSection, SafetyIntelligenceSection } from './sections/IntelligenceSections.jsx';
 import { ActivityLogsSection, AuditLogsSection, NotificationsSection, ProfileSection, SettingsSection } from './sections/GovernanceSections.jsx';
 import { FeatureFlagsSection, SecurityCenterSection, SystemHealthSection } from './sections/SystemSections.jsx';
@@ -32,7 +32,7 @@ const registry = {
   'safety-heatmap': { Component: SafetyHeatmapSection, title: 'Safety Heatmap', subtitle: 'Reported incident density by period and category. Restricted incidents are never plotted.' },
   facilities: { Component: FacilitiesSection, title: 'Facilities', subtitle: 'Manage real emergency, safety, healthcare and civic service locations used by the public map and nearest-help search.' },
   categories: { Component: CategoriesSection, title: 'Emergency Categories', subtitle: 'Configured and built-in categories joined with real usage counts.' },
-  'response-time': { Component: CategoriesSection, title: 'Response Time Management', subtitle: 'Configure response targets, warning thresholds and measured response-time rules using the existing emergency category records.' },
+  'response-time': { Component: ResponseTimeSection, title: 'Response Time Management', subtitle: 'Configure per-category response targets and review performance from recorded responder arrivals.' },
   'service-config': { Component: ServiceConfigSection, title: 'Service Configuration', subtitle: 'Emergency routing per department and the report categories citizens can choose.' },
   analytics: { Component: AnalyticsSection, title: 'System Analytics', subtitle: 'Platform growth, role distribution and complaint throughput.' },
   'emergency-analytics': { Component: AnalyticsSection, title: 'Emergency Analytics', subtitle: 'Incident volume, severity and response-time metrics from the emergency collection.' },

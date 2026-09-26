@@ -139,7 +139,7 @@ export default function EmergencyMap({
   ) : <>{incidentMarkers}{facilityMarkers}</>;
 
   return (
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-surface">
       {tileError ? <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="alert"><span><strong>Map tiles are currently unavailable.</strong> Check your internet connection or try again.</span><button type="button" onClick={retryTiles} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100">Retry map</button></div> : null}
       {showControls ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
@@ -180,7 +180,7 @@ export default function EmergencyMap({
           </Marker>
         ) : null}
       </MapContainer>
-      <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 bg-white px-3 py-2 text-[11px] text-slate-500">
+      <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 bg-white px-3 py-2 text-[11px] text-slate-500 dark:border-slate-800 dark:bg-surface dark:text-slate-400">
         <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Active / high concentration</span>
         <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Medium concentration</span>
         <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-yellow-400" /> Low concentration</span>

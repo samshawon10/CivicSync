@@ -22,9 +22,25 @@ export function useCivicAI() {
   const [open, setOpen] = useState(false);
   const [context, setContext] = useState({});
 
-  /** Opens the copilot, optionally pre-scoped to a page (case, service, map…). */
+  /**
+   * Opens the copilot, optionally pre-scoped to a page (case, service, map…).
+   *
+   * Accepts either a raw pageContext or a full page preset produced by
+   * `presetFor()`. A preset arrives as { title, prompts, context }, where only
+   * `context` is the envelope the gateway understands. We flatten it here so the
+   * conversation layer and the backend both always see route/caseId/emergencyId
+   * at the TOP level — previously they were nested one level too deep, so every
+   * contextual id (case, emergency, department) silently failed to reach the
+   * Context Engine and the AI answered without its page scope.
+   */
   const openCopilot = useCallback((preset = {}) => {
-    setContext(preset);
+    const isPreset = Boolean(preset.context) || Array.isArray(preset.prompts) || Boolean(preset.title);
+    const pageContext = isPreset ? preset.context || {} : preset;
+    setContext({
+      ...pageContext,
+      ...(isPreset && preset.title ? { title: preset.title } : {}),
+      ...(isPreset && preset.prompts ? { prompts: preset.prompts } : {})
+    });
     setOpen(true);
   }, []);
 
@@ -141,6 +157,9 @@ export function useCivicAIConversation({ context = {} } = {}) {
         ]);
       } catch (err) {
         await ticker.catch(() => {});
+        // Keep the failed prompt in the composer so the visible "Try Again"
+        // control can actually resubmit it.
+        setInput(prompt);
         setError(aiApi.toAiError(err));
       } finally {
         setBusy(false);
@@ -152,7 +171,7 @@ export function useCivicAIConversation({ context = {} } = {}) {
 
   return {
     messages, setMessages, input, setInput, busy, stages, error, setError,
-    conversationId, history, showHistory, setShowHistory, actionBusy, setActionBusy,
+    conversationId, setConversationId, history, showHistory, setShowHistory, actionBusy, setActionBusy,
     send, loadHistory, openConversation, deleteConversation
   };
 }

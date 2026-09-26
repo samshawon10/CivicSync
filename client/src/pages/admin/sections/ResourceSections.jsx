@@ -220,7 +220,7 @@ export function FacilitiesSection() {
 }
 /* --------------------------------------------------- Emergency categories */
 
-export function CategoriesSection() {
+function CategoryManagementSection({ responseTimeOnly = false }) {
   const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -298,20 +298,41 @@ export function CategoriesSection() {
       </div>
     );
   }
-  if (governance.error) return <ErrorState message={governance.error} onRetry={governance.reload} />;
+  if (governance.error || managed.error) return <ErrorState message={governance.error || managed.error} onRetry={() => { governance.reload(); managed.reload(); }} />;
+
+  const measuredRows = rows.filter((row) => row.measuredResponseCount > 0);
+  const measuredIncidentCount = measuredRows.reduce((sum, row) => sum + row.measuredResponseCount, 0);
+  const averageResponseMinutes = measuredIncidentCount
+    ? measuredRows.reduce((sum, row) => sum + (row.averageResponseMinutes * row.measuredResponseCount), 0) / measuredIncidentCount
+    : null;
+  const onTargetPercent = measuredIncidentCount
+    ? measuredRows.reduce((sum, row) => sum + ((row.withinTargetPercent ?? 0) * row.measuredResponseCount), 0) / measuredIncidentCount
+    : null;
 
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="Emergency categories"
-        subtitle={`${governance.data?.configuredCount ?? 0} configured in the database over a built-in catalog of ${governance.data?.catalogCount ?? 0}. Usage counts come from the real emergency collection.`}
-        action={<Button variant="primary" icon="plus" onClick={openCreate}>New category</Button>}
+        title={responseTimeOnly ? 'Response-time policies' : 'Emergency categories'}
+        subtitle={responseTimeOnly
+          ? 'Per-category response targets are evaluated only against recorded arrival times. No response time is inferred when an incident has not been attended.'
+          : `${governance.data?.configuredCount ?? 0} configured in the database over a built-in catalog of ${governance.data?.catalogCount ?? 0}. Usage counts come from the real emergency collection.`}
+        action={<Button variant="primary" icon="plus" onClick={openCreate}>{responseTimeOnly ? 'New response policy' : 'New category'}</Button>}
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Configured categories" value={formatNumber(governance.data?.configuredCount)} icon="layers" tone="info" hint="stored in the database" />
-        <StatCard label="Built-in catalog" value={formatNumber(governance.data?.catalogCount)} icon="box" tone="neutral" hint="compiled into the API" />
-        <StatCard label="Reports across categories" value={formatNumber(governance.data?.totalReports)} icon="siren" tone="critical" hint="all recorded incidents" />
+        {responseTimeOnly ? (
+          <>
+            <StatCard label="Measured responses" value={formatNumber(measuredIncidentCount)} icon="clock" tone="info" hint="incidents with a recorded arrival" />
+            <StatCard label="Average response" value={formatMinutes(averageResponseMinutes)} icon="activity" tone="neutral" hint="weighted across recorded arrivals" />
+            <StatCard label="Within target" value={onTargetPercent == null ? '—' : `${Math.round(onTargetPercent)}%`} icon="check" tone="success" hint="using each category's active policy" />
+          </>
+        ) : (
+          <>
+            <StatCard label="Configured categories" value={formatNumber(governance.data?.configuredCount)} icon="layers" tone="info" hint="stored in the database" />
+            <StatCard label="Built-in catalog" value={formatNumber(governance.data?.catalogCount)} icon="box" tone="neutral" hint="compiled into the API" />
+            <StatCard label="Reports across categories" value={formatNumber(governance.data?.totalReports)} icon="siren" tone="critical" hint="all recorded incidents" />
+          </>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -330,13 +351,25 @@ export function CategoriesSection() {
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap gap-4 text-[12px] text-fg-muted">
-                <span><span className="tabular font-semibold text-fg">{formatNumber(row.usage)}</span> reports</span>
-                <span><span className="tabular font-semibold text-fg">{formatNumber(row.restrictedCount)}</span> restricted</span>
-                <span>Last reported {row.lastReportedAt ? formatRelative(row.lastReportedAt) : 'never'}</span>
-                <span>Response target {row.responseTargetMinutes} min · {row.responseTimeActive ? 'enabled' : 'paused'}</span>
-                <span>Measured response {row.measuredResponseCount ? `${formatNumber(row.measuredResponseCount)} incident(s) · ${formatMinutes(row.averageResponseMinutes)} average` : 'No response-time data available yet.'}</span>
+                {responseTimeOnly ? (
+                  <>
+                    <span>Target <span className="tabular font-semibold text-fg">{row.responseTargetMinutes} min</span></span>
+                    <span>Warning <span className="tabular font-semibold text-fg">{row.responseWarningMinutes} min</span></span>
+                    <span>Critical <span className="tabular font-semibold text-fg">{row.responseCriticalMinutes} min</span></span>
+                    <span>{row.responseTimeActive ? 'Policy enabled' : 'Policy paused'}</span>
+                    <span>{row.measuredResponseCount ? `${formatNumber(row.measuredResponseCount)} arrivals · ${formatMinutes(row.averageResponseMinutes)} average${row.withinTargetPercent == null ? '' : ` · ${row.withinTargetPercent}% within target`}` : 'No recorded arrivals yet.'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span><span className="tabular font-semibold text-fg">{formatNumber(row.usage)}</span> reports</span>
+                    <span><span className="tabular font-semibold text-fg">{formatNumber(row.restrictedCount)}</span> restricted</span>
+                    <span>Last reported {row.lastReportedAt ? formatRelative(row.lastReportedAt) : 'never'}</span>
+                    <span>Response target {row.responseTargetMinutes} min · {row.responseTimeActive ? 'enabled' : 'paused'}</span>
+                    <span>Measured response {row.measuredResponseCount ? `${formatNumber(row.measuredResponseCount)} incident(s) · ${formatMinutes(row.averageResponseMinutes)} average` : 'No response-time data available yet.'}</span>
+                  </>
+                )}
               </div>
-              {row.subcategories?.length ? (
+              {!responseTimeOnly && (row.subcategories?.length ? (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {row.subcategories.map((sub) => (
                     <span key={sub.key} className="chip status-muted" title={`${sub.label}: ${sub.usage} report(s)`}>
@@ -346,9 +379,9 @@ export function CategoriesSection() {
                 </div>
               ) : (
                 <p className="mt-3 text-[12px] text-fg-subtle">No subcategories configured.</p>
-              )}
+              ))}
               <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
-                <Button size="sm" icon="pencil" disabled={!doc || !row.editable} onClick={() => openEdit(row)}>Edit</Button>
+                <Button size="sm" icon="pencil" disabled={!doc || !row.editable} onClick={() => openEdit(row)}>{responseTimeOnly ? 'Configure' : 'Edit'}</Button>
                 <Button size="sm" icon={row.active ? 'close' : 'check'} disabled={!doc} onClick={() => toggleActive(doc)}>
                   {row.active ? 'Deactivate' : 'Activate'}
                 </Button>
@@ -427,6 +460,14 @@ export function CategoriesSection() {
 
     </div>
   );
+}
+
+export function CategoriesSection() {
+  return <CategoryManagementSection />;
+}
+
+export function ResponseTimeSection() {
+  return <CategoryManagementSection responseTimeOnly />;
 }
 /* -------------------------------------------------------- Response teams */
 

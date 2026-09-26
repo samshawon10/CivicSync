@@ -38,8 +38,8 @@ export default function NearbyServices() {
       <div className="mx-auto max-w-5xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-ink">Emergency & safety services</h2>
-            <p className="text-sm text-slate-500">Real registered locations, sorted by geographic distance only after sharing a position.</p>
+            <h2 className="text-lg font-black text-ink dark:text-slate-100">Emergency & safety services</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Real registered locations, sorted by geographic distance only after sharing a position.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="civic-secondary" onClick={async () => { const result = await geolocation.capture(); setHasLocation(Boolean(result.ok)); await load(result.location); }} disabled={geolocation.loading}><LocateFixed size={16} /> {geolocation.loading ? 'Locating…' : hasLocation ? 'Update location' : 'Use my location'}</button>
@@ -49,7 +49,7 @@ export default function NearbyServices() {
           </div>
         </div>
         {!hasLocation && !geolocation.loading && (
-          <p className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-700">
+          <p className="rounded-lg bg-amber-50 dark:bg-amber-950/40 p-3 text-sm font-semibold text-amber-700 dark:text-amber-300">
             {geolocation.error || 'Location unavailable — services are listed without distance sorting.'}
             <button onClick={async () => { const result = await geolocation.capture(); setHasLocation(Boolean(result.ok)); await load(result.location); }} className="ml-2 font-black underline">Try again</button>
           </p>
@@ -58,7 +58,7 @@ export default function NearbyServices() {
         {loading ? <LoadingState text="Loading nearby services…" /> : facilities.length ? (
           <div className="grid gap-3 md:grid-cols-2">{facilities.map((facility) => <NearbyServiceCard key={facility._id} facility={facility} origin={geolocation.location} />)}</div>
         ) : (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 p-8 text-center text-sm text-slate-500 dark:text-slate-400">
             No services registered yet. Administrators maintain the facilities directory — nothing is faked here.
           </p>
         )}

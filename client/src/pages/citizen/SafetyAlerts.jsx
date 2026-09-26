@@ -42,8 +42,8 @@ export default function SafetyAlerts() {
       <div className="mx-auto max-w-3xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-black text-ink">Public safety alerts</h2>
-            <p className="text-sm text-slate-500">Broadcast by Emergency Command: fire, flood, road closures, weather, and more.</p>
+            <h2 className="text-lg font-black text-ink dark:text-slate-100">Public safety alerts</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Broadcast by Emergency Command: fire, flood, road closures, weather, and more.</p>
           </div>
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" className="h-4 w-4" checked={criticalOnly} onChange={(e) => setCriticalOnly(e.target.checked)} />
@@ -56,7 +56,7 @@ export default function SafetyAlerts() {
             {visible.map((alert) => <EmergencyAlertCard key={alert._id} alert={alert} onDismiss={dismiss} />)}
           </div>
         ) : (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 p-8 text-center text-sm text-slate-500 dark:text-slate-400">
             {alerts.length ? 'All alerts dismissed for this device.' : 'No active safety alerts. You will see broadcasts here when Emergency Command issues one.'}
           </p>
         )}

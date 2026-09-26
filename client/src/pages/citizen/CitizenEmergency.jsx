@@ -124,7 +124,7 @@ export default function CitizenEmergency() {
     <CitizenLayout title="Emergency & Safety">
       <div className="mx-auto max-w-5xl space-y-6">
         {!online && <p className="rounded-lg bg-slate-800 p-3 text-sm font-bold text-white">⚠ You are offline. Emergencies and SOS cannot be sent until the connection returns.</p>}
-        {online && !live && <p className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-700">Live connection reconnecting… updates may lag.</p>}
+        {online && !live && <p className="rounded-lg bg-amber-50 dark:bg-amber-950/40 p-3 text-sm font-semibold text-amber-700 dark:text-amber-300">Live connection reconnecting… updates may lag.</p>}
         <ErrorState message={error} />
 
         <section className="overflow-hidden rounded-2xl bg-red-700 p-6 text-white shadow-lg">
@@ -151,12 +151,12 @@ export default function CitizenEmergency() {
 
           {sosResult && (
             <div className="mt-5 rounded-xl bg-white/95 p-4 text-slate-800">
-              <p className="text-sm font-black text-red-700">Emergency ID: {sosResult.emergencyId}</p>
+              <p className="text-sm font-black text-red-700 dark:text-red-300">Emergency ID: {sosResult.emergencyId}</p>
               <ul className="mt-2 space-y-1 text-sm">
                 <li>{sosResult._locationCaptured ? '✓' : '✗'} Location {sosResult._locationCaptured ? `captured${Number.isFinite(Number(sosResult.location?.accuracy)) ? ` (±${Math.round(Number(sosResult.location.accuracy))} m)` : ''}` : 'NOT captured — enter an address'}</li>
                 <li>✓ Emergency Command notified (server confirmed)</li>
                 <li>{sosResult._contactInfo?.recorded ? `✓ ${sosResult._contactInfo.recorded} emergency contact(s) recorded for command` : '— No enabled emergency contacts on file'}</li>
-                {!sosResult._contactInfo?.recorded && <li className="text-xs text-slate-500">Add contacts so command can reach your next of kin (SMS delivery needs an SMS gateway, which is not configured).</li>}
+                {!sosResult._contactInfo?.recorded && <li className="text-xs text-slate-500 dark:text-slate-400">Add contacts so command can reach your next of kin (SMS delivery needs an SMS gateway, which is not configured).</li>}
               </ul>
               {!sosResult._locationCaptured && (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -166,15 +166,15 @@ export default function CitizenEmergency() {
               )}
               {sosResult.location?.latitude != null && sosResult.location?.longitude != null ? (
                 <div className="mt-4">
-                  <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Your emergency location</p>
+                  <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">Your emergency location</p>
                   <EmergencyMap height="h-64" emergencies={[sosResult]} userLocation={sosResult.location} showControls={false} autoFit />
                 </div>
               ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <span className="text-xs font-black uppercase text-slate-500">Response status:</span>
-                <span className={`rounded-full px-3 py-1 text-xs font-black ${activeStatus === 'DISPATCHING' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{label(activeStatus)}</span>
-                <button onClick={() => navigate(`/dashboard/citizen/emergency/${sosResult._id}`)} className="text-sm font-bold text-civic-600">Open full tracking →</button>
-                <button onClick={() => setSosResult(null)} className="text-sm font-bold text-slate-500">Dismiss</button>
+                <span className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">Response status:</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-black ${activeStatus === 'DISPATCHING' ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300' : 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300'}`}>{label(activeStatus)}</span>
+                <button onClick={() => navigate(`/dashboard/citizen/emergency/${sosResult._id}`)} className="text-sm font-bold text-civic-600 dark:text-civic-300">Open full tracking →</button>
+                <button onClick={() => setSosResult(null)} className="text-sm font-bold text-slate-500 dark:text-slate-400">Dismiss</button>
               </div>
             </div>
           )}
@@ -184,7 +184,7 @@ export default function CitizenEmergency() {
                 <p className="font-black">I'm Not Safe</p>
                 <p className="text-xs text-red-100">Discreet request for help — minimal details, extra privacy.</p>
               </div>
-              <button onClick={holdNotSafe} disabled={busy} className="rounded-lg bg-white px-4 py-2.5 text-sm font-black text-red-700 hover:bg-red-50">I'M NOT SAFE</button>
+              <button onClick={holdNotSafe} disabled={busy} className="rounded-lg bg-white dark:bg-slate-900 px-4 py-2.5 text-sm font-black text-red-700 dark:text-red-300 hover:bg-red-50">I'M NOT SAFE</button>
             </div>
           )}
         </section>
@@ -192,8 +192,8 @@ export default function CitizenEmergency() {
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {quickLinks.map(([text, to, Icon]) => (
             <button key={to} onClick={() => navigate(to)} className="civic-card interactive flex flex-col items-center gap-2 p-4 text-center">
-              <Icon size={24} className="text-civic-600" aria-hidden="true" />
-              <span className="text-xs font-bold text-ink">{text}</span>
+              <Icon size={24} className="text-civic-600 dark:text-civic-300" aria-hidden="true" />
+              <span className="text-xs font-bold text-ink dark:text-slate-100">{text}</span>
             </button>
           ))}
         </section>
@@ -201,27 +201,27 @@ export default function CitizenEmergency() {
         <section className="civic-card p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-black text-ink">My emergencies</h2>
-              <p className="text-sm text-slate-500">Live status of incidents you reported.</p>
+              <h2 className="text-xl font-black text-ink dark:text-slate-100">My emergencies</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Live status of incidents you reported.</p>
             </div>
             <button onClick={() => navigate('/dashboard/citizen/emergency/new')} className="civic-primary">New detailed report</button>
           </div>
           <div className="mt-4 space-y-3">
-            {loading ? <p className="py-6 text-center text-sm text-slate-500">Loading emergencies…</p>
+            {loading ? <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">Loading emergencies…</p>
               : emergencies.length ? emergencies.map((item) => (
                 <EmergencyCard key={item._id} emergency={item} onOpen={(emergency) => navigate(`/dashboard/citizen/emergency/${emergency._id}`)} />
               )) : (
-                <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No active emergencies. If you need help, hold the SOS button.</p>
+                <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-6 text-center text-sm text-slate-500 dark:text-slate-400">No active emergencies. If you need help, hold the SOS button.</p>
               )}
           </div>
         </section>
 
         {confirmNotSafe && (
           <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4">
-            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
-              <p className="text-sm font-black text-slate-700">DISCREET HELP</p>
-              <h2 className="mt-1 text-lg font-black text-ink">Send "I'm Not Safe"?</h2>
-              <p className="mt-2 text-sm text-slate-600">We'll capture your location and quietly alert Emergency Command.</p>
+            <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 p-5 shadow-2xl">
+              <p className="text-sm font-black text-slate-700 dark:text-slate-200">DISCREET HELP</p>
+              <h2 className="mt-1 text-lg font-black text-ink dark:text-slate-100">Send "I'm Not Safe"?</h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">We'll capture your location and quietly alert Emergency Command.</p>
               <div className="mt-4 flex gap-3">
                 <button onClick={confirmNotSafeSOS} disabled={busy} className="flex-1 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-black text-white">{busy ? 'Sending…' : 'Send quietly'}</button>
                 <button onClick={() => setConfirmNotSafe(false)} className="civic-secondary flex-1">Cancel</button>

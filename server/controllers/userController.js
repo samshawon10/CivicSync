@@ -107,7 +107,7 @@ export async function updateMyProfile(req, res, next) {
     if (name !== undefined) { if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 80) return res.status(400).json({ success: false, message: 'Name must be between 2 and 80 characters.' }); req.user.name = name.trim(); }
     if (phone !== undefined) { if (typeof phone !== 'string' || (phone.trim() && !/^[+()\-\s\d]{6,30}$/.test(phone.trim()))) return res.status(400).json({ success: false, message: 'Phone number is invalid.' }); req.user.phone = phone.trim(); }
     if (photoURL !== undefined) { if (typeof photoURL !== 'string' || photoURL.length > 500 || (photoURL && !/^https?:\/\//i.test(photoURL) && !photoURL.startsWith('/api/users/me/photo/'))) return res.status(400).json({ success: false, message: 'Profile photo URL is invalid.' }); await removeProfilePhoto(req.user.photoURL); req.user.photoURL = photoURL.trim(); req.user.profilePhotoFilename = profilePhotoFilename(req.user.photoURL); }
-    await req.user.save(); await logActivity(req.user, 'profile_updated', 'user', req.user._id, req.user.name, 'Administrator updated their profile.'); res.json({ success: true, user: safeUser(req.user) });
+    await req.user.save(); await logActivity(req.user, 'profile_updated', 'user', req.user._id, req.user.name, 'User updated their profile.'); res.json({ success: true, user: safeUser(req.user) });
   } catch (error) { next(error); }
 }
 export async function uploadMyProfilePhoto(req, res, next) {
@@ -117,7 +117,7 @@ export async function uploadMyProfilePhoto(req, res, next) {
     req.user.profilePhotoFilename = req.file.filename;
     req.user.photoURL = `/api/users/me/photo/${encodeURIComponent(req.file.filename)}`;
     await req.user.save();
-    await logActivity(req.user, 'profile_photo_updated', 'user', req.user._id, req.user.name, 'Administrator updated their profile photo.');
+    await logActivity(req.user, 'profile_photo_updated', 'user', req.user._id, req.user.name, 'User updated their profile photo.');
     return res.json({ success: true, message: 'Profile photo updated.', user: safeUser(req.user) });
   } catch (error) { next(error); }
 }

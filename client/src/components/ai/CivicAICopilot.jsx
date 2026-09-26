@@ -79,7 +79,7 @@ export default function CivicAICopilot({ open, onClose, context = {} }) {
   });
 
   const {
-    messages, setMessages, input, setInput, busy, stages, error, setError,
+    messages, setMessages, input, setInput, busy, stages, error, setError, setConversationId,
     history, showHistory, setShowHistory, actionBusy,
     send, loadHistory, openConversation, deleteConversation
   } = state;
@@ -97,6 +97,7 @@ export default function CivicAICopilot({ open, onClose, context = {} }) {
     setMessages([]);
     setError(null);
     setInput('');
+    setConversationId(null);
   };
 
   const handleConfirm = async (token) => {

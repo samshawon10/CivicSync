@@ -82,8 +82,8 @@ export default function CreateEmergency() {
         <ErrorState message={error} />
         <form onSubmit={submit} className="civic-card space-y-5 p-5">
           <div>
-            <h2 className="text-xl font-black text-ink">What is happening?</h2>
-            <p className="text-sm text-slate-500">Not sure of the type? Describe it — we'll suggest a classification, and Emergency Command makes the final call.</p>
+            <h2 className="text-xl font-black text-ink dark:text-slate-100">What is happening?</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Not sure of the type? Describe it — we'll suggest a classification, and Emergency Command makes the final call.</p>
           </div>
 
           <EmergencyTypeSelector categories={types} value={form} onChange={setForm} suggestion={suggestion} onAcceptSuggestion={() => suggestion && setForm((current) => ({ ...current, category: suggestion.category, subcategory: suggestion.subcategory || 'other', severity: suggestion.severity || current.severity }))} />
@@ -98,26 +98,26 @@ export default function CreateEmergency() {
           </div>
           <label className="block text-sm font-bold">Description<textarea rows="4" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={2000} placeholder="Describe the emergency, people involved, and immediate hazards." /></label>
 
-          <fieldset className="space-y-3 border-t border-slate-100 pt-4">
-            <legend className="text-sm font-black text-ink">Location</legend>
+          <fieldset className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+            <legend className="text-sm font-black text-ink dark:text-slate-100">Location</legend>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={captureGps} className="civic-secondary inline-flex items-center justify-center gap-2"><LocateFixed size={16} /> {geolocation.loading ? 'Locating…' : 'Capture my location'}</button>
-        {coords && <span className="text-xs font-bold text-emerald-700">✓ GPS captured ({coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}){Number.isFinite(Number(coords.accuracy)) ? ` · ±${Math.round(Number(coords.accuracy))} m` : ''}</span>}
-              {gpsError && <span className="text-xs font-bold text-amber-700">{gpsError}</span>}
+        {coords && <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">✓ GPS captured ({coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}){Number.isFinite(Number(coords.accuracy)) ? ` · ±${Math.round(Number(coords.accuracy))} m` : ''}</span>}
+              {gpsError && <span className="text-xs font-bold text-amber-700 dark:text-amber-300">{gpsError}</span>}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-bold">Address or landmark<input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Street, area…" /></label>
               <label className="text-sm font-bold">Landmark note<input value={form.landmark} onChange={(e) => setForm({ ...form, landmark: e.target.value })} maxLength={150} placeholder="Nearby landmark" /></label>
             </div>
-            <div className="rounded-lg border border-slate-200 p-2">
-              <p className="mb-1 text-xs font-bold text-slate-500">Or tap the map to pin the exact spot (optional)</p>
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-2">
+              <p className="mb-1 text-xs font-bold text-slate-500 dark:text-slate-400">Or tap the map to pin the exact spot (optional)</p>
               <EmergencyMap height="h-64" userLocation={coords} showControls={false} autoFit={Boolean(coords)} onMapClick={(point) => setCoords(point)} />
             </div>
           </fieldset>
 
           {showPerson && (
-            <fieldset className="space-y-3 border-t border-slate-100 pt-4">
-              <legend className="text-sm font-black text-ink">Person details (restricted visibility)</legend>
+            <fieldset className="space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+              <legend className="text-sm font-black text-ink dark:text-slate-100">Person details (restricted visibility)</legend>
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="text-sm font-bold">Name<input value={person.name} onChange={(e) => setPerson({ ...person, name: e.target.value })} maxLength={120} /></label>
                 <label className="text-sm font-bold">Age<input value={person.age} onChange={(e) => setPerson({ ...person, age: e.target.value })} maxLength={10} /></label>
@@ -128,11 +128,11 @@ export default function CreateEmergency() {
                 <label className="text-sm font-bold sm:col-span-3">Description<textarea rows="2" value={person.description} onChange={(e) => setPerson({ ...person, description: e.target.value })} maxLength={1000} /></label>
                 <label className="text-sm font-bold sm:col-span-3">Additional information<textarea rows="2" value={person.additionalInfo} onChange={(e) => setPerson({ ...person, additionalInfo: e.target.value })} maxLength={1000} /></label>
               </div>
-              <p className="text-xs text-slate-500">Person details are restricted: only Emergency Command and assigned responders can see them.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Person details are restricted: only Emergency Command and assigned responders can see them.</p>
             </fieldset>
           )}
 
-          <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
             <button disabled={busy} className="civic-primary">{busy ? 'Submitting…' : 'Submit emergency report'}</button>
             <button type="button" onClick={() => navigate('/dashboard/citizen/emergency')} className="civic-secondary">Cancel</button>
           </div>

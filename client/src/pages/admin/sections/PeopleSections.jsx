@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminApi } from '../../../services/adminService.js';
 import useAsync from '../../../hooks/useAsync.js';
@@ -7,6 +7,7 @@ import DataTable from '../../../components/ui/DataTable.jsx';
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Field, KeyValue, SectionHeading, StatCard } from '../../../components/ui/primitives.jsx';
 import { SkeletonKpiGrid, SkeletonList } from '../../../components/ui/Skeleton.jsx';
 import { ConfirmDialog, Drawer, Modal } from '../../../components/ui/Overlays.jsx';
+import Icon from '../../../components/ui/Icon.jsx';
 import { useToast } from '../../../components/ui/Toaster.jsx';
 import { cx, formatDate, formatDateTime, formatNumber, formatRelative, labelize, statusTone } from '../../../utils/format.js';
 import { roles as allRoles, roleLabels } from '../../../utils/roles.js';
@@ -388,6 +389,14 @@ export function DepartmentsSection() {
     () => adminApi.departments({ search: query, scope, status, page, limit: 15 }).then((response) => response.data),
     [query, scope, status, page]
   );
+  // Complaint destinations are a fixed backend catalog. A department only
+  // receives citizen complaints when its name matches one exactly, so the form
+  // loads the catalog to make that consequence visible while typing.
+  const destinations = useAsync(
+    () => adminApi.categoryGovernance().then((response) => response.data.reportDepartments || []),
+    [],
+    { immediate: false }
+  );
   const candidates = useAsync(
     () => adminApi.selectUsers(headQuery).then((response) => response.data.users),
     [headQuery, headTarget?.kind],
@@ -413,10 +422,17 @@ export function DepartmentsSection() {
       next.delete('focus');
       setSearchParams(next, { replace: true });
     }
+    // `create=1` is how the dashboard's "New department" action deep-links here.
+    if (searchParams.get('create') === '1') {
+      openCreate();
+      const next = new URLSearchParams(searchParams);
+      next.delete('create');
+      setSearchParams(next, { replace: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function openCreate() { setFormError(''); setForm(blankDepartment); setEditTarget('new'); }
+  function openCreate() { setFormError(''); setForm(blankDepartment); setEditTarget('new'); destinations.reload(); }
 
   function openEdit(department) {
     setFormError('');
@@ -430,7 +446,50 @@ export function DepartmentsSection() {
     setEditTarget(department);
   }
 
+  // Live, client-side validation that mirrors the server's `validDepartment`
+  // rules, so the operator sees the problem before submitting.
+  const nameError = useMemo(() => {
+    const value = form.name.trim();
+    if (!value) return 'A department name is required.';
+    if (value.length > 120) return 'Name must be 120 characters or fewer.';
+    if (rows.some((row) => row.name?.toLowerCase() === value.toLowerCase() && row._id !== editTarget?._id)) {
+      return 'A department with this name already exists.';
+    }
+    return '';
+  }, [form.name, rows, editTarget]);
+  const emailError = useMemo(() => {
+    const value = form.email.trim();
+    if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email address.';
+    return '';
+  }, [form.email]);
+  const phoneError = useMemo(() => {
+    const value = form.contactNumber.trim();
+    if (value && !/^[+()\-\s\d]{6,30}$/.test(value)) return 'Use digits, spaces and + ( ) - only (6–30 characters).';
+    return '';
+  }, [form.contactNumber]);
+  const routingError = useMemo(() => (
+    (form.scope === 'emergency' || form.scope === 'hybrid') && !form.emergencyTypes.length
+      ? 'Emergency and hybrid departments must handle at least one emergency type.'
+      : ''
+  ), [form.scope, form.emergencyTypes]);
+  const formInvalid = Boolean(nameError || emailError || phoneError || routingError);
+
+  // The configured complaint destinations, offered as one-tap fill chips so an
+  // operator never has to guess the exact spelling the report API requires.
+  const destinationNames = useMemo(
+    () => (destinations.data || []).map((row) => String(row.name || '').trim()).filter(Boolean),
+    [destinations.data]
+  );
+
+  // Live consequence of the exact name citizens will file complaints under.
+  const complaintRoutable = useMemo(() => {
+    const value = form.name.trim().toLowerCase();
+    if (!value) return null;
+    return destinationNames.some((name) => name.toLowerCase() === value);
+  }, [form.name, destinationNames]);
+
   async function saveDepartment() {
+    if (formInvalid) { setFormError('Fix the highlighted fields before saving.'); return; }
     setBusy(true); setFormError('');
     try {
       if (editTarget === 'new') {
@@ -562,63 +621,187 @@ export function DepartmentsSection() {
         size="lg"
         footer={
           <>
+            <span className="mr-auto text-[12px] text-fg-subtle">
+              {formInvalid ? 'Resolve the highlighted fields to continue.' : editTarget === 'new' ? 'A department head can be assigned right after creation.' : 'Renaming also re-points existing complaints.'}
+            </span>
             <Button onClick={() => setEditTarget(null)} disabled={busy}>Cancel</Button>
-            <Button variant="primary" loading={busy} onClick={saveDepartment}>
+            <Button variant="primary" loading={busy} disabled={formInvalid} onClick={saveDepartment}>
               {editTarget === 'new' ? 'Create department' : 'Save changes'}
             </Button>
           </>
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name" required>
-            <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} maxLength={120} />
-          </Field>
-          <Field label="Type" hint="Free-text classification shown to citizens.">
-            <input value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))} placeholder="e.g. Waste Management" maxLength={80} />
-          </Field>
-          <Field label="Scope" hint="Emergency and hybrid departments can receive emergency routing.">
-            <select value={form.scope} onChange={(event) => setForm((current) => ({ ...current, scope: event.target.value }))}>
-              {scopeOptions.map((value) => <option key={value} value={value}>{labelize(value)}</option>)}
-            </select>
-          </Field>
-          <Field label="Status">
-            <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </Field>
-          <Field label="Contact email">
-            <input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} maxLength={120} />
-          </Field>
-          <Field label="Contact number">
-            <input value={form.contactNumber} onChange={(event) => setForm((current) => ({ ...current, contactNumber: event.target.value }))} maxLength={30} />
-          </Field>
-          <Field label="Address" className="sm:col-span-2">
-            <input value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} maxLength={300} />
-          </Field>
-          <Field label="Description" className="sm:col-span-2">
-            <textarea rows={3} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={2000} />
-          </Field>
-          <div className="sm:col-span-2">
-            <p className="text-[13px] font-semibold text-fg">Emergency types routed to this department</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {emergencyTypeOptions.map((type) => {
-                const active = form.emergencyTypes.includes(type);
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setForm((current) => ({
-                      ...current,
-                      emergencyTypes: active ? current.emergencyTypes.filter((value) => value !== type) : [...current.emergencyTypes, type]
-                    }))}
-                    className={cx('chip cursor-pointer', active ? 'status-info' : 'status-muted')}
-                  >
-                    {labelize(type)}
-                  </button>
-                );
-              })}
+        <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+          <div className="space-y-5">
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="grid h-7 w-7 place-items-center rounded-lg" style={{ backgroundColor: 'color-mix(in oklab, var(--color-civic-500) 14%, var(--surface))', color: 'var(--color-civic-600)' }}>
+                  <Icon name="building2" size={15} />
+                </span>
+                <h3 className="text-[13px] font-bold uppercase tracking-wide text-fg-subtle">Identity</h3>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Name" required error={nameError} hint={!nameError ? `${form.name.trim().length}/120 · must be unique` : undefined} className="sm:col-span-2">
+              <input
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                maxLength={120}
+                placeholder="e.g. Water & Sewerage"
+                aria-invalid={Boolean(nameError)}
+              />
+            </Field>
+
+            {/* One-tap fill with a name the citizen report API will accept.
+                This is the fastest route to a working, citizen-visible
+                department, so it sits directly under the name field. */}
+            {Boolean(destinationNames.length) && !complaintRoutable && (
+              <div className="sm:col-span-2">
+                <p className="mb-2 text-[12px] font-semibold text-fg-muted">Use a configured destination name</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {destinationNames.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setForm((current) => ({ ...current, name }))}
+                      className="chip cursor-pointer status-info"
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Honest, immediate feedback on whether citizens can actually file
+                complaints to this department — the backend routes on an exact
+                name match against a fixed catalog. */}
+            {complaintRoutable !== null && (
+              <div
+                className={cx(
+                  'sm:col-span-2 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[12px]',
+                  complaintRoutable
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
+                    : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200'
+                )}
+              >
+                <Icon name={complaintRoutable ? 'checkCircle' : 'alertTriangle'} size={15} className="mt-0.5 shrink-0" />
+                <span>
+                  {complaintRoutable
+                    ? 'This exact name is a configured complaint destination — citizens can file complaints to this department.'
+                    : 'This name is not a configured complaint destination, so citizens will not be able to file complaints to it. Pick an existing destination name if that is intended.'}
+                </span>
+              </div>
+            )}
+
+            <Field label="Type" hint="Free-text classification shown to citizens.">
+              <input value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))} placeholder="e.g. Waste Management" maxLength={80} />
+            </Field>
+            <Field label="Status" hint="Inactive departments are hidden from citizen pickers.">
+              <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </Field>
+            <Field label="Description" className="sm:col-span-2" hint={`${form.description.length}/2000 — shown on the department record.`}>
+              <textarea rows={3} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={2000} placeholder="What this department is responsible for…" />
+            </Field>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="grid h-7 w-7 place-items-center rounded-lg" style={{ backgroundColor: 'color-mix(in oklab, var(--color-civic-500) 14%, var(--surface))', color: 'var(--color-civic-600)' }}>
+                  <Icon name="phone" size={15} />
+                </span>
+                <h3 className="text-[13px] font-bold uppercase tracking-wide text-fg-subtle">Public contact</h3>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Contact email" error={emailError} hint={!emailError ? 'Optional.' : undefined}>
+                  <input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} maxLength={120} placeholder="dept@civicsync.gov" aria-invalid={Boolean(emailError)} />
+                </Field>
+                <Field label="Contact number" error={phoneError} hint={!phoneError ? 'Optional.' : undefined}>
+                  <input value={form.contactNumber} onChange={(event) => setForm((current) => ({ ...current, contactNumber: event.target.value }))} maxLength={30} placeholder="+880 1XXX XXXXX" aria-invalid={Boolean(phoneError)} />
+                </Field>
+                <Field label="Address" className="sm:col-span-2">
+                  <input value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} maxLength={300} placeholder="Head office address" />
+                </Field>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="rounded-xl border p-4" style={{ borderColor: 'var(--line)' }}>
+              <p className="text-[13px] font-semibold text-fg">Scope</p>
+              <p className="mt-0.5 text-[12px] text-fg-subtle">Determines whether the department handles emergencies and needs an emergency head.</p>
+              <div className="mt-3 space-y-1.5">
+                {[
+                  { value: 'civic', title: 'Civic', hint: 'Handles citizen complaints. Needs a department head.' },
+                  { value: 'emergency', title: 'Emergency', hint: 'Handles dispatched incidents. Needs an emergency head.' },
+                  { value: 'hybrid', title: 'Hybrid', hint: 'Handles both. Needs both heads.' }
+                ].map((option) => {
+                  const active = form.scope === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setForm((current) => ({ ...current, scope: option.value }))}
+                      className={cx('block w-full rounded-lg border px-3 py-2 text-left transition hover:bg-surface-2', active && 'border-civic-500 bg-civic-500/10')}
+                      style={active ? undefined : { borderColor: 'var(--line)' }}
+                    >
+                      <p className={cx('text-[13px] font-semibold', active ? 'text-fg' : 'text-fg-muted')}>{option.title}</p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-fg-subtle">{option.hint}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-xl border p-4" style={{ borderColor: routingError ? '#f59e0b' : 'var(--line)' }}>
+              <p className="text-[13px] font-semibold text-fg">Emergency types routed here</p>
+              <p className="mt-0.5 text-[12px] text-fg-subtle">Emergency and hybrid departments must handle at least one type.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {emergencyTypeOptions.map((type) => {
+                  const active = form.emergencyTypes.includes(type);
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setForm((current) => ({
+                        ...current,
+                        emergencyTypes: active ? current.emergencyTypes.filter((value) => value !== type) : [...current.emergencyTypes, type]
+                      }))}
+                      className={cx('chip cursor-pointer', active ? 'status-info' : 'status-muted')}
+                    >
+                      {labelize(type)}
+                    </button>
+                  );
+                })}
+              </div>
+              {routingError ? <p className="mt-2 text-xs font-semibold text-amber-600">{routingError}</p> : null}
+            </div>
+
+            <div className="rounded-xl border p-4" style={{ borderColor: 'var(--line)', backgroundColor: 'var(--surface-2)' }}>
+              <p className="text-[13px] font-semibold text-fg">Preview</p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                <Badge tone={scopeToneMap[form.scope] || 'neutral'}>{labelize(form.scope)}</Badge>
+                <Badge tone={statusTone(form.status)}>{labelize(form.status)}</Badge>
+                {complaintRoutable ? <Badge tone="success" icon="checkCircle">Complaint destination</Badge> : null}
+              </div>
+              <dl className="mt-3 space-y-1.5 text-[12px]">
+                {[
+                  ['Name', form.name.trim() || '—'],
+                  ['Type', form.type.trim() || '—'],
+                  ['Email', form.email.trim() || '—'],
+                  ['Phone', form.contactNumber.trim() || '—'],
+                  ['Routing', form.emergencyTypes.length ? form.emergencyTypes.map((type) => labelize(type)).join(', ') : 'None']
+                ].map(([caption, value]) => (
+                  <div key={caption} className="flex items-start justify-between gap-3">
+                    <dt className="shrink-0 text-fg-subtle">{caption}</dt>
+                    <dd className="min-w-0 truncate text-right font-medium text-fg" title={value}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           </div>
         </div>

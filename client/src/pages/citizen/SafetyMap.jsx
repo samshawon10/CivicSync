@@ -33,14 +33,14 @@ function FilterGroup({ group, available, selected, onToggle, onAll }) {
   const visibleTypes = group.types.filter((type) => available.has(type));
   if (!visibleTypes.length) return null;
   return (
-    <fieldset className="border-t border-slate-100 py-3 first:border-t-0">
-      <legend className="mb-2 flex w-full items-center justify-between text-xs font-black uppercase tracking-wide text-slate-500">
+    <fieldset className="border-t border-slate-100 dark:border-slate-800 py-3 first:border-t-0">
+      <legend className="mb-2 flex w-full items-center justify-between text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {group.label}
-        <button type="button" className="text-[11px] font-bold normal-case tracking-normal text-civic-600" onClick={() => onAll(group.types, visibleTypes)}>Select all</button>
+        <button type="button" className="text-[11px] font-bold normal-case tracking-normal text-civic-600 dark:text-civic-300" onClick={() => onAll(group.types, visibleTypes)}>Select all</button>
       </legend>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
         {visibleTypes.map((type) => (
-          <label key={type} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm hover:bg-slate-50">
+          <label key={type} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm hover:bg-slate-50 hover:bg-slate-800">
             <input type="checkbox" checked={selected.has(type)} onChange={() => onToggle(type)} className="h-4 w-4 accent-civic-600" />
             <span>{facilityTypeLabels[type]}</span>
           </label>
@@ -148,24 +148,24 @@ export default function SafetyMap() {
           <div className="grid lg:grid-cols-[19rem_1fr]">
             <aside className={`${filtersOpen ? 'block' : 'hidden'} border-b border-slate-200 bg-white p-4 lg:block lg:border-r lg:border-b-0`} aria-label="Safety map filters">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><Filter className="h-5 w-5 text-civic-600" /><h2 className="font-black text-ink">Map filters</h2></div>
-                <button type="button" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden" aria-label="Close filters" onClick={() => setFiltersOpen(false)}><X size={18} /></button>
+                <div className="flex items-center gap-2"><Filter className="h-5 w-5 text-civic-600 dark:text-civic-300" /><h2 className="font-black text-ink dark:text-slate-100">Map filters</h2></div>
+                <button type="button" className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:bg-slate-800 lg:hidden" aria-label="Close filters" onClick={() => setFiltersOpen(false)}><X size={18} /></button>
               </div>
               <label className="relative mt-4 block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full pl-9" placeholder="Search services or area" aria-label="Search mapped services or area" />
               </label>
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <label className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 text-xs font-bold"><input type="checkbox" className="h-4 w-4 accent-red-600" checked={showActiveAreas} onChange={(event) => setShowActiveAreas(event.target.checked)} /><Siren size={15} className="text-red-600" /> Active areas</label>
-                <label className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 text-xs font-bold"><input type="checkbox" className="h-4 w-4 accent-amber-600" checked={showDensity} onChange={(event) => setShowDensity(event.target.checked)} /><Layers3 size={15} className="text-amber-600" /> Incident density</label>
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 p-2 text-xs font-bold"><input type="checkbox" className="h-4 w-4 accent-red-600" checked={showActiveAreas} onChange={(event) => setShowActiveAreas(event.target.checked)} /><Siren size={15} className="text-red-600" /> Active areas</label>
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 p-2 text-xs font-bold"><input type="checkbox" className="h-4 w-4 accent-amber-600" checked={showDensity} onChange={(event) => setShowDensity(event.target.checked)} /><Layers3 size={15} className="text-amber-600" /> Incident density</label>
               </div>
               <div className="mt-3">
                 {facilityGroups.map((group) => <FilterGroup key={group.key} group={group} available={availableTypes} selected={selectedTypes} onToggle={toggleType} onAll={selectGroup} />)}
-                {!availableTypes.size ? <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">No service categories have registered locations yet. Nothing is shown until real records exist.</p> : null}
+                {!availableTypes.size ? <p className="rounded-lg bg-slate-50 dark:bg-slate-900 p-3 text-xs text-slate-500 dark:text-slate-400">No service categories have registered locations yet. Nothing is shown until real records exist.</p> : null}
               </div>
             </aside>
 
-            <div className="min-w-0 bg-slate-50 p-3 sm:p-4">
+            <div className="min-w-0 bg-slate-50 dark:bg-slate-900 p-3 sm:p-4">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <button type="button" className="civic-secondary lg:hidden" onClick={() => setFiltersOpen(true)}><Filter size={16} /> Filters</button>
                 <select value={days} onChange={(event) => setDays(Number(event.target.value))} aria-label="Incident date range" className="w-auto">
@@ -183,12 +183,12 @@ export default function SafetyMap() {
                   </button>
                 </div>
               </div>
-              {locationState === 'detected' ? <p className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"><MapPin size={15} /> Current location detected{Number.isFinite(Number(location?.accuracy)) ? ` · accuracy ±${Math.round(Number(location.accuracy))} m` : ''}. It is shown only to you on this page.</p> : null}
-              {locationState === 'error' ? <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">{geolocation.error || 'Location permission was not granted.'} You can still browse the map and public directory.</p> : null}
-              {error ? <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div> : null}
-              {loading ? <div className="grid h-[32rem] place-items-center rounded-xl border border-slate-200 bg-white"><div className="text-center"><ShieldCheck className="mx-auto h-8 w-8 animate-pulse text-civic-600" /><p className="mt-2 text-sm font-semibold text-slate-500">Loading real safety map data…</p></div></div> : (
+              {locationState === 'detected' ? <p className="mb-3 flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300"><MapPin size={15} /> Current location detected{Number.isFinite(Number(location?.accuracy)) ? ` · accuracy ±${Math.round(Number(location.accuracy))} m` : ''}. It is shown only to you on this page.</p> : null}
+              {locationState === 'error' ? <p className="mb-3 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs font-semibold text-amber-800 dark:text-amber-300">{geolocation.error || 'Location permission was not granted.'} You can still browse the map and public directory.</p> : null}
+              {error ? <div className="mb-3 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div> : null}
+              {loading ? <div className="grid h-[32rem] place-items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"><div className="text-center"><ShieldCheck className="mx-auto h-8 w-8 animate-pulse text-civic-600 dark:text-civic-300" /><p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">Loading real safety map data…</p></div></div> : (
                 <>
-                  {!activeAreas.length && meta?.insufficientData ? <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Not enough incident data available for this area. Try a longer date range or another incident category.</div> : null}
+                  {!activeAreas.length && meta?.insufficientData ? <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm font-semibold text-amber-800 dark:text-amber-300">Not enough incident data available for this area. Try a longer date range or another incident category.</div> : null}
                   <EmergencyMap
                     height="h-[32rem] min-h-[28rem]"
                     hotspots={allAreas}
@@ -200,14 +200,14 @@ export default function SafetyMap() {
                   />
                 </>
               )}
-              <p className="mt-2 text-xs leading-relaxed text-slate-500">Active emergencies and reported density are rounded geographic aggregates. Individual citizen report locations are never returned to this public map. {meta?.totalReports || 0} standard report(s) matched the density period.</p>
+              <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Active emergencies and reported density are rounded geographic aggregates. Individual citizen report locations are never returned to this public map. {meta?.totalReports || 0} standard report(s) matched the density period.</p>
             </div>
           </div>
         </section>
         {selectedFacility ? (
           <section className="civic-card p-4" aria-live="polite">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div><p className="text-xs font-black uppercase tracking-wide text-civic-600">Selected service</p><h2 className="text-lg font-black text-ink">{selectedFacility.name}</h2><p className="text-sm text-slate-500">{facilityTypeLabels[selectedFacility.type]}{selectedFacility.address ? ` · ${selectedFacility.address}` : ''}</p></div>
+              <div><p className="text-xs font-black uppercase tracking-wide text-civic-600 dark:text-civic-300">Selected service</p><h2 className="text-lg font-black text-ink dark:text-slate-100">{selectedFacility.name}</h2><p className="text-sm text-slate-500 dark:text-slate-400">{facilityTypeLabels[selectedFacility.type]}{selectedFacility.address ? ` · ${selectedFacility.address}` : ''}</p></div>
               <button type="button" className="civic-secondary" onClick={() => setSelectedFacility(null)}>Close</button>
             </div>
             <div className="mt-3"><NearbyServiceCard facility={selectedFacility} origin={location} /></div>
@@ -216,11 +216,11 @@ export default function SafetyMap() {
 
         <section className="civic-card p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h2 className="text-lg font-black text-ink">Nearest help</h2><p className="text-sm text-slate-500">Results come from registered service locations and are sorted by actual geographic distance.</p></div>
+            <div><h2 className="text-lg font-black text-ink dark:text-slate-100">Nearest help</h2><p className="text-sm text-slate-500 dark:text-slate-400">Results come from registered service locations and are sorted by actual geographic distance.</p></div>
             <button type="button" className="civic-primary" onClick={findNearestHelp} disabled={nearestBusy}><Navigation size={16} /> Find nearest help</button>
           </div>
           <div className="mt-4">
-            {nearestBusy ? <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">Calculating proximity using the server-side geospatial index…</p> : nearest.length ? <div className="grid gap-3 md:grid-cols-2">{nearest.map((facility) => <NearbyServiceCard key={facility._id} facility={facility} origin={location} />)}</div> : <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">Share your location or choose Find nearest help. No distances are shown until a real position and real service records are available.</p>}
+            {nearestBusy ? <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-6 text-center text-sm text-slate-500 dark:text-slate-400">Calculating proximity using the server-side geospatial index…</p> : nearest.length ? <div className="grid gap-3 md:grid-cols-2">{nearest.map((facility) => <NearbyServiceCard key={facility._id} facility={facility} origin={location} />)}</div> : <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-6 text-center text-sm text-slate-500 dark:text-slate-400">Share your location or choose Find nearest help. No distances are shown until a real position and real service records are available.</p>}
           </div>
         </section>
       </div>

@@ -9,10 +9,13 @@ import { adminNav } from './adminNav.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { useAdminRealtime } from '../../context/AdminRealtimeContext.jsx';
+import { useCivicAIContext } from '../ai/CivicAIProvider.jsx';
+import { presetFor } from '../ai/aiPrompts.js';
 import { adminApi } from '../../services/adminService.js';
 import api from '../../services/api.js';
 import { notificationsApi } from '../../services/notificationService.js';
 import { cx } from '../../utils/format.js';
+import { profilePhotoUrl } from '../../services/profilePhoto.js';
 
 const SIDEBAR_KEY = 'civicsync.admin.sidebar';
 
@@ -32,6 +35,7 @@ export default function SuperAdminLayout({ section, title, subtitle, actions, br
   const navigate = useNavigate();
   const { mode, resolved, cycle } = useTheme();
   const { live } = useAdminRealtime();
+  const ai = useCivicAIContext();
 
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -100,10 +104,10 @@ export default function SuperAdminLayout({ section, title, subtitle, actions, br
     <div className="flex h-full flex-col" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
       <div className={cx('flex items-center gap-3 px-4 py-4', collapsed && 'lg:justify-center')}>
         <Link to="/admin/dashboard" className="flex min-w-0 items-center gap-2.5" onClick={() => setMobileOpen(false)}>
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-civic-600 text-sm font-extrabold text-white">CS</span>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-civic-600 text-sm font-extrabold text-white" aria-hidden="true">✦</span>
           {!collapsed && (
             <span className="min-w-0">
-              <span className="block truncate text-[15px] font-bold text-white">CivicSync</span>
+              <span className="block truncate text-[18px] font-extrabold tracking-tight text-white">Civic<span className="text-civic-300">Sync</span></span>
               <span className="block truncate text-[11px] font-semibold uppercase tracking-[.14em] text-slate-400">Command Center</span>
             </span>
           )}
@@ -145,8 +149,8 @@ export default function SuperAdminLayout({ section, title, subtitle, actions, br
           {!collapsed && <span>Theme · {themeLabel}</span>}
         </button>
         <button type="button" onClick={() => changeSection('/admin/profile')} className={cx('nav-item w-full text-left', collapsed && 'lg:justify-center')}>
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-civic-600 text-[12px] font-bold text-white">
-            {user?.name?.[0]?.toUpperCase() || 'A'}
+          <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-civic-600 text-[12px] font-bold text-white">
+            {user?.photoURL ? <img src={profilePhotoUrl(user.photoURL)} alt="Administrator profile" className="h-full w-full object-cover" /> : user?.name?.[0]?.toUpperCase() || 'A'}
           </span>
           {!collapsed && (
             <span className="min-w-0">
@@ -236,6 +240,18 @@ export default function SuperAdminLayout({ section, title, subtitle, actions, br
                 {live ? 'Live' : 'Offline'}
               </span>
               <IconButton icon={resolved === 'dark' ? 'sun' : 'moon'} label={`Theme: ${themeLabel}. Click to change.`} onClick={cycle} />
+              {ai && (
+                <button
+                  type="button"
+                  onClick={() => ai.openCopilot(presetFor('admin', { section: section || 'dashboard' }))}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-civic-600 transition hover:bg-civic-500/10 dark:text-civic-300"
+                  aria-label="Open CivicSync Intelligence"
+                  title="Ask CivicSync Intelligence about the platform"
+                >
+                  <Icon name="sparkles" size={17} />
+                  <span className="hidden text-[12px] font-bold sm:inline">AI</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setNotificationsOpen(true)}
@@ -256,7 +272,7 @@ export default function SuperAdminLayout({ section, title, subtitle, actions, br
                   aria-haspopup="menu"
                   aria-expanded={profileOpen}
                 >
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-civic-600 text-[13px] font-bold text-white">{user?.name?.[0]?.toUpperCase() || 'A'}</span>
+                  <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-civic-600 text-[13px] font-bold text-white">{user?.photoURL ? <img src={profilePhotoUrl(user.photoURL)} alt="Administrator profile" className="h-full w-full object-cover" /> : user?.name?.[0]?.toUpperCase() || 'A'}</span>
                   <Icon name="chevronDown" size={14} className="hidden text-fg-subtle sm:block" />
                 </button>
                 {profileOpen && (

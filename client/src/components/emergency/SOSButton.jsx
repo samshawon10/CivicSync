@@ -61,7 +61,7 @@ export default function SOSButton({ onActivate, captureLocation, label = 'SOS\nH
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <p className="text-xs font-black uppercase tracking-[.18em] text-red-200">{title}</p>
+      <p className="text-xs font-black uppercase tracking-[.18em] text-red-700 dark:text-red-200">{title}</p>
       <button
         type="button"
         onPointerDown={begin}
@@ -72,12 +72,12 @@ export default function SOSButton({ onActivate, captureLocation, label = 'SOS\nH
         onKeyUp={cancel}
         disabled={busy}
         aria-label={title}
-        className={`sos-pulse relative grid h-36 w-36 select-none place-items-center rounded-full border-8 border-red-300 bg-white text-center text-xl font-black whitespace-pre-line text-red-700 shadow-2xl transition ${holding ? 'scale-95 bg-red-100' : ''}`}
-        style={holding ? { background: `conic-gradient(#fee2e2 ${progress * 3.6}deg, #ffffff 0deg)` } : undefined}
+        className={`sos-pulse relative grid h-36 w-36 select-none place-items-center rounded-full border-8 border-red-300 bg-white text-center text-xl font-black whitespace-pre-line text-red-700 shadow-2xl transition dark:border-red-800 dark:bg-surface dark:text-red-300 ${holding ? 'scale-95 bg-red-100 dark:bg-red-950/70' : ''}`}
+        style={holding ? { background: `conic-gradient(#ef4444 ${progress * 3.6}deg, var(--surface-2) 0deg)` } : undefined}
       >
         {busy ? <><Siren size={28} /> SENDING…</> : holding ? `HOLD ${Math.ceil((duration - (Date.now() - startedAt.current)) / 1000) || 1}` : <><Siren size={30} />{label.split('\n').map((line) => <span key={line} className="block">{line}</span>)}</>}
       </button>
-      <p className="text-[11px] font-semibold text-red-100/90" aria-live="polite">
+      <p className="text-[11px] font-semibold text-red-700 dark:text-red-200" aria-live="polite">
         {phase === 'locating' ? <span className="inline-flex items-center gap-1"><LocateFixed size={13} /> Requesting location permission…</span> : phase === 'located' ? <span className="inline-flex items-center gap-1"><CheckCircle2 size={13} /> Location detected · submitting emergency</span> : phase === 'error' ? 'Location unavailable · enter an address below' : 'Press and hold for 3 seconds'}
       </p>
     </div>

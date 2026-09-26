@@ -9,7 +9,7 @@
  * only non-sensitive identifiers (ids/labels) — the gateway re-authorizes the
  * actual data server-side.
  */
-import { createContext, useContext, lazy, Suspense, useCallback } from 'react';
+import { createContext, useContext, lazy, Suspense } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { Button } from '../ui/primitives.jsx';
 import { useCivicAI } from './useCivicAI.js';
@@ -26,7 +26,10 @@ export function useCivicAIContext() {
 /** True only for a signed-in, active CivicSync account. */
 function useCanUseAI() {
   const { user } = useAuth();
-  return Boolean(user?._id && user?.status !== 'suspended' && user?.status !== 'disabled');
+  // AuthContext receives the server's safe user projection, which exposes the
+  // Mongo id as `id` (not `_id`). Accept `_id` as well for callers that provide
+  // a hydrated document, so the AI entry points work with both shapes.
+  return Boolean((user?.id || user?._id) && user?.status !== 'suspended' && user?.status !== 'disabled');
 }
 
 /** The floating ✦ entry point. Desktop: inline pill. Mobile: fixed action. */
@@ -54,16 +57,15 @@ export function CivicAIButton({ className = '', label = true }) {
 export default function CivicAIProvider({ children }) {
   const ai = useCivicAI();
   const allowed = useCanUseAI();
-  const openGeneral = useCallback((preset) => ai.openCopilot(preset), [ai]);
 
   return (
-    <CivicAIContext.Provider value={{ ...ai, openGeneral }}>
+    <CivicAIContext.Provider value={ai}>
       {children}
       {allowed && (
         <>
           <div className="pointer-events-none fixed bottom-4 right-4 z-[60] sm:hidden">
             <Button
-              onClick={openGeneral}
+              onClick={() => ai.openCopilot()}
               aria-label="Open CivicSync Intelligence"
               className="pointer-events-auto h-12 w-12 rounded-full shadow-lg"
             >

@@ -414,14 +414,19 @@ export function AlertsSection() {
   const [toggleTarget, setToggleTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const alerts = useAsync(() => emergencyApi.alerts({ all: 'true' }).then((response) => response.data.alerts), []);
-  const rows = alerts.data || [];
-  const activeCount = rows.filter((alert) => alert.active).length;
+  const alerts = useAsync(async () => {
+    const response = await emergencyApi.alerts({ all: 'true' });
+    const payload = response?.data;
+    if (!Array.isArray(payload?.alerts)) throw new Error('The alerts service returned an invalid response. Please try again.');
+    return payload.alerts;
+  }, []);
+  const rows = Array.isArray(alerts.data) ? alerts.data.filter((alert) => alert && typeof alert === 'object') : [];
+  const activeCount = rows.filter((alert) => alert.active === true).length;
 
   useEffect(() => {
     const focus = searchParams.get('focus');
-    if (!focus || !alerts.data) return;
-    const target = alerts.data.find((alert) => String(alert._id) === focus);
+    if (!focus || !rows.length) return;
+    const target = rows.find((alert) => String(alert._id) === focus);
     if (target) setToggleTarget(target);
     const next = new URLSearchParams(searchParams);
     next.delete('focus');
@@ -437,15 +442,27 @@ export function AlertsSection() {
       const latitude = Number(form.latitude);
       const longitude = Number(form.longitude);
       if (hasLatitude && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180)) throw new Error('Enter valid latitude and longitude values.');
+      const startAt = form.startAt ? new Date(form.startAt) : null;
+      const endAt = form.endAt ? new Date(form.endAt) : null;
+      if (startAt && Number.isNaN(startAt.getTime())) throw new Error('Enter a valid start time.');
+      if (endAt && Number.isNaN(endAt.getTime())) throw new Error('Enter a valid end time.');
+      if (startAt && endAt && endAt <= startAt) throw new Error('The end time must be after the start time.');
       const payload = {
-        title: form.title, message: form.message, category: form.category, severity: form.severity, status: form.status,
+        title: form.title.trim(), message: form.message.trim(), category: form.category, severity: form.severity, status: form.status,
         affectedArea: form.affectedArea, radiusKm: form.radiusKm === '' ? undefined : Number(form.radiusKm),
-        startAt: form.startAt || undefined, endAt: form.endAt || undefined,
+        startAt: startAt?.toISOString(), endAt: endAt?.toISOString(),
         location: { address: form.address, ...(hasLatitude ? { latitude, longitude } : {}) }
       };
       const result = editTarget ? await emergencyApi.updateAlert(editTarget._id, payload) : await emergencyApi.createAlert(payload);
       const { data } = result;
-      toast.success(data.delivery === 'in_app' ? (editTarget ? 'Broadcast updated. Active citizens receive the new version in their notification feed.' : 'Broadcast published. Active citizens receive it in their notification feed.') : 'Broadcast saved. It is scheduled and is not yet active.');
+      const savedStatus = data.alert?.status || form.status;
+      toast.success(
+        data.delivery === 'in_app'
+          ? (editTarget ? 'Broadcast updated.' : 'Broadcast published and delivered to active citizens in-app.')
+          : savedStatus === 'scheduled'
+            ? 'Broadcast scheduled. It will be delivered when its start time is reached.'
+            : `Broadcast saved as ${labelize(savedStatus)}.`
+      );
       setCreateOpen(false);
       setEditTarget(null);
       setForm({ title: '', message: '', category: 'public_safety', severity: 'medium', status: 'active', address: '', affectedArea: '', radiusKm: '', startAt: '', endAt: '', latitude: '', longitude: '' });
@@ -466,8 +483,15 @@ export function AlertsSection() {
   async function toggleAlert() {
     setBusy(true);
     try {
-      await emergencyApi.updateAlert(toggleTarget._id, { active: !toggleTarget.active });
+      const payload = toggleTarget.active
+        ? { status: 'cancelled' }
+        : { status: 'active', startAt: null, endAt: null };
+      const response = await emergencyApi.updateAlert(toggleTarget._id, payload);
+      const nextStatus = response.data.alert?.status;
       toast.success(toggleTarget.active ? 'Broadcast closed and hidden from citizen feeds.' : 'Broadcast reopened.');
+      if (!toggleTarget.active && nextStatus && nextStatus !== 'active') {
+        toast.info(`The broadcast is now ${labelize(nextStatus)} because of its configured timing.`);
+      }
       setToggleTarget(null);
       alerts.reload();
     } catch (error) { toast.error(apiMessage(error)); } finally { setBusy(false); }

@@ -1,11 +1,12 @@
-import { Bell, ClipboardList, FilePlus2, Hospital, LayoutDashboard, MapPinned, Menu, Moon, PhoneCall, Search, Settings, ShieldCheck, Siren, Sparkles, Sun, UserRound, UsersRound, X } from 'lucide-react';
+import { Bell, ChevronDown, ClipboardList, FilePlus2, Hospital, LayoutDashboard, LogOut, MapPinned, Menu, Moon, PhoneCall, Search, Settings, ShieldCheck, Siren, Sparkles, Sun, UserRound, UsersRound, X } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PageHead from '../../components/ui/PageHead.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { useGlobalSearch } from '../search/GlobalSearch.jsx';
 import { useCivicAIContext } from '../ai/CivicAIProvider.jsx';
+import { profilePhotoUrl } from '../../services/profilePhoto.js';
 
 const links = [
   ['Overview', '/dashboard/citizen', LayoutDashboard], ['SOS / Emergency', '/dashboard/citizen/emergency', Siren],
@@ -22,9 +23,26 @@ export default function CitizenLayout({ title, children, unreadCount = 0 }) {
   const { resolved, toggle } = useTheme();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
   const search = useGlobalSearch();
   const ai = useCivicAIContext();
-  async function signOut() { await logout(); navigate('/login'); }
+  useEffect(() => {
+    function closeMenu(event) {
+      if (event.type === 'keydown') {
+        if (event.key === 'Escape') setProfileMenuOpen(false);
+        return;
+      }
+      if (!profileMenuRef.current?.contains(event.target)) setProfileMenuOpen(false);
+    }
+    if (profileMenuOpen) {
+      document.addEventListener('mousedown', closeMenu);
+      document.addEventListener('keydown', closeMenu);
+    }
+    return () => { document.removeEventListener('mousedown', closeMenu); document.removeEventListener('keydown', closeMenu); };
+  }, [profileMenuOpen]);
+  async function signOut() { try { await logout(); } finally { setProfileMenuOpen(false); navigate('/login'); } }
+  function openAccount(path) { setProfileMenuOpen(false); navigate(path); }
   const sidebar = (
     <aside className="flex h-full flex-col bg-ink p-5 text-white">
       <div className="flex items-center justify-between">
@@ -51,7 +69,7 @@ export default function CitizenLayout({ title, children, unreadCount = 0 }) {
       <div className="min-w-0">
         <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:px-8">
           <div className="flex items-center gap-3"><button onClick={() => setOpen(true)} className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 lg:hidden" aria-label="Open navigation"><Menu size={21} /></button><div><p className="text-xs font-bold tracking-[.14em] text-civic-600">CITIZEN PORTAL</p><h1 className="font-bold text-ink">{title}</h1></div></div>
-          <div className="flex items-center gap-1">{ai && <button type="button" onClick={() => ai.openCopilot()} className="flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-civic-700 hover:bg-civic-500/10 dark:text-civic-300" aria-label="Open CivicSync Intelligence"><Sparkles size={18} aria-hidden="true" /><span className="hidden text-sm font-bold sm:inline">AI</span></button>}<button type="button" onClick={() => search.open()} className="grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Search CivicSync"><Search size={18} /></button><button type="button" onClick={toggle} className="grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label={`Switch to ${resolved === 'dark' ? 'light' : 'dark'} theme`}>{resolved === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button><NavLink to="/dashboard/citizen/notifications" className="relative grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label={unreadCount ? `${unreadCount} unread notifications` : 'Notifications'}><Bell size={18} />{unreadCount > 0 && <span className="absolute right-1 top-1 grid min-w-4 h-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}</NavLink><span className="hidden text-sm text-slate-500 dark:text-slate-300 sm:block">{user?.name}</span></div>
+          <div className="flex items-center gap-1">{ai && <button type="button" onClick={() => ai.openCopilot()} className="flex h-10 items-center gap-1.5 rounded-lg px-2.5 text-civic-700 hover:bg-civic-500/10 dark:text-civic-300" aria-label="Open CivicSync Intelligence"><Sparkles size={18} aria-hidden="true" /><span className="hidden text-sm font-bold sm:inline">AI</span></button>}<button type="button" onClick={() => search.open()} className="grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label="Search CivicSync"><Search size={18} /></button><button type="button" onClick={toggle} className="grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label={`Switch to ${resolved === 'dark' ? 'light' : 'dark'} theme`}>{resolved === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button><NavLink to="/dashboard/citizen/notifications" className="relative grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label={unreadCount ? `${unreadCount} unread notifications` : 'Notifications'}><Bell size={18} />{unreadCount > 0 && <span className="absolute right-1 top-1 grid min-w-4 h-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}</NavLink><div ref={profileMenuRef} className="relative ml-1"><button type="button" onClick={() => setProfileMenuOpen((value) => !value)} aria-haspopup="menu" aria-expanded={profileMenuOpen} aria-label="Open profile menu" className="flex h-10 items-center gap-1 rounded-full p-0.5 transition hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-civic-600 dark:hover:bg-slate-800"><span className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-civic-100 text-sm font-bold text-civic-800 dark:bg-civic-500/15 dark:text-civic-200">{user?.photoURL ? <img src={profilePhotoUrl(user.photoURL)} alt="Your profile" className="h-full w-full object-cover" /> : user?.name?.[0]?.toUpperCase() || 'C'}</span><ChevronDown size={15} className="hidden text-slate-500 sm:block dark:text-slate-400" /></button>{profileMenuOpen && <div role="menu" className="menu-panel absolute right-0 top-12 z-40 w-60 overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-xl"><div className="border-b border-line px-3 py-2.5"><p className="truncate text-sm font-semibold text-fg">{user?.name || 'Citizen'}</p><p className="truncate text-xs text-fg-muted">{user?.email || 'Citizen account'}</p></div><button type="button" role="menuitem" onClick={() => openAccount('/dashboard/citizen/profile')} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-fg transition hover:bg-surface-2"><UserRound size={16} />Profile management</button><button type="button" role="menuitem" onClick={() => openAccount('/dashboard/citizen/settings')} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-medium text-fg transition hover:bg-surface-2"><Settings size={16} />Settings</button><div className="my-1 border-t border-line" /><button type="button" role="menuitem" onClick={signOut} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm font-semibold text-red-700 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/30"><LogOut size={16} />Log out</button></div>}</div></div>
         </header>
         <main className="mx-auto max-w-7xl p-4 pb-24 sm:p-7 lg:pb-7">{children}</main>
         <nav aria-label="Mobile quick navigation" className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-slate-200 bg-white/95 px-2 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 lg:hidden">{[['Home', '/dashboard/citizen', LayoutDashboard], ['Cases', '/dashboard/citizen/reports', ClipboardList], ['Help', '/dashboard/citizen/emergency', Siren], ['Profile', '/dashboard/citizen/profile', UserRound]].map(([label, to, NavIcon]) => <NavLink end={to === '/dashboard/citizen'} key={to} to={to} className={({ isActive }) => `grid min-h-12 place-items-center gap-0.5 rounded-lg text-[11px] font-bold ${isActive ? 'text-civic-700 dark:text-civic-300' : 'text-slate-500 dark:text-slate-400'}`}><NavIcon size={18} /><span>{label}</span></NavLink>)}</nav>
