@@ -1,8 +1,8 @@
 node_modules/
 dist/
 .env
-server/.env
-client/.env
+.env.*
+!.env.example
 *.log
 server/uploads/
 server/storage/
