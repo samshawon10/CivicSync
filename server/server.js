@@ -36,11 +36,23 @@ dotenv.config({ path: path.join(serverDir, '.env') });
 
 const app = express();
 const httpServer = http.createServer(app);
+let initializationPromise;
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 app.get(['/', '/api/health'], (req, res) => res.json({ success: true, message: 'CivicSync API is running' }));
+app.use((req, res, next) => {
+  ensureDatabaseReady()
+    .then(() => next())
+    .catch((error) => {
+      console.error('CivicSync backend initialization failed.', {
+        name: error?.name,
+        code: error?.code
+      });
+      res.status(503).json({ success: false, message: 'The service is temporarily unavailable.' });
+    });
+});
 app.get('/uploads/reports/:filename', requireAuth, getLegacyReportAttachment);
 app.use('/api/auth', authRoutes);
 app.use('/api/complaints', complaintRoutes);
@@ -64,6 +76,28 @@ app.use(notFound);
 app.use(errorHandler);
 
 const port = process.env.PORT || 5000;
+
+function ensureDatabaseReady() {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      await connectDatabase();
+      await ensureSingletonHeadIndex();
+      try {
+        const seeded = await seedReportCatalogue();
+        if (seeded.seeded) {
+          console.log(`Report catalogue seeded: ${seeded.categories} category/categories, ${seeded.departments} department(s).`);
+        }
+      } catch (error) {
+        console.error('Report catalogue seed failed:', error.message);
+      }
+      initializeRealtime(httpServer);
+    })().catch((error) => {
+      initializationPromise = undefined;
+      throw error;
+    });
+  }
+  return initializationPromise;
+}
 httpServer.once('error', (error) => {
   if (error.code === 'EADDRINUSE') {
     console.error(`CivicSync API could not start: port ${port} is already in use.`);
@@ -74,23 +108,10 @@ httpServer.once('error', (error) => {
   process.exit(1);
 });
 
-connectDatabase()
-  .then(async () => {
-    await ensureSingletonHeadIndex();
-    // One-off seed of the report catalogue (categories + their default
-    // departments). Guarded by a marker, so a category an admin later deletes
-    // is not resurrected on the next boot.
-    try {
-      const seeded = await seedReportCatalogue();
-      if (seeded.seeded) {
-        console.log(`Report catalogue seeded: ${seeded.categories} category/categories, ${seeded.departments} department(s).`);
-      }
-    } catch (error) {
-      // Never block startup — the catalogue service falls back to compiled
-      // defaults whenever the collection is empty.
-      console.error('Report catalogue seed failed:', error.message);
-    }
-    initializeRealtime(httpServer);
-    httpServer.listen(port, () => console.log(`CivicSync API listening on port ${port}`));
-  })
-  .catch((error) => { console.error(`Database connection failed: ${error.message}`); process.exit(1); });
+httpServer.listen(port, () => console.log(`CivicSync API listening on port ${port}`));
+ensureDatabaseReady().catch((error) => {
+  console.error('CivicSync backend initialization failed.', {
+    name: error?.name,
+    code: error?.code
+  });
+});
