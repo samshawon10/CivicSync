@@ -1,10 +1,5 @@
 import { labelize, formatNumber } from '../../utils/format.js';
 
-/**
- * Dependency-free, theme-aware SVG charts. Every chart exposes the same data
- * as text (accessibility + honesty): the visual is never the only source of
- * information, and no value is invented.
- */
 const toneColor = {
   info: 'var(--color-civic-600)', civic: 'var(--color-civic-600)', success: '#10b981', critical: '#ef4444',
   high: '#f97316', medium: '#eab308', neutral: 'var(--line-strong)'

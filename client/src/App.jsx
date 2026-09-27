@@ -9,6 +9,7 @@ import ReportDetails from './pages/citizen/ReportDetails.jsx';
 import CitizenReports from './pages/citizen/CitizenReports.jsx';
 import CreateReport from './pages/citizen/CreateReport.jsx';
 import CitizenAccount from './pages/citizen/CitizenAccount.jsx';
+import CitizenDepartments from './pages/citizen/CitizenDepartments.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { dashboardPathFor } from './utils/roles.js';
 import Login from './pages/Login.jsx';
@@ -25,7 +26,10 @@ import SafetyAlerts from './pages/citizen/SafetyAlerts.jsx';
 import EmergencyContacts from './pages/citizen/EmergencyContacts.jsx';
 import WomenSafety from './pages/citizen/WomenSafety.jsx';
 import EmergencyAnalytics from './pages/emergency/EmergencyAnalytics.jsx';
-import EmergencyDashboard from './pages/emergency/EmergencyDashboard.jsx';
+import EmergencyHeadDashboard from './pages/emergency/EmergencyHeadDashboard.jsx';
+import EmergencyDepartmentOfficerDashboard from './pages/emergency/EmergencyDepartmentOfficerDashboard.jsx';
+import EmergencyOfficerDashboard from './pages/emergency/EmergencyOfficerDashboard.jsx';
+import EmergencyFieldWorkerDashboard from './pages/emergency/EmergencyFieldWorkerDashboard.jsx';
 import CivicAIProvider from './components/ai/CivicAIProvider.jsx';
 
 export default function App() {
@@ -43,6 +47,7 @@ export default function App() {
       </Route>
       <Route element={<RoleGuard role="citizen" />}>
         <Route path="/dashboard/citizen" element={<CitizenDashboard />} />
+        <Route path="/dashboard/citizen/departments" element={<CitizenDepartments />} />
         <Route path="/dashboard/citizen/emergency" element={<CitizenEmergency />} />
         <Route path="/dashboard/citizen/emergency/new" element={<CreateEmergency />} />
         <Route path="/dashboard/citizen/emergency/:id" element={<EmergencyTracking />} />
@@ -70,14 +75,17 @@ export default function App() {
         <Route path="/dashboard/field-worker" element={<FieldWorkerDashboard />} />
       </Route>
       <Route element={<RoleGuard role="emergency_department_head" />}>
-        <Route path="/dashboard/emergency-head" element={<EmergencyDashboard mode="command" />} />
+        <Route path="/dashboard/emergency-head" element={<EmergencyHeadDashboard />} />
         <Route path="/dashboard/emergency-head/analytics" element={<EmergencyAnalytics />} />
       </Route>
-      <Route element={<RoleGuard role={['emergency_department_officer', 'emergency_officer']} />}>
-        <Route path="/dashboard/emergency-officer" element={<EmergencyDashboard mode="officer" />} />
+      <Route element={<RoleGuard role="emergency_department_officer" />}>
+        <Route path="/dashboard/emergency-department-officer" element={<EmergencyDepartmentOfficerDashboard />} />
+      </Route>
+      <Route element={<RoleGuard role="emergency_officer" />}>
+        <Route path="/dashboard/emergency-officer" element={<EmergencyOfficerDashboard />} />
       </Route>
       <Route element={<RoleGuard role="emergency_field_worker" />}>
-        <Route path="/dashboard/emergency-field-worker" element={<EmergencyDashboard mode="field" />} />
+        <Route path="/dashboard/emergency-field-worker" element={<EmergencyFieldWorkerDashboard />} />
       </Route>
       <Route element={<RoleGuard role="admin" />}>
         <Route path="/dashboard/admin" element={<Navigate to="/admin/dashboard" replace />} />

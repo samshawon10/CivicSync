@@ -7,12 +7,6 @@ const toList = (value) => {
   return items.map((item) => String(item).trim()).filter(Boolean);
 };
 
-/**
- * Global CivicSearch. Every authenticated role searches through this one
- * endpoint; the authorized category set is resolved server-side from the role
- * (services/civicSearchScope.js), so an unauthorized category can never be
- * requested into existence.
- */
 export async function globalSearch(req, res, next) {
   try {
     const result = await searchForUser({

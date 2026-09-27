@@ -43,11 +43,6 @@ export function emitDepartmentEvent(event, payload, { userIds = [], roles = [], 
   if (department) io.to(`dept:${department}`).emit(event, payload);
 }
 
-/**
- * Real Socket.IO status for the Super Admin system-health card.
- * Reports only what the server can actually observe — never a fabricated
- * "connected" state.
- */
 export function realtimeStatus() {
   if (!io) return { initialized: false, connections: null, rooms: null };
   const sockets = io.sockets?.sockets;

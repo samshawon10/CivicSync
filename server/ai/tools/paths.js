@@ -1,11 +1,3 @@
-/**
- * Deep links for AI citations.
- *
- * Only routes that actually exist in the SPA are produced. Department, emergency
- * command and admin workspaces open records from in-page state rather than a URL
- * parameter, so those citations carry no path and the client renders them as
- * plain references instead of a broken link.
- */
 
 export const dashboardHome = Object.freeze({
   citizen: '/dashboard/citizen',

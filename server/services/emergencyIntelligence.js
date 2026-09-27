@@ -1,12 +1,4 @@
-/**
- * Emergency intelligence helpers.
- *
- * NOTE ON "AI": this project has no external AI/LLM infrastructure (no
- * OPENAI_API_KEY integration exists). Rather than faking an AI service, this
- * module provides a deterministic, transparent, rule-based advisory
- * classifier. Its output is ALWAYS advisory: the Emergency Head can apply,
- * override, or ignore it. It never makes irreversible decisions on its own.
- */
+
 import { sensitiveCategories } from '../config/emergencyOptions.js';
 
 const criticalWords = ['unconscious', 'not breathing', 'chest pain', 'heart attack', 'severe bleeding', 'trapped', 'explosion', 'collapsed', 'dying', 'no pulse', 'choking', 'shot', 'bleeding heavily'];

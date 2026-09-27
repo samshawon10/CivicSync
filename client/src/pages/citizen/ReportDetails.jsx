@@ -68,7 +68,6 @@ function ResolutionVerification({ report, busy, reopenNote, setReopenNote, feedb
   );
 }
 
-
 export default function ReportDetails() {
   const { id } = useParams();
   const [report, setReport] = useState(null);

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { isValidElement, useMemo, useState } from 'react';
 import Icon from './Icon.jsx';
 import { Button, EmptyState, ErrorState, Pagination } from './primitives.jsx';
 import { SkeletonTable } from './Skeleton.jsx';
@@ -18,12 +18,6 @@ function Checkbox({ checked, onChange, label, indeterminate = false }) {
   );
 }
 
-/**
- * Enterprise data table used by every Super Admin collection:
- * sorting, column visibility, selection, sticky header, skeleton loading,
- * professional empty/error states and a mobile card fallback instead of
- * squeezing ten columns onto a phone.
- */
 export default function DataTable({
   columns = [],
   rows = [],
@@ -105,10 +99,16 @@ export default function DataTable({
   );
 
   if (!sorted.length) {
+
+    const emptyState = isValidElement(empty)
+      ? empty
+      : empty
+        ? <EmptyState {...empty} />
+        : <EmptyState title="Nothing to display yet." hint="Records appear here as soon as CivicSync has data for this view." />;
     return (
       <div className="space-y-4">
         {header}
-        {empty || <EmptyState title="Nothing to display yet." hint="Records appear here as soon as CivicSync has data for this view." />}
+        {emptyState}
       </div>
     );
   }

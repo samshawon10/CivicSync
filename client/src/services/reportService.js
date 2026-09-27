@@ -23,6 +23,8 @@ const multipartConfig = {
 
 export const reportsApi = {
   departments: () => api.get('/reports/departments'),
+  /** Live category catalogue: key, label, description and default department. */
+  categories: () => api.get('/reports/categories'),
   create: (payload) => api.post('/reports', toReportFormData(payload), multipartConfig),
   mine: (params) => api.get('/reports/my', { params }),
   stats: () => api.get('/reports/my/stats'),

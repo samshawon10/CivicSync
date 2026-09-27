@@ -1,15 +1,6 @@
 import { CheckCircle2, LocateFixed, Siren } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-/**
- * Hold-to-confirm SOS button (3 seconds).
- * - Requires a completed GPS attempt before activation when possible,
- *   and clearly reports when location is unavailable.
- * - Refuses to pretend anything was sent while the device is offline.
- *
- * onActivate({ location, locationStatus }) must perform the real creation
- * request; this component never claims success on its own.
- */
 export default function SOSButton({ onActivate, captureLocation, label = 'SOS\nHOLD', title = 'HOLD TO SEND SOS', busy = false }) {
   const [holding, setHolding] = useState(false);
   const [phase, setPhase] = useState('idle');

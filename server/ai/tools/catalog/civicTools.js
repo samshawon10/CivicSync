@@ -1,11 +1,4 @@
-/**
- * Civic reference tools (task §21, §35). Read-only and deterministic.
- *
- * `classifyCivicIssue` and the emergency classification tool expose the
- * platform's EXISTING rule engines (services/civicIntelligenceRules.js and
- * services/emergencyIntelligence.js). Rules stay the source of truth for
- * classification, routing and severity; the LLM only explains them (§35, §36).
- */
+
 import SafetyFacility from '../../../models/SafetyFacility.js';
 import EmergencyAlert from '../../../models/EmergencyAlert.js';
 import Department from '../../../models/Department.js';

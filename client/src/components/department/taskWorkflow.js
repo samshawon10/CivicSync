@@ -1,8 +1,4 @@
-/**
- * Client mirror of the server-side DepartmentTask transition map
- * (see server/controllers/departmentController.js -> updateTaskStatus).
- * The server remains the source of truth; this only drives which buttons render.
- */
+
 export const taskTransitions = {
   assigned: ['accepted', 'rejected', 'cancelled'],
   accepted: ['traveling', 'blocked', 'cancelled'],

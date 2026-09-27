@@ -12,10 +12,27 @@ const userSchema = new mongoose.Schema(
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null },
     departmentName: { type: String, trim: true, default: '' },
     status: { type: String, enum: ['active', 'suspended'], default: 'active' },
+
+    availability: {
+      type: String,
+      enum: ['available', 'busy', 'off_duty', 'on_leave', 'unavailable'],
+      default: 'available',
+      index: true
+    },
+    /** The task currently holding this user, used to keep BUSY honest. */
+    activeTask: { type: mongoose.Schema.Types.ObjectId, ref: 'DepartmentTask', default: null },
+
+    activeEmergencyTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'EmergencyResponseTeam', default: null },
+    availabilityChangedAt: { type: Date, default: null },
     emailVerified: { type: Boolean, default: false },
     preferences: { emailNotifications: { type: Boolean, default: true } }
   },
   { timestamps: true }
+);
+
+userSchema.index(
+  { role: 1, status: 1 },
+  { unique: true, name: 'uniq_single_active_emergency_head', partialFilterExpression: { role: 'emergency_department_head', status: 'active' } }
 );
 
 userSchema.methods.toSafeObject = function toSafeObject() {

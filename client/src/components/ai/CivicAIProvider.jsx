@@ -1,14 +1,4 @@
-/**
- * CivicSync Intelligence — global mount point.
- *
- * Rendered once near the app root. The copilot itself is `lazy()`-loaded so the
- * AI feature contributes nothing to the initial bundle, and the floating trigger
- * is a small static button that any layout can reuse.
- *
- * Pages that want contextual AI call `useCivicAI().openCopilot(preset)` and pass
- * only non-sensitive identifiers (ids/labels) — the gateway re-authorizes the
- * actual data server-side.
- */
+
 import { createContext, useContext, lazy, Suspense } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { Button } from '../ui/primitives.jsx';
@@ -49,11 +39,6 @@ export function CivicAIButton({ className = '', label = true }) {
   );
 }
 
-/**
- * Hosts the lazily-loaded copilot. Safe to mount unconditionally: the trigger is
- * hidden for anonymous or disabled accounts, so unauthenticated visitors never
- * see an AI affordance they cannot use.
- */
 export default function CivicAIProvider({ children }) {
   const ai = useCivicAI();
   const allowed = useCanUseAI();

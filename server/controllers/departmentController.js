@@ -12,6 +12,8 @@ import { activeTaskStatuses, scoreTeamsForCase, taskCountsByTeam } from '../serv
 import { emitDepartmentEvent } from '../realtime/emergencyRealtime.js';
 
 import { canReviewReportCompletion, canTransitionReport } from '../services/reportLifecycle.js';
+import { checkStageTransition } from '../services/reportWorkflow.js';
+import { resolveAssignableTarget, canAssignCaseLevel } from '../services/assignmentAuthority.js';
 import { reportCategories, reportPriorities, reportStatuses } from '../config/reportOptions.js';
 import { getReportNextAction } from '../services/nextAction.js';
 import { departmentTaskAccess } from '../services/departmentTaskAccess.js';
@@ -47,7 +49,6 @@ async function auditLog(user, action, targetType, targetId, targetName, descript
   }).catch(() => {});
 }
 
-
 function canAccessReport(user, report) {
   const departmentName = departmentNameFor(user);
   if (!departmentName || report.departmentName !== departmentName) return false;
@@ -62,6 +63,7 @@ async function loadScopedReport(req, res) {
   }
   const reportQuery = Report.findById(req.params.id)
     .populate('assignedOfficer', 'name role phone')
+    .populate('assignedDepartmentOfficer', 'name role phone')
     .populate('assignedFieldWorker', 'name role phone')
     .populate('assignedTeam', 'name status serviceArea phone members')
     .populate('teamLeader', 'name role phone')
@@ -147,7 +149,7 @@ export async function listReports(req, res, next) {
     const { search = '', status = '', priority = '', category = '', officer = '', fieldWorker = '', overdue = '', escalated = '', page = 1, limit = 10, sort = 'updated' } = req.query;
     if (reportStatuses.includes(status)) filter.status = status;
     if (reportPriorities.includes(priority)) filter.priority = priority;
-    if (reportCategories.includes(category)) filter.category = category;
+    if (String(category).trim()) filter.category = String(category).trim();
     if (mongoose.Types.ObjectId.isValid(officer)) filter.assignedOfficer = officer;
     if (mongoose.Types.ObjectId.isValid(fieldWorker)) filter.assignedFieldWorker = fieldWorker;
     if (escalated === 'true') {
@@ -189,8 +191,12 @@ export async function listReports(req, res, next) {
     ]);
     res.json({
       success: true,
+      // `aggregate()` returns plain objects and `Model.populate()` does not
+      // hydrate them, so `report` is already a plain JSON-ready object here.
+      // Calling `toObject()` on it throws `TypeError: report.toObject is not
+      // a function`, which 500s every department case list.
       reports: reports.map((report) => ({
-        ...report.toObject(),
+        ...report,
         nextAction: getReportNextAction(report),
         sla: calculateDepartmentSla(report)
       })),
@@ -266,34 +272,86 @@ export async function updatePriority(req, res, next) {
 
 export async function assignReport(req, res, next) {
   try {
-    if (!managementRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only department heads and department officers can assign reports.' });
-    const { officerId, fieldWorkerId, teamId } = req.body;
-    if (officerId === undefined && fieldWorkerId === undefined && teamId === undefined) return res.status(400).json({ success: false, message: 'Select an officer, field worker, or team assignment to update.' });
-    if ([officerId, fieldWorkerId, teamId].some((id) => id && !mongoose.Types.ObjectId.isValid(id))) return res.status(400).json({ success: false, message: 'Select valid department staff or team.' });
-    const report = await loadScopedReport(req, res);
-    if (!report) return;
-    const departmentName = departmentNameFor(req.user);
-    const [officer, worker, team] = await Promise.all([
-      officerId ? User.findOne({ _id: officerId, role: { $in: ['department_officer', 'officer'] }, departmentName, status: 'active' }) : null,
-      fieldWorkerId ? User.findOne({ _id: fieldWorkerId, role: { $in: ['field_worker', 'officer'] }, departmentName, status: 'active' }) : null,
-      teamId ? DepartmentTeam.findOne({ _id: teamId, departmentName, active: true }).populate('leader', 'name role').populate('members', 'name role') : null
-    ]);
-    if (officerId && !officer) return res.status(400).json({ success: false, message: 'Selected officer is not in this department.' });
-    if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Selected field worker is not in this department.' });
-    if (teamId && !team) return res.status(400).json({ success: false, message: 'Selected team is not active in this department.' });
-
-    if (officerId !== undefined) report.assignedOfficer = officer?._id || null;
-    if (fieldWorkerId !== undefined) report.assignedFieldWorker = worker?._id || null;
-    if (teamId !== undefined) {
-      report.assignedTeam = team?._id || null;
-      report.teamLeader = team?.leader?._id || null;
-      if (team) {
-        team.status = 'busy';
-        await team.save();
-      }
+    // ── Load the case first ───────────────────────────────────────────────
+    // Case-level hand-off is management only. An Officer or Worker reaching
+    // this endpoint is refused up front rather than being told the case does
+    // not exist, which would be a confusing answer to a real authorisation
+    // question. Worker booking happens on the task, under `officer`.
+    if (!canAssignCaseLevel(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only department heads and department officers can hand off a case.'
+      });
     }
 
-    if ((officer || worker || team) && ['pending', 'verified'].includes(report.status)) {
+    // Scoping happens before any further authority check so a user from another
+    // department gets a 404 rather than a 403 that would confirm the case
+    // exists.
+    const report = await loadScopedReport(req, res);
+    if (!report) return;
+
+    // ── Assignment authority ──────────────────────────────────────────────
+    // A Department Head hands a case to a Department Officer. A Department
+    // Officer hands it to an Officer. Workers and teams are an *operational*
+    // act reserved for Officers, and live on the task — never on the case.
+    const { departmentOfficerId, officerId, fieldWorkerId, teamId } = req.body;
+    if (fieldWorkerId || teamId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Workers and teams are assigned by an Officer on the task, not on the case. Use the task assignment endpoint.'
+      });
+    }
+    const requested = [];
+    if (departmentOfficerId !== undefined) requested.push('departmentOfficerId');
+    if (officerId !== undefined) requested.push('officerId');
+    if (!requested.length) {
+      return res.status(400).json({ success: false, message: 'Select a Department Officer or an Officer to assign.' });
+    }
+    if (requested.length > 1) {
+      return res.status(422).json({ success: false, message: 'Assign one person at a time so the chain of custody stays unambiguous.' });
+    }
+    const isDepartmentOfficerHandoff = requested[0] === 'departmentOfficerId';
+    const targetId = isDepartmentOfficerHandoff ? departmentOfficerId : officerId;
+
+    // Role, department, active state and existence are all decided by the
+    // service from the *authenticated* actor. Nothing in the body is trusted.
+    const target = await resolveAssignableTarget({ actor: req.user, targetUserId: targetId, res });
+    if (!target) return;
+
+    // ── Workflow transition ───────────────────────────────────────────────
+    const nextStage = isDepartmentOfficerHandoff ? 'ASSIGNED_TO_DEPARTMENT_OFFICER' : 'ASSIGNED_TO_OFFICER';
+    const transition = checkStageTransition({ from: report.workflowStage, to: nextStage, actorRole: req.user.role });
+    if (!transition.ok) {
+      return res.status(transition.status).json({ success: false, message: transition.message });
+    }
+
+    // ── Apply the hand-off ────────────────────────────────────────────────
+    const previousStage = report.workflowStage;
+    if (isDepartmentOfficerHandoff) {
+      report.assignedDepartmentOfficer = target._id;
+      // A new Department Officer takes over the chain from scratch.
+      report.assignedOfficer = null;
+      report.assignedTeam = null;
+      report.teamLeader = null;
+      report.assignedFieldWorker = null;
+    } else {
+      report.assignedOfficer = target._id;
+      // The Officer now owns the work, so any stale team/worker link from a
+      // previous chain is cleared rather than left to confuse the dashboard.
+      report.assignedTeam = null;
+      report.teamLeader = null;
+      report.assignedFieldWorker = null;
+    }
+    report.workflowStage = nextStage;
+    report.workflowHistory.push({
+      stage: nextStage,
+      previousStage,
+      actor: req.user._id,
+      actorRole: req.user.role,
+      note: `${isDepartmentOfficerHandoff ? 'Department Officer' : 'Officer'}: ${target.name}`
+    });
+
+    if (['pending', 'verified'].includes(report.status)) {
       report.status = 'assigned';
     }
 
@@ -309,62 +367,48 @@ export async function assignReport(req, res, next) {
       };
     }
 
-    // Create or link a field task if worker or team assigned
-    const targetWorker = worker || (team?.members?.[0]);
-    if (targetWorker && !report.activeTask) {
-      const task = await DepartmentTask.create({
-        report: report._id,
-        taskNumber: `TK-${Date.now().toString().slice(-4)}`,
-        title: report.title,
-        description: report.description,
-        departmentName,
-        team: team?._id || null,
-        teamLeader: team?.leader?._id || null,
-        assignedWorker: targetWorker._id,
-        assignedBy: req.user._id,
-        status: 'assigned',
-        priority: report.priority,
-        targetDueAt: report.dueAt || report.sla?.resolutionDueAt,
-        location: {
-          address: report.location?.address || report.location?.area || '',
-          latitude: report.location?.latitude || null,
-          longitude: report.location?.longitude || null
-        },
-        timeline: [{ status: 'assigned', actor: req.user._id, actorRole: req.user.role, note: 'Task created and dispatched.' }]
-      });
-      report.activeTask = task._id;
-    }
-
-    const changes = [];
-    if (officerId !== undefined) changes.push(`Officer: ${officer?.name || 'Unassigned'}`);
-    if (fieldWorkerId !== undefined) changes.push(`Field worker: ${worker?.name || 'Unassigned'}`);
-    if (teamId !== undefined) changes.push(`Team: ${team?.name || 'Unassigned'}`);
-
-    report.activity.push({ action: 'Assignment updated', actorRole: req.user.role, note: changes.join(', ') });
+    // The field task is created by the Officer once they accept the work, not
+    // here: no worker may be committed before an Officer owns the case.
+    const roleLabel = isDepartmentOfficerHandoff ? 'Department Officer' : 'Officer';
+    const changeNote = `${roleLabel}: ${target.name} (${previousStage} → ${nextStage})`;
+    report.activity.push({ action: `Assigned to ${roleLabel}`, actorRole: req.user.role, note: changeNote });
     await report.save();
 
-    await auditLog(req.user, 'case_assigned', 'report', report._id, report.title, changes.join(', '));
+    await auditLog(
+      req.user,
+      isDepartmentOfficerHandoff ? 'REPORT_ASSIGNED_TO_DEPARTMENT_OFFICER' : 'REPORT_ASSIGNED_TO_OFFICER',
+      'report',
+      report._id,
+      report.title,
+      changeNote,
+      { assignedUserId: String(target._id), assignedRole: target.role, previousStatus: previousStage, newStatus: nextStage }
+    );
 
-    const notificationRecipients = [officer?._id, worker?._id, team?.leader?._id].filter(Boolean);
-    await Promise.all(notificationRecipients.map((recipient) => Notification.create({ recipient, report: report._id, type: 'report_status', message: `You/your team were assigned to "${report.title}".` })));
+    await Notification.create({
+      recipient: target._id,
+      report: report._id,
+      type: 'report_status',
+      message: `You were assigned "${report.title}" as ${roleLabel}.`
+    });
 
     emitDepartmentEvent('CASE_ASSIGNED', {
       caseId: report._id,
       title: report.title,
-      departmentName,
+      departmentName: report.departmentName,
       status: report.status,
-      assignedOfficer: officer?._id,
-      assignedWorker: worker?._id,
-      assignedTeam: team?._id
-    }, { department: departmentName });
+      workflowStage: nextStage,
+      assignedDepartmentOfficer: isDepartmentOfficerHandoff ? target._id : null,
+      assignedOfficer: isDepartmentOfficerHandoff ? null : target._id
+    }, { userIds: [target._id], department: report.departmentName });
 
+    await report.populate('assignedDepartmentOfficer', 'name role phone');
     await report.populate('assignedOfficer', 'name role phone');
     await report.populate('assignedFieldWorker', 'name role phone');
     await report.populate('assignedTeam', 'name status serviceArea phone');
     await report.populate('teamLeader', 'name role phone');
     await report.populate('activeTask');
 
-    res.json({ success: true, message: 'Assignment updated.', report });
+    res.json({ success: true, message: `Case assigned to ${roleLabel} ${target.name}.`, report });
   } catch (error) { next(error); }
 }
 
@@ -1033,7 +1077,4 @@ export async function reviewResourceRequest(req, res, next) {
     res.json({ success: true, message: `Resource request ${status}.`, resource });
   } catch (error) { next(error); }
 }
-
-
-
 

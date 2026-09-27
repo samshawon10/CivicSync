@@ -57,6 +57,7 @@ function ResourceForm({ onClose, onSaved }) {
       onClose={onClose}
       title="Register department resource"
       subtitle="Vehicles, equipment and specialists can then be requested against live cases."
+      icon="box"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="resource-form" disabled={busy} className={primaryButton}>{busy ? 'Saving…' : 'Register resource'}</button></>}
     >
       <form id="resource-form" onSubmit={submit} className="space-y-4">
@@ -111,6 +112,7 @@ function RequestResourceModal({ resource, cases, onClose, onSubmitted }) {
       onClose={onClose}
       title={`Request ${resource.name}`}
       subtitle="Link the request to a case so the approver understands the operational impact."
+      icon="send"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="resource-request-form" disabled={busy} className={primaryButton}>{busy ? 'Submitting…' : 'Submit request'}</button></>}
     >
       <form id="resource-request-form" onSubmit={submit} className="space-y-4">
@@ -154,6 +156,7 @@ function ReviewRequestModal({ resource, request, onClose, onReviewed }) {
       onClose={onClose}
       title={`Review request for ${resource.name}`}
       subtitle="Approving a request marks the resource as in use on the linked case."
+      icon="shieldCheck"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="resource-review-form" disabled={busy} className={primaryButton}>{busy ? 'Saving…' : 'Submit decision'}</button></>}
     >
       <form id="resource-review-form" onSubmit={submit} className="space-y-4">
@@ -176,7 +179,6 @@ function ReviewRequestModal({ resource, request, onClose, onReviewed }) {
     </Modal>
   );
 }
-
 
 function ResourceCard({ resource, canApprove, onRequest, onReview }) {
   const Icon = typeIcon[resource.type] || Boxes;

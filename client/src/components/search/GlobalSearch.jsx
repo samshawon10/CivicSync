@@ -13,10 +13,6 @@ function readRecent() {
   try { return JSON.parse(window.localStorage.getItem(RECENT_KEY) || '[]').slice(0, 6); } catch { return []; }
 }
 
-/**
- * Highlights the matched part of a title/subtitle. Plain React nodes only —
- * no dangerouslySetInnerHTML, so search text can never be injected as markup.
- */
 export function Highlight({ text = '', query = '' }) {
   const value = String(text ?? '');
   const term = String(query || '').trim();
@@ -34,14 +30,6 @@ export function Highlight({ text = '', query = '' }) {
 
 const toneBadge = { critical: 'critical', high: 'high', muted: 'muted', success: 'success' };
 
-/**
- * Global CivicSearch overlay.
- *
- * One implementation serves every role: the backend returns only the
- * categories the authenticated role may search, so the same component is safe
- * on a citizen phone and in the Super Admin command palette. Keyboard-first
- * (Ctrl/Cmd+K to open, arrows to move, Enter to open a result).
- */
 export default function GlobalSearch({ open, onClose, navCommands = [], placeholder = 'Search CivicSync…' }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -247,11 +235,6 @@ export function useGlobalSearch() {
   return useContext(GlobalSearchContext) || { open: () => {}, close: () => {} };
 }
 
-/**
- * Owns the single search overlay for a dashboard and exposes it through
- * context. Shells add their own trigger button instead of mounting a second
- * instance — two instances would both handle Ctrl/Cmd+K and open twice.
- */
 export function GlobalSearchProvider({ children }) {
   const [open, setOpen] = useState(false);
   const value = useMemo(() => ({ open: () => setOpen(true), close: () => setOpen(false) }), []);

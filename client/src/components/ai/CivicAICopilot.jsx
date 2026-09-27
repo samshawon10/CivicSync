@@ -1,11 +1,4 @@
-/**
- * CivicSync Intelligence — the copilot shell.
- *
- * Purely presentational: all conversation state lives in useCivicAI.js. It is
- * rendered lazily by CivicAIProvider so the feature stays out of the initial
- * bundle, and reuses the existing Drawer so focus trapping, Escape handling and
- * scroll locking behave exactly like every other CivicSync panel.
- */
+
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/primitives.jsx';

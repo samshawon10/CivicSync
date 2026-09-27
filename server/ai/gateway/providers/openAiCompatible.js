@@ -1,12 +1,4 @@
-/**
- * Shared implementation for OpenAI-compatible chat-completions endpoints
- * (Groq, OpenRouter, and any future self-hosted runtime such as Ollama, vLLM,
- * llama.cpp or LM Studio).
- *
- * CivicSync never talks to a provider SDK: one thin `fetch` wrapper keeps the
- * dependency surface at zero (the project ships no HTTP client) and gives every
- * provider identical timeout, error-mapping and token-accounting behaviour.
- */
+
 import { buildMessages, normalizeProviderError, withTimeout } from './providerInterface.js';
 
 /** Reads usage defensively — providers differ on casing and optional fields. */
@@ -26,10 +18,6 @@ function readChoice(payload = {}) {
   return String(content || '');
 }
 
-/**
- * Creates an OpenAI-compatible provider.
- * @param {{ id: string, label: string, baseUrl: string, apiKey: string, model: string, timeoutMs?: number, headers?: object }} options
- */
 export function createOpenAiCompatibleProvider({ id, label, baseUrl, apiKey, model, timeoutMs = 20000, headers = {} }) {
   const endpoint = () => `${String(baseUrl || '').replace(/\/+$/, '')}/chat/completions`;
 

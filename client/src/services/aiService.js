@@ -1,27 +1,11 @@
 import api from './api.js';
 
-/**
- * CivicSync Intelligence API surface.
- *
- * The browser talks ONLY to the CivicSync backend. Model providers (Gemini,
- * Groq, OpenRouter) are reached exclusively through the server-side AI Gateway,
- * so no provider credential is ever present in the client bundle.
- *
- * Authentication is the normal Firebase session cookie/Bearer token handled by
- * the shared axios instance, and the backend independently derives role,
- * department and team — the client never asserts its own permissions.
- */
-
 /** AI surfaces render their own inline error state, so suppress the global modal. */
 const AI_CONFIG = { skipGlobalErrorToast: true };
 
 /** Axios hands back the full response; every caller here wants the body. */
 const unwrap = (promise) => promise.then((response) => response.data);
 
-/**
- * Normalizes a transport failure into a stable `{ code, message }` shape so the
- * UI can pick a friendly message without inspecting axios internals.
- */
 function toAiError(error) {
   if (error?.response?.data?.code) {
     return { code: error.response.data.code, message: error.response.data.message };
@@ -51,10 +35,6 @@ export const aiApi = {
 
   pendingConfirmations: () => unwrap(api.get('/ai/pending-confirmations', AI_CONFIG)),
 
-  /**
-   * Executes a proposed action. This is UX confirmation only — the backend
-   * re-authorizes the actor, role and payload before anything is written.
-   */
   confirmAction: (token) => unwrap(api.post(`/ai/confirmations/${token}/confirm`, {}, AI_CONFIG)),
   rejectAction: (token, reason = '') => unwrap(api.post(`/ai/confirmations/${token}/reject`, { reason }, AI_CONFIG)),
 

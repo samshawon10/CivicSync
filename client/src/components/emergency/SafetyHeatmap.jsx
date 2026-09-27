@@ -7,10 +7,6 @@ import { EmptyState, ErrorState, LoadingState } from './EmergencyCard.jsx';
 const ranges = [[1, '24 Hours'], [7, '7 Days'], [30, '30 Days'], [90, '3 Months'], [180, '6 Months'], [365, '1 Year']];
 const categoryFilters = ['', 'road_traffic', 'security_crime', 'women_safety', 'medical', 'fire_disaster', 'missing_person', 'infrastructure'];
 
-/**
- * Safety heatmap backed by real aggregate data. Shows a proper empty state
- * when the selected period has insufficient reports — never fake density.
- */
 export default function SafetyHeatmap({ height = 'h-[28rem]' }) {
   const [days, setDays] = useState(30);
   const [category, setCategory] = useState('');

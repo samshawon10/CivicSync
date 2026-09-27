@@ -26,10 +26,6 @@ function readCollapsed() {
   try { return window.localStorage.getItem(SIDEBAR_KEY) === 'collapsed'; } catch { return false; }
 }
 
-/**
- * Reusable Super Admin application shell: one sidebar, one top navigation and
- * one content frame shared by every administration page.
- */
 export default function SuperAdminLayout({ section, title, subtitle, actions, breadcrumb, children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -328,7 +324,7 @@ export default function SuperAdminLayout({ section, title, subtitle, actions, br
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <NotificationCenter open={notificationsOpen} onClose={() => { setNotificationsOpen(false); loadUnread(); }} />
 
-      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title="Help & keyboard shortcuts" subtitle="Everything in this console is backed by live CivicSync data." size="lg">
+      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} icon="keyboard" title="Help & keyboard shortcuts" subtitle="Everything in this console is backed by live CivicSync data." size="lg">
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <h3 className="text-[13px] font-bold uppercase tracking-wide text-fg-subtle">Shortcuts</h3>
@@ -363,5 +359,4 @@ export default function SuperAdminLayout({ section, title, subtitle, actions, br
     </div>
   );
 }
-
 

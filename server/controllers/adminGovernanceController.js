@@ -1,11 +1,4 @@
-/**
- * Super Admin governance API.
- *
- * Everything in this controller is derived from real CivicSync collections â€”
- * no sample data, no estimated numbers. Trend percentages are only produced
- * when a real comparison window exists; otherwise the API reports
- * `changePercent: null` with a basis of `no_prior_data` and the UI says so.
- */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +18,7 @@ import Notification from '../models/Notification.js';
 import SystemSetting from '../models/SystemSetting.js';
 import { activeEmergencyStatuses, emergencySeverities, emergencyTypeCatalog } from '../config/emergencyOptions.js';
 import { reportStatuses, reportPriorities, reportCategories, reportDepartments } from '../config/reportOptions.js';
+import { allReportCategories } from '../services/reportCatalogue.js';
 import { permissionMatrix, roleMeta, roleOrder } from '../config/permissions.js';
 import { readFeatureFlags } from '../config/settingsDefaults.js';
 import { realtimeStatus } from '../realtime/emergencyRealtime.js';
@@ -408,10 +402,6 @@ export async function getSystemHealth(req, res, next) {
   } catch (error) { next(error); }
 }
 
-/**
- * Cross-collection command palette search. Grouped results with real records
- * only; restricted incidents never expose location or victim details.
- */
 export async function globalSearch(req, res, next) {
   try {
     const query = String(req.query.q || '').trim();
@@ -420,12 +410,6 @@ export async function globalSearch(req, res, next) {
   } catch (error) { next(error); }
 }
 
-
-/**
- * Role/permission governance. The matrix comes from config/permissions.js,
- * which mirrors real server-side enforcement, and is combined with live user
- * counts so the screen never shows an empty, decorative table.
- */
 export async function getPermissions(req, res, next) {
   try {
     const [roleRows, totalUsers] = await Promise.all([
@@ -444,12 +428,6 @@ export async function getPermissions(req, res, next) {
   } catch (error) { next(error); }
 }
 
-/**
- * Emergency category governance: configured categories joined with real usage
- * counts from the emergency collection. Built-in catalog entries that were
- * never overridden appear with source: 'catalog' â€” that is exactly how the
- * citizen reporting API composes its type list.
- */
 export async function getCategoryGovernance(req, res, next) {
   try {
     const [configured, usageRows, subcategoryRows, reportUsageRows, reportDepartmentRows, responseRows] = await Promise.all([
@@ -514,18 +492,22 @@ export async function getCategoryGovernance(req, res, next) {
       configuredCount: configured.length,
       catalogCount: emergencyTypeCatalog.length,
       totalReports: rows.reduce((sum, row) => sum + row.usage, 0),
-      reportCategories: reportCategories.map((key) => ({ key, usage: count(reportUsage[key]?.count), lastReportedAt: reportUsage[key]?.lastAt || null })),
+      // Live catalogue (not the legacy compile-time list) so a category the
+      // admin added shows up here with its default department and real usage.
+      reportCategories: (await allReportCategories()).map((category) => ({
+        key: category.key,
+        label: category.label,
+        defaultDepartment: category.defaultDepartment,
+        active: category.active,
+        usage: count(reportUsage[category.key]?.count),
+        lastReportedAt: reportUsage[category.key]?.lastAt || null
+      })),
       reportDepartments: reportDepartments.map((name) => ({ name, usage: count(reportDepartmentUsage[name]) })),
       rows
     });
   } catch (error) { next(error); }
 }
 
-/**
- * Operations analytics: real workload and utilisation aggregates for response
- * teams, officers, field workers and departments. Averages are computed only
- * from assignments that actually carry the relevant timestamps.
- */
 export async function getOperationsAnalytics(req, res, next) {
   try {
     const features = readFeatureFlags(await storedSettings());

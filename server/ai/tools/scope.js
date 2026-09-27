@@ -1,15 +1,4 @@
-/**
- * AI data scoping.
- *
- * The AI layer must obey exactly the same visibility rules as the screens. This
- * module mirrors the existing server rules rather than re-inventing them:
- *   - controllers/reportController.js     -> canViewReport / staffRoles
- *   - controllers/departmentController.js -> canAccessReport / scopedFilter
- *   - controllers/emergencyController.js  -> participant / commandAccess
- *
- * Unknown scope always means "no rows", never "all rows" — the same contract as
- * services/civicSearch.js.
- */
+
 import EmergencyResponseAssignment from '../../models/EmergencyResponseAssignment.js';
 import { emergencyRoleGroups } from '../../config/emergencyOptions.js';
 import { redactEmergencyForViewer, redactUserForViewer } from '../security/redaction.js';
@@ -77,11 +66,6 @@ export async function emergencyScopeFilter(user) {
     .distinct('_id');
   return { $or: [{ citizen: user._id }, { emergencyHead: user._id }, { responseAssignments: { $in: assignmentIds } }] };
 }
-
-/**
- * AI data scoping (part 2) — compact, redacted projections for prompts.
- * See `scope.js` header for the full contract.
- */
 
 /** Compact case projection. Never includes another citizen's identity. */
 export function caseSummary(report, { detail = false, viewer = null } = {}) {

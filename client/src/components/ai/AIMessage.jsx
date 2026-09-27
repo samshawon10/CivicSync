@@ -1,22 +1,10 @@
-/**
- * CivicSync Intelligence — message rendering.
- *
- * Renders the gateway's validated response contract (server/ai/security/
- * outputValidator.js). Because the backend has already stripped model output
- * into a closed type set and intersected citations with authorized records, this
- * component can render defensively without re-implementing any validation.
- */
+
 import { Button } from '../ui/primitives.jsx';
 import { cx } from '../../utils/format.js';
 import { AISourceBadge, AIToolExecution, AIActionCard } from './AIBlocks.jsx';
 
 const BULLET = /^\s*[-•]\s+/;
 
-/**
- * Renders assistant prose into paragraphs and bullets. The backend strips code
- * fences, so a simple line split is sufficient and avoids pulling in a markdown
- * dependency (and any XSS surface that comes with one).
- */
 function Prose({ text }) {
   const lines = String(text || '').split('\n');
   return (

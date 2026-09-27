@@ -1,10 +1,5 @@
 import { memo } from 'react';
 
-/**
- * Single, dependency-free icon system (Lucide geometry, MIT licensed).
- * Every icon shares one 24x24 grid, one stroke weight and rounded joins so the
- * administration shell never mixes icon styles.
- */
 const paths = {
   dashboard: ['M3 3h7v7H3z', 'M14 3h7v5h-7z', 'M14 12h7v9h-7z', 'M3 14h7v7H3z'],
   siren: ['M7 18v-6a5 5 0 0 1 10 0v6', 'M5 21h14', 'M10 6l1-3 1 3', 'M3.5 9.5 1 8', 'M22.5 9.5 20 8'],
@@ -107,7 +102,15 @@ const paths = {
   route: ['M6 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', 'M18 15a2 2 0 1 0 0 4 2 2 0 0 0 0-4z', 'M8 7h6a4 4 0 0 1 0 8h-4a4 4 0 0 0 0 8h6'],
   clipboardList: ['M9 3h6v3H9z', 'M8 5H6v16h12V5h-2', 'M9 11h6', 'M9 15h4'],
   box: ['M12 2 3 6.5v11L12 22l9-4.5v-11z', 'M3 6.5 12 11l9-4.5', 'M12 11v11'],
-  userCheck: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M16 11l2 2 4-4']
+  x: ['M18 6 6 18', 'M6 6l12 12'],
+  image: ['M3 4h18v16H3z', 'M8.5 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z', 'M21 16l-5-5L5 21'],
+  palette: ['M12 21a9 9 0 1 1 9-9 4 4 0 0 1-4 4h-1.5a2 2 0 0 0-1.4 3.4A1.4 1.4 0 0 1 12 21z', 'M7.5 11h.01', 'M11 7.5h.01', 'M15 9.5h.01'],
+  checkCircle2: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M8.5 12.5 11 15l4.5-5.5'],
+  pauseCircle: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M10 9.5v5', 'M14 9.5v5'],
+  playCircle: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M10.5 8.5l5 3.5-5 3.5z'],
+  shieldOff: ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'M4 4l16 16'],
+  userCheck: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M16 11l2 2 4-4'],
+  userX: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', 'M17 8l5 5', 'M22 8l-5 5']
 };
 
 export const iconNames = Object.keys(paths);

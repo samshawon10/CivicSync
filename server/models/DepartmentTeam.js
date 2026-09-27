@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 const departmentTeamSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 120 },
+
+    type: { type: String, enum: ['normal', 'roster'], default: 'normal', index: true },
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department', required: true, index: true },
     departmentName: { type: String, required: true, trim: true },
     category: { type: String, trim: true, default: '' },

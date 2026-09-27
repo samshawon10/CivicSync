@@ -1,14 +1,6 @@
 @import "tailwindcss";
 @import "./ai.css";
 
-/* ---------------------------------------------------------------------------
-   CivicSync design tokens
-   ---------------------------------------------------------------------------
-   Semantic tokens (app / surface / line / fg / muted) resolve through runtime
-   CSS variables declared in `:root` and `.dark`, so every component that uses
-   `bg-surface`, `text-fg` or `border-line` follows the active theme without a
-   single duplicated class.
---------------------------------------------------------------------------- */
 @theme {
   --color-civic-50: #eff6ff;
   --color-civic-100: #dbeafe;
@@ -178,12 +170,11 @@
   .hero-marker { animation: civic-marker 2.8s ease-in-out infinite; transform-origin: center; }
   .sos-pulse { animation: civic-sos 2.6s ease-in-out infinite; }
 
-  /* Page, drawer, modal, menu and toast entrances */
-  .page-enter { animation: civic-page-in var(--dur-normal) var(--ease-standard) both; }
-  .drawer-panel { animation: civic-drawer-in var(--dur-normal) var(--ease-standard) both; }
-  .modal-panel { animation: civic-modal-in var(--dur-normal) var(--ease-standard) both; }
-  .menu-panel { animation: civic-menu-in var(--dur-fast) var(--ease-standard) both; }
-  .toast-panel { animation: civic-toast-in var(--dur-normal) var(--ease-standard) both; }
+  .page-enter { animation: civic-page-in var(--dur-normal) var(--ease-standard) backwards; }
+  .drawer-panel { animation: civic-drawer-in var(--dur-normal) var(--ease-standard) backwards; }
+  .modal-panel { animation: civic-modal-in var(--dur-normal) var(--ease-standard) backwards; }
+  .menu-panel { animation: civic-menu-in var(--dur-fast) var(--ease-standard) backwards; }
+  .toast-panel { animation: civic-toast-in var(--dur-normal) var(--ease-standard) backwards; }
 
   /* Skeleton loading system */
   .skeleton { position: relative; overflow: hidden; background-color: var(--skeleton-base); border-radius: 8px; }
@@ -207,14 +198,6 @@
   .nav-item-active::before { content: ''; position: absolute; left: -11px; width: 3px; height: 20px; border-radius: 0 3px 3px 0; background-color: var(--color-civic-400); }
 }
 
-/* ---------------------------------------------------------------------------
-   Dark-mode bridge for legacy utility classes.
-   The administration surface is built directly on semantic tokens, but older
-   pages across CivicSync still use raw slate/white utilities. These rules sit
-   outside every cascade layer, so they win over the layered utilities and the
-   whole product follows the theme instead of showing white cards on a dark
-   shell.
---------------------------------------------------------------------------- */
 .dark .bg-white { background-color: var(--surface); }
 .dark .bg-slate-50 { background-color: var(--surface); }
 .dark .bg-slate-100 { background-color: var(--surface-2); }
@@ -262,7 +245,6 @@
 .dark .civic-map-marker { border-color: var(--surface); }
 .dark .civic-user-marker > span { border-color: var(--surface); }
 
-
 /* Leaflet stays usable in dark mode: tiles are inverted, popups use surfaces. */
 .dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.86) contrast(.92) saturate(.7); }
 .dark .leaflet-container { background-color: #0b1420; }
@@ -307,12 +289,6 @@
   .no-print { display: none !important; }
   body { background: #fff; color: #000; }
 }
-/* ============================================================================
-   CivicSync Intelligence
-   Every rule is built from the existing CivicSync tokens (--surface, --line,
-   --fg, --color-civic-600), so the assistant inherits the active theme in both
-   light and dark mode with no separate palette and no hard-coded colours.
-   ========================================================================== */
 
 .ai-surface {
   background: var(--surface);

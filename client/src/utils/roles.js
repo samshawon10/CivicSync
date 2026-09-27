@@ -20,7 +20,7 @@ export const dashboardPaths = {
   officer: '/dashboard/officer',
   field_worker: '/dashboard/field-worker',
   emergency_department_head: '/dashboard/emergency-head',
-  emergency_department_officer: '/dashboard/emergency-officer',
+  emergency_department_officer: '/dashboard/emergency-department-officer',
   emergency_officer: '/dashboard/emergency-officer',
   emergency_field_worker: '/dashboard/emergency-field-worker',
   admin: '/dashboard/admin'

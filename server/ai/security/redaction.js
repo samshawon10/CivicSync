@@ -1,13 +1,4 @@
-/**
- * Sensitive-data filtering for the AI layer (task §21, §29).
- *
- * The AI Gateway must never be a side-channel around the platform's own
- * visibility rules. These helpers mirror the existing server rules
- * (controllers/reportController.js `canViewReport`,
- * controllers/emergencyController.js `emergencyForViewer`,
- * services/civicSearchScope.js `isCategoryPublic`) so an AI answer can never
- * expose more than the equivalent screen would.
- */
+
 import { isCategoryPublic } from '../../services/civicSearchScope.js';
 import { sensitiveCategories } from '../../config/emergencyOptions.js';
 
@@ -24,12 +15,6 @@ export function isCommand(viewer) {
   return commandRoles.includes(viewer?.role);
 }
 
-/**
- * Filters an emergency payload exactly like `emergencyForViewer` does, so the AI
- * context, tool results and citations stay consistent with the UI.
- * @param {object} emergency plain object
- * @param {{ role?: string, _id?: unknown }} viewer
- */
 export function redactEmergencyForViewer(emergency, viewer, { summary = false } = {}) {
   const value = { ...(emergency || {}) };
   if (responderRoles.includes(viewer?.role)) {
@@ -57,10 +42,6 @@ export function mayDescribeEmergency(emergency, viewer) {
   return !sensitiveCategories.includes(emergency.category) && emergency.visibility !== 'restricted';
 }
 
-/**
- * Drops identity columns from user rows unless the viewer administers them.
- * Staff need names to work cases; they never need emails or phone numbers.
- */
 export function redactUserForViewer(user, viewer, { allowContact = false } = {}) {
   if (!user) return null;
   const value = { ...user };

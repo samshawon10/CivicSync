@@ -193,7 +193,7 @@ export function AuditLogsSection() {
         pagination={store.pagination ? { page: store.pagination.page, pages: store.pagination.pages, total: store.pagination.total, limit: store.pagination.limit } : undefined}
         onPage={store.setPage}
       />
-      <Modal open={Boolean(focused)} onClose={() => setFocused(null)} title="Audit event" subtitle="Immutable action metadata captured by the backend.">
+      <Modal open={Boolean(focused)} onClose={() => setFocused(null)} icon="fileText" title="Audit event" subtitle="Immutable action metadata captured by the backend.">
         {focused ? (
           <div className="space-y-4">
             <KeyValue

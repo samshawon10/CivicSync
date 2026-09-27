@@ -1,8 +1,4 @@
-/**
- * Single source of truth for Super Admin navigation.
- * The sidebar, the command palette and the section router all read this file,
- * so a new page only has to be registered once.
- */
+
 export const adminNav = [
   {
     group: 'Overview',

@@ -21,10 +21,6 @@ const domainOptions = [
   { value: 'security', label: 'Security & crime' }
 ];
 
-/**
- * One component serves four analytics routes; `pathname` selects the dataset.
- * Only the active dataset is requested — the others never leave the browser.
- */
 export function AnalyticsSection() {
   const { pathname } = useLocation();
   const [range, setRange] = useState('30d');

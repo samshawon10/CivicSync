@@ -5,6 +5,7 @@ import CivicServiceSave from '../models/CivicServiceSave.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { emitDepartmentEvent } from '../realtime/emergencyRealtime.js';
 import { reportCategories, reportDepartments } from '../config/reportOptions.js';
+import { isReportCategory, isReportDepartment } from '../services/reportCatalogue.js';
 import { isPubliclyReadable, missingInformation, normalizeService, parseNearby, publishBlockers, serviceStatuses } from '../services/civicServiceRules.js';
 
 const id = (value) => mongoose.Types.ObjectId.isValid(value);
@@ -65,11 +66,6 @@ async function savedServiceIds(userId, rows) {
   return new Set(saves.map((row) => String(row.service)));
 }
 
-/**
- * Service discovery. Citizens only ever receive `published` records; the Super
- * Admin may filter by any status. Nearby search uses the geospatial index and is
- * therefore mutually exclusive with the text filter.
- */
 export async function listServices(req, res, next) {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
@@ -204,22 +200,19 @@ export async function archiveService(req, res, next) {
   } catch (error) { next(error); }
 }
 
-/**
- * Service -> Case hand-off (spec section 30).
- *
- * Returns a prefill for the EXISTING citizen report form instead of creating a
- * case here, so one report workflow (and its validation) remains the only way a
- * case enters the system. The citizen confirms in the form and `origin` records
- * which service the case came from.
- */
 export async function serviceRequestPrefill(req, res, next) {
   try {
     if (!id(req.params.id)) return res.status(404).json({ success: false, message: 'Service not found.' });
     const service = await CivicService.findOne({ _id: req.params.id, status: 'published' }).lean();
     if (!service) return res.status(404).json({ success: false, message: 'Service not found.' });
     if (!service.requestEnabled) return res.status(400).json({ success: false, message: 'This service does not accept requests through CivicSync yet.' });
-    const category = reportCategories.includes(service.category) ? service.category : '';
-    const departmentName = reportDepartments.includes(service.requestDepartmentName) ? service.requestDepartmentName : '';
+    // Checked against the live catalogue, so a service pointing at a category or
+    // department the admin added later still routes correctly. The request
+    // endpoint re-validates before the report is written.
+    const [category, departmentName] = await Promise.all([
+      isReportCategory(service.category) ? Promise.resolve(service.category) : Promise.resolve(''),
+      isReportDepartment(service.requestDepartmentName) ? Promise.resolve(service.requestDepartmentName) : Promise.resolve('')
+    ]);
     res.json({
       success: true,
       prefill: {

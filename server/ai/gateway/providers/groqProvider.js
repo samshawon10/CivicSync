@@ -1,8 +1,4 @@
-/**
- * Groq provider — OpenAI-compatible chat completions.
- * Thin wrapper only: the transport lives in openAiCompatible.js so every
- * OpenAI-compatible runtime behaves identically.
- */
+
 import { createOpenAiCompatibleProvider } from './openAiCompatible.js';
 
 export function createGroqProvider({ apiKey, model, baseUrl, timeoutMs }) {

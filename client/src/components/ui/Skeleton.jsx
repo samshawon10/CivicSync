@@ -1,11 +1,5 @@
 import { cx } from '../../utils/format.js';
 
-/**
- * One skeleton system for the whole product.
- * Every skeleton is a real layout placeholder: no blank screens, no layout
- * jump, no "Loading…" text. Animation is CSS-only and is disabled entirely by
- * `prefers-reduced-motion` (see index.css), where a static state remains.
- */
 export function Skeleton({ className = '', width, height, radius = 8, style, ...rest }) {
   return (
     <div

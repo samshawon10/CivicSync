@@ -1,9 +1,4 @@
-/**
- * Operational SLA configuration per priority
- * Response SLA: time to review & assign (minutes)
- * Arrival SLA: time for field worker to travel & arrive (minutes)
- * Resolution SLA: time to complete resolution (minutes)
- */
+
 export const departmentSlaTargets = Object.freeze({
   urgent: { response: 15, arrival: 45, resolution: 180 },
   high: { response: 30, arrival: 90, resolution: 360 },

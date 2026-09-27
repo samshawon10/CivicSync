@@ -28,7 +28,6 @@ function normaliseArea(area = {}, active = false) {
   };
 }
 
-
 function FilterGroup({ group, available, selected, onToggle, onAll }) {
   const visibleTypes = group.types.filter((type) => available.has(type));
   if (!visibleTypes.length) return null;

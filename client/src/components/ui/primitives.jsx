@@ -312,4 +312,3 @@ export function StatCard({ label, value, icon, hint, trend, tone = 'info', loadi
   );
 }
 
-

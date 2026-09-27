@@ -1,11 +1,4 @@
-/**
- * CivicSync Intelligence — end-to-end acceptance test (§38).
- *
- * Drives the real HTTP contract the React client uses (aiService.js) for a
- * citizen, one operational role and one emergency role, against a live server.
- * Verifies the full chain: frontend payload -> /api/ai/chat -> RBAC -> context
- * engine -> tool engine -> model router -> validated response.
- */
+
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';

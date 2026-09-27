@@ -1,9 +1,5 @@
 import { label } from '../../services/emergencyService.js';
 
-/**
- * Response timer with honest missing timestamps: stages without a recorded
- * time render as "—" and are never fabricated.
- */
 const stages = [
   ['Reported', (e) => e.createdAt],
   ['Dispatched', (e) => e.dispatchedAt],

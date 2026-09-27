@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { TASK_STATES } from '../services/taskWorkflow.js';
 
 const departmentTaskSchema = new mongoose.Schema(
   {
@@ -7,17 +8,19 @@ const departmentTaskSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true, maxlength: 180 },
     description: { type: String, trim: true, maxlength: 2000, default: '' },
     departmentName: { type: String, required: true, trim: true, index: true },
+
+    assignedOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     team: { type: mongoose.Schema.Types.ObjectId, ref: 'DepartmentTeam', default: null, index: true },
     teamLeader: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
     assignedWorker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    workerIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }],
     assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    status: {
-      type: String,
-      enum: ['assigned', 'accepted', 'traveling', 'arrived', 'in_progress', 'completed', 'rejected', 'paused', 'blocked', 'cancelled'],
-      default: 'assigned',
-      index: true
-    },
+    status: { type: String, enum: TASK_STATES, default: 'pending', index: true },
+    /** Denormalised from the linked case so lists can filter without a join. */
     priority: { type: String, enum: ['low', 'medium', 'high', 'urgent'], default: 'medium' },
+    progressPercent: { type: Number, min: 0, max: 100, default: 0 },
+    instructions: { type: String, trim: true, maxlength: 2000, default: '' },
     targetDueAt: { type: Date, default: null },
     timeline: [
       {
@@ -62,7 +65,9 @@ const departmentTaskSchema = new mongoose.Schema(
 );
 
 departmentTaskSchema.index({ assignedWorker: 1, status: 1 });
+departmentTaskSchema.index({ workerIds: 1, status: 1 });
 departmentTaskSchema.index({ departmentName: 1, status: 1 });
 departmentTaskSchema.index({ team: 1, status: 1 });
+departmentTaskSchema.index({ assignedOfficer: 1, status: 1 });
 
 export default mongoose.model('DepartmentTask', departmentTaskSchema);

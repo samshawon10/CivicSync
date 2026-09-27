@@ -1,13 +1,5 @@
 import mongoose from 'mongoose';
 
-/**
- * Ephemeral human-in-the-loop action confirmation records (task §10).
- *
- * When an AI reasoning step proposes an action (such as drafting/submitting a report),
- * an AiConfirmation token is minted with an expiration TTL.
- * The user can inspect the exact payload in the UI and confirm or reject it.
- * Only upon valid user confirmation with role enforcement does the ActionExecutor run.
- */
 const aiConfirmationSchema = new mongoose.Schema(
   {
     token: {

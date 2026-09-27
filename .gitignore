@@ -5,3 +5,4 @@ server/.env
 client/.env
 *.log
 server/uploads/
+server/storage/

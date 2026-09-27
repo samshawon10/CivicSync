@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiMessage } from '../services/api.js';
 
-/**
- * Tiny data hook shared by every API-driven screen: consistent loading,
- * error and retry behaviour so skeletons and error states never diverge.
- *
- * `loader` is intentionally not part of the dependency list — pass the inputs
- * it depends on through `deps`.
- */
 export default function useAsync(loader, deps = [], { immediate = true, keepPreviousData = false } = {}) {
   const [state, setState] = useState({ loading: immediate, error: '', data: null });
   const [nonce, setNonce] = useState(0);

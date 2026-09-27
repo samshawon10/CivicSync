@@ -1,18 +1,4 @@
-/**
- * Tool Registry — the only way the AI layer may touch CivicSync data (task §8, §9).
- *
- * A tool declares:
- *   name, description, category, risk ('read' | 'write' | 'high_risk_write')
- *   inputSchema          — validated before execution (tools/schemaValidator.js)
- *   roles                — the existing CivicSync roles allowed to run it
- *   permission           — { resource, action } mapped onto config/permissions.js
- *   handler              — server code; the model never sees or supplies it
- *   confirmation         — required for write / high-risk tools
- *
- * The model may *request* a tool; only this registry decides whether the request
- * is allowed. An unknown or unauthorized tool is refused and audited, no matter
- * how confidently the model asked for it.
- */
+
 import { AiError } from '../errors.js';
 import { can, roleOrder } from '../../config/permissions.js';
 
@@ -52,11 +38,6 @@ export function createToolRegistry(tools = []) {
     return all.filter((tool) => isAuthorized(user, tool).ok);
   }
 
-  /**
-   * Server-side authorization. Two independent checks must pass:
-   *   1. the role allow-list declared on the tool,
-   *   2. the platform permission matrix in config/permissions.js (when declared).
-   */
   function isAuthorized(user, tool) {
     if (!user?.role) return { ok: false, reason: 'unauthenticated' };
     if (!tool) return { ok: false, reason: 'unknown_tool' };

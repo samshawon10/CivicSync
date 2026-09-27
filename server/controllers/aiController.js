@@ -1,10 +1,3 @@
-/**
- * AI Copilot HTTP controller (task §12, §14, §22).
- *
- * Thin transport layer over the AI gateway:
- *  - Translates HTTP concerns (persistence, pagination, error mapping) into gateway calls.
- *  - Contains no reasoning or provider logic.
- */
 
 import AiConversation from '../models/AiConversation.js';
 import AiConfirmation from '../models/AiConfirmation.js';
@@ -20,14 +13,6 @@ import { toAiError } from '../ai/errors.js';
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_STORED_MESSAGES = 100;
 
-/**
- * Friendly, human-readable descriptions of the steps CivicSync took to answer.
- *
- * Tool names are internal identifiers (`getDepartmentWorkload`), so the raw name
- * is never sent to the browser. The client only ever renders these labels, which
- * describe the *outcome* ("Retrieved your cases") without exposing tool
- * permissions, endpoint names or query details.
- */
 const TOOL_STEP_LABELS = Object.freeze({
   getMyCases: 'Retrieved your cases',
   getCaseDetails: 'Opened the case record',
@@ -79,16 +64,11 @@ function toSteps(executions = []) {
     .slice(0, 6);
 }
 
-
 /** Maps an AiError (or anything else) onto the standard express error pipeline. */
 function forwardError(next, error) {
   return next(toAiError(error));
 }
 
-/**
- * POST /api/ai/chat
- * Runs one gateway turn, persists the exchange, and returns the grounded response.
- */
 export async function chatWithAi(req, res, next) {
   try {
     const { message = '', conversationId = null, pageContext = {} } = req.body || {};
@@ -167,10 +147,6 @@ export async function chatWithAi(req, res, next) {
   }
 }
 
-/**
- * GET /api/ai/conversations
- * Lists the caller's own conversations (never another user's).
- */
 export async function listConversations(req, res, next) {
   try {
     const conversations = await AiConversation.find({ user: req.user._id, active: true })
@@ -195,9 +171,6 @@ export async function listConversations(req, res, next) {
   }
 }
 
-/**
- * GET /api/ai/conversations/:id
- */
 export async function getConversation(req, res, next) {
   try {
     const conversation = await AiConversation.findOne({
@@ -215,9 +188,6 @@ export async function getConversation(req, res, next) {
   }
 }
 
-/**
- * DELETE /api/ai/conversations/:id
- */
 export async function deleteConversation(req, res, next) {
   try {
     const result = await AiConversation.deleteOne({
@@ -235,10 +205,6 @@ export async function deleteConversation(req, res, next) {
   }
 }
 
-/**
- * POST /api/ai/confirmations/:token/confirm
- * Executes a previously proposed action after human approval.
- */
 export async function confirmAiAction(req, res, next) {
   try {
     const result = await confirmAction({ token: req.params.token, user: req.user });
@@ -248,9 +214,6 @@ export async function confirmAiAction(req, res, next) {
   }
 }
 
-/**
- * POST /api/ai/confirmations/:token/reject
- */
 export async function rejectAiAction(req, res, next) {
   try {
     const result = await rejectAction({
@@ -264,10 +227,6 @@ export async function rejectAiAction(req, res, next) {
   }
 }
 
-/**
- * GET /api/ai/pending-confirmations
- * Lists actions awaiting this user's decision.
- */
 export async function listPendingConfirmations(req, res, next) {
   try {
     const records = await AiConfirmation.find({
@@ -299,10 +258,6 @@ export async function listPendingConfirmations(req, res, next) {
   }
 }
 
-/**
- * POST /api/ai/feedback
- * Records helpful/unhelpful feedback for transparency reporting.
- */
 export async function submitAiFeedback(req, res, next) {
   try {
     const { conversationId, messageIndex, rating, comment = '' } = req.body || {};
@@ -351,10 +306,6 @@ export async function submitAiFeedback(req, res, next) {
   }
 }
 
-/**
- * GET /api/ai/capabilities
- * Tells the client exactly which tools/actions/limits the current role has.
- */
 export async function getCapabilities(req, res, next) {
   try {
     const user = req.user;
@@ -387,10 +338,6 @@ export async function getCapabilities(req, res, next) {
   }
 }
 
-/**
- * GET /api/ai/health
- * Provider readiness and failure stats (no secrets are exposed).
- */
 export async function getAiHealth(req, res, next) {
   try {
     res.json({

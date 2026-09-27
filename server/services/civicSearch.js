@@ -1,16 +1,4 @@
-/**
- * Global CivicSearch executor.
- *
- * Translates the scope descriptors from `civicSearchScope.js` into Mongo
- * filters and runs one bounded query per authorized category. Every query is
- * built from a role-scoped match: a category whose scope cannot be resolved
- * (for example a department user with no department) returns no rows instead of
- * falling back to an unscoped search.
- *
- * Result shape matches the Super Admin command palette contract
- * ({ groups: [{ key, label, items: [{ id, title, subtitle, tone, icon, path }] }] }),
- * so the palette and the citizen/field search overlay share one implementation.
- */
+
 import Report from '../models/Report.js';
 import CommunityPost from '../models/CommunityPost.js';
 import Emergency from '../models/Emergency.js';
@@ -64,11 +52,6 @@ const staffHome = {
 };
 const casePath = (user, id) => (user.role === 'citizen' ? `/dashboard/citizen/reports/${id}` : staffHome[user.role] || '/dashboard/citizen/reports');
 
-/**
- * Super Admin destinations. Admin results keep the exact deep-links the
- * previous /admin/search implementation used, so the command palette behaves
- * the same for the same records.
- */
 const adminPath = (key, id) => ({
   cases: '/admin/complaints',
   community: '/admin/command-center',
@@ -242,10 +225,6 @@ const runners = {
     }), limit)
 };
 
-/**
- * Runs a permission-scoped, categorized search for one user.
- * @returns {{ query: string, categories: string[], groups: Array, total: number, took: number }}
- */
 export async function searchForUser({ user, query, categories = [], limit = PER_CATEGORY }) {
   const startedAt = Date.now();
   const text = String(query || '').trim();

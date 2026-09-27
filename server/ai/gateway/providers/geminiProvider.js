@@ -1,10 +1,4 @@
-/**
- * Google Gemini provider (REST, no SDK).
- *
- * Gemini is the default external reasoning engine, but nothing in CivicSync
- * imports Gemini outside this file: the gateway only sees the Provider
- * Interface (gateway/providers/providerInterface.js).
- */
+
 import { buildMessages, normalizeProviderError, withTimeout } from './providerInterface.js';
 
 const toGeminiContents = (messages = []) => messages
@@ -24,9 +18,6 @@ function blockedReason(payload = {}) {
   return payload?.promptFeedback?.blockReason || payload?.candidates?.[0]?.finishReason || '';
 }
 
-/**
- * @param {{ apiKey: string, model: string, baseUrl: string, timeoutMs?: number }} options
- */
 export function createGeminiProvider({ apiKey, model, baseUrl, timeoutMs = 20000 }) {
   const base = String(baseUrl || 'https://generativelanguage.googleapis.com/v1beta').replace(/\/+$/, '');
   const body = (system, messages, temperature, maxTokens) => ({

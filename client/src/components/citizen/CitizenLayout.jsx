@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, ClipboardList, FilePlus2, Hospital, LayoutDashboard, LogOut, MapPinned, Menu, Moon, PhoneCall, Search, Settings, ShieldCheck, Siren, Sparkles, Sun, UserRound, UsersRound, X } from 'lucide-react';
+import { Bell, Building2, ChevronDown, ClipboardList, FilePlus2, Hospital, LayoutDashboard, LogOut, MapPinned, Menu, Moon, PhoneCall, Search, Settings, ShieldCheck, Siren, Sparkles, Sun, UserRound, UsersRound, X } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import PageHead from '../../components/ui/PageHead.jsx';
@@ -14,6 +14,7 @@ const links = [
   ['Safety Map', '/dashboard/citizen/safety-map', MapPinned], ['Safety Alerts', '/dashboard/citizen/alerts', Bell],
   ['Nearby Services', '/dashboard/citizen/nearby-services', Hospital], ['Emergency Contacts', '/dashboard/citizen/emergency-contacts', PhoneCall],
   ['Community', '/dashboard/citizen/community', UsersRound],
+  ['Departments', '/dashboard/citizen/departments', Building2],
   ['My Reports', '/dashboard/citizen/reports', ClipboardList], ['Create Report', '/dashboard/citizen/reports/new', FilePlus2], ['Notifications', '/dashboard/citizen/notifications', Bell],
   ['Profile', '/dashboard/citizen/profile', UserRound], ['Settings', '/dashboard/citizen/settings', Settings]
 ];

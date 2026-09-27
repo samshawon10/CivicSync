@@ -27,7 +27,6 @@ export default function CaseConversation({ report, onPosted }) {
     } finally { setBusy(false); }
   }
 
-
   return (
     <div className="space-y-4">
       <OpsError message={error} />

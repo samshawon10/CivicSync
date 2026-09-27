@@ -16,12 +16,6 @@ function systemPrefersDark() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-/**
- * Theme provider for the whole CivicSync product.
- * - mode: 'light' | 'dark' | 'system' (persisted in localStorage)
- * - the resolved theme is applied as `.dark` on <html>, which every semantic
- *   token in index.css responds to.
- */
 export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(readStoredMode);
   const [systemDark, setSystemDark] = useState(systemPrefersDark);

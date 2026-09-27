@@ -114,7 +114,6 @@ export default function CaseDirectory({ onOpenCase, title = 'Case workspace dire
         <div className="mt-4"><EmptyPanel title="No cases match these filters" message="Adjust the search, status or SLA filters to find department cases." /></div>
       )}
 
-
     </Panel>
   );
 }

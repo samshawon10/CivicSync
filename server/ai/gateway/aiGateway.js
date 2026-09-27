@@ -1,18 +1,3 @@
-/**
- * AI Gateway Execution Engine (task §6, §7, §12, §14).
- *
- * Core multi-turn reasoning and tool-calling execution loop:
- *  1. Checks rate limits (security/rateLimiter.js).
- *  2. Scans user prompt for safety / prompt injection (security/promptSafety.js).
- *  3. Builds deterministic ground-truth context (gateway/contextEngine.js).
- *  4. Builds system prompt & message history (prompts/systemPrompts.js).
- *  5. Executes reasoning loop up to maxToolCalls:
- *     - Tool request: validates RBAC, schema, executes handler, fences result.
- *     - Action confirmation: issues confirmation token.
- *     - Final answer: validates citations and grounding.
- *  6. Validates final output contract (security/outputValidator.js).
- *  7. Logs full request audit trail (security/audit.js).
- */
 
 import { readAiConfig, limitsForRole, estimateCost } from '../config/aiConfig.js';
 import { getModelRouter } from './modelRouter.js';
@@ -310,8 +295,6 @@ export class AiGateway {
       model: lastProviderMeta.model
     };
   }
-
-
 
 }
 let defaultGatewayInstance = null;

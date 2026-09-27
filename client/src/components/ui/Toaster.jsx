@@ -10,10 +10,6 @@ const toneMap = {
   info: { icon: 'info', className: 'status-info' }
 };
 
-/**
- * The single toast system for CivicSync. Nothing else in the product should
- * render its own transient notification UI.
- */
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 

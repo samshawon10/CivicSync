@@ -28,6 +28,8 @@ import intelligenceRoutes from './routes/intelligenceRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 
 import { initializeRealtime } from './realtime/emergencyRealtime.js';
+import { seedReportCatalogue } from './services/reportCatalogue.js';
+import { ensureSingletonHeadIndex } from './services/emergencyOps.js';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(serverDir, '.env') });
@@ -72,7 +74,23 @@ httpServer.once('error', (error) => {
   process.exit(1);
 });
 
-
 connectDatabase()
-  .then(() => { initializeRealtime(httpServer); httpServer.listen(port, () => console.log(`CivicSync API listening on port ${port}`)); })
+  .then(async () => {
+    await ensureSingletonHeadIndex();
+    // One-off seed of the report catalogue (categories + their default
+    // departments). Guarded by a marker, so a category an admin later deletes
+    // is not resurrected on the next boot.
+    try {
+      const seeded = await seedReportCatalogue();
+      if (seeded.seeded) {
+        console.log(`Report catalogue seeded: ${seeded.categories} category/categories, ${seeded.departments} department(s).`);
+      }
+    } catch (error) {
+      // Never block startup — the catalogue service falls back to compiled
+      // defaults whenever the collection is empty.
+      console.error('Report catalogue seed failed:', error.message);
+    }
+    initializeRealtime(httpServer);
+    httpServer.listen(port, () => console.log(`CivicSync API listening on port ${port}`));
+  })
   .catch((error) => { console.error(`Database connection failed: ${error.message}`); process.exit(1); });

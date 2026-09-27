@@ -1,15 +1,4 @@
-/**
- * AI audit trail (task §27, §32).
- *
- * CivicSync already owns one audit system: models/ActivityLog.js, written by the
- * Super Admin, department and emergency flows. The AI platform therefore records
- * into that same collection instead of introducing a second, competing trail.
- *
- * `targetType: 'system'` is used with explicit `ai_*` action names so the AI
- * trail is filterable in the existing audit screens without schema changes.
- * Nothing here can throw into a request path: audit failures are swallowed and
- * reported through the returned boolean.
- */
+
 import ActivityLog from '../../models/ActivityLog.js';
 import { redactSecrets } from './promptSafety.js';
 
@@ -29,11 +18,6 @@ export const AI_AUDIT_ACTIONS = Object.freeze({
   feedback: 'ai_feedback'
 });
 
-/**
- * Writes one AI audit row.
- *
- * @param {{ user?: object, action: string, targetType?: string, targetId?: unknown, targetName?: string, description?: string, metadata?: object, result?: 'success'|'failure'|'info' }} entry
- */
 export async function auditAi(entry = {}) {
   const { user, action, targetType = 'system', targetId = null, targetName = '', description = '', metadata = {}, result = 'info' } = entry;
   if (!user?._id || !action) return false;

@@ -78,6 +78,7 @@ function TeamForm({ team, staff, onClose, onSaved }) {
       onClose={onClose}
       title={team ? `Edit ${team.name}` : 'Create response team'}
       subtitle="Teams group field workers so cases can be dispatched to a unit instead of individuals."
+      icon={team ? 'pencil' : 'users'}
       size="lg"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="team-form" disabled={busy} className={primaryButton}>{busy ? 'Saving…' : team ? 'Save changes' : 'Create team'}</button></>}
     >
@@ -192,7 +193,6 @@ function TeamCard({ team, canManage, onEdit }) {
     </article>
   );
 }
-
 
 export default function TeamManagement({ canManage = false }) {
   const [teams, setTeams] = useState([]);

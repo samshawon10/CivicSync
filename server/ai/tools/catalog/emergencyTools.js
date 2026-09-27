@@ -1,16 +1,4 @@
-/**
- * Emergency & responder tools (task §7).
- *
- * Emergency operations are strictly scoped:
- *   - Command roles (Super Admin, Emergency Head) see every incident and responder pool.
- *   - Responder roles (Emergency Officer, Emergency Field Worker) see ONLY the
- *     incidents they are assigned to (enforced via scope.js `emergencyScopeFilter`).
- *   - Citizen sees only emergencies they created.
- *
- * All tools are read-only advisory. The assistant NEVER dispatches, escalates,
- * or transitions an incident — these are human-command decisions executed in the
- * Emergency Command Center (§36).
- */
+
 import mongoose from 'mongoose';
 import Emergency from '../../../models/Emergency.js';
 import EmergencyResponseAssignment from '../../../models/EmergencyResponseAssignment.js';

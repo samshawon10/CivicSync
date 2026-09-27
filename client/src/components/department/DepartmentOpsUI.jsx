@@ -85,7 +85,6 @@ export function SlaBreakdown({ sla }) {
   );
 }
 
-
 export function formatOpsDate(value) {
   if (!value) return 'Not set';
   const date = new Date(value);

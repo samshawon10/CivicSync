@@ -1,10 +1,5 @@
 import { label } from '../../services/emergencyService.js';
 
-/**
- * Emergency type selector with an explicit "I'm not sure" option.
- * When the category is not_sure and advisory text is available, the parent
- * can render a suggestion via `suggestion` + `onAcceptSuggestion`.
- */
 export default function EmergencyTypeSelector({ categories = [], value, onChange, suggestion = null, onAcceptSuggestion, showSuggestion = true }) {
   const active = categories.find((item) => item.key === value.category);
   const subcategories = active?.subcategories || ['other'];

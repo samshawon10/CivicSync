@@ -14,11 +14,6 @@ import ActivityLog from '../models/ActivityLog.js';
 const router = Router();
 router.use(requireAuth);
 
-/**
- * POST /api/intelligence/advisory
- * Context-aware civic intelligence assistant.
- * Transparent, deterministic, authorized access only.
- */
 router.post('/advisory', async (req, res, next) => {
   try {
     const query = String(req.body.query || '').trim();
@@ -83,10 +78,6 @@ router.post('/advisory', async (req, res, next) => {
   }
 });
 
-
-/* ==========================================================================
-   2. COMMUNITY GROUPS (Phase 6)
-   ========================================================================== */
 router.get('/groups', async (req, res, next) => {
   try {
     const { category, search } = req.query;
@@ -151,9 +142,6 @@ router.post('/groups/:id/join', async (req, res, next) => {
   }
 });
 
-/* ==========================================================================
-   3. VOLUNTEER & COMMUNITY HELP (Phase 7)
-   ========================================================================== */
 router.get('/volunteers', async (req, res, next) => {
   try {
     const { type, status } = req.query;
@@ -220,10 +208,6 @@ router.post('/volunteers/:id/participate', async (req, res, next) => {
   }
 });
 
-
-/* ==========================================================================
-   4. CITIZEN FEEDBACK & TRANSPARENCY (Phase 8 & 12)
-   ========================================================================== */
 router.post('/feedback', async (req, res, next) => {
   try {
     const { targetType, targetId, rating, comment, aspectRatings } = req.body;
@@ -279,9 +263,6 @@ router.get('/transparency', async (req, res, next) => {
   }
 });
 
-/* ==========================================================================
-   5. TRUST & VERIFICATION (Phase 9 & 13)
-   ========================================================================== */
 router.get('/verifications', async (req, res, next) => {
   try {
     const verifications = await VerificationRecord.find({ status: 'active' })
@@ -326,6 +307,5 @@ router.post('/verifications', requireRole(['admin']), async (req, res, next) => 
     next(error);
   }
 });
-
 
 export default router;

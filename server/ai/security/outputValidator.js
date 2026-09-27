@@ -1,17 +1,3 @@
-/**
- * Output validation (task §12, §14).
- *
- * The model's output is never forwarded to the SPA as-is. Every response is
- * rebuilt into CivicSync's structured contract, with:
- *   - a closed set of response types,
- *   - citations restricted to records that were actually retrieved and authorized,
- *   - suggested actions restricted to registered capabilities,
- *   - an identifier check that flags any case/emergency reference the model
- *     produced that does not exist in the verified data it was given.
- *
- * That last check is the platform's hallucination tripwire: CivicSync would
- * rather add an honest warning than present an invented case number as fact.
- */
 
 export const RESPONSE_TYPES = Object.freeze(['answer', 'action_confirmation', 'insufficient_data', 'error']);
 
@@ -40,11 +26,6 @@ export function identifiersIn(message) {
   return [...found];
 }
 
-/**
- * Compares identifiers used in the message against everything CivicSync
- * actually verified (tool results + context). Anything unknown is reported so
- * the response can carry an honest grounding warning.
- */
 export function unverifiedIdentifiers(message, verifiedPayload) {
   const haystack = JSON.stringify(verifiedPayload ?? {}).toUpperCase();
   return identifiersIn(message).filter((token) => !haystack.includes(token.toUpperCase()));
@@ -91,17 +72,6 @@ export function degradedResponse(message, meta = {}) {
   });
 }
 
-/**
- * Validates and rebuilds a model decision into the client contract.
- *
- * @param {object} args
- * @param {object} args.decision            parsed model decision (providerInterface.parseDecision)
- * @param {Array}  args.availableCitations  citations CivicSync can actually vouch for
- * @param {Function} args.validateAction    (name, payload) => { ok, message } from actions/actionRegistry.js
- * @param {object} args.verifiedData        every record the model was shown
- * @param {boolean} args.hasVerifiedData    whether any authorized record was retrieved
- * @param {{provider: string, model: string, degraded?: boolean}} args.meta
- */
 export function validateAiResponse({ decision = {}, availableCitations = [], validateAction, verifiedData, hasVerifiedData = false, meta = {} }) {
   const issues = [];
   const allowedCitations = availableCitations.map(normalizeCitation).filter(Boolean);

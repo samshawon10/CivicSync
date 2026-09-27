@@ -48,6 +48,36 @@ export const emergencyApi = {
   deleteContact: (id) => api.delete(`/emergency-contacts/${id}`)
 };
 
+export const emergencyOpsApi = {
+  dashboard: (role) => api.get(`/emergencies/dashboard/${role}`),
+  list: (params) => api.get('/emergencies/ops/incidents', { params }),
+  get: (id) => api.get(`/emergencies/ops/incidents/${id}`),
+  staff: (role) => api.get('/emergencies/ops/staff', { params: { role } }),
+  rosters: () => api.get('/emergencies/ops/rosters'),
+  review: (id, notes) => api.post(`/emergencies/ops/incidents/${id}/review`, { notes }),
+  classify: (id, payload) => api.post(`/emergencies/ops/incidents/${id}/classify`, payload),
+  assignEDO: (id, edoId) => api.post(`/emergencies/ops/incidents/${id}/assign-edo`, { edoId }),
+  reviewEDO: (id, notes) => api.post(`/emergencies/ops/incidents/${id}/edo-review`, { notes }),
+  assignEO: (id, eoId) => api.post(`/emergencies/ops/incidents/${id}/assign-eo`, { eoId }),
+  accept: (id) => api.post(`/emergencies/ops/incidents/${id}/accept`),
+  fieldAssignment: (id, step) => api.post(`/emergencies/ops/incidents/${id}/field-assignment`, { step }),
+  acceptFieldWork: (id) => api.post(`/emergencies/ops/incidents/${id}/field-assignment`, { step: 'accept' }),
+  startFieldWork: (id) => api.post(`/emergencies/ops/incidents/${id}/field-assignment`, { step: 'start' }),
+  createTeam: (id, payload) => api.post(`/emergencies/ops/incidents/${id}/teams`, payload),
+  attachRoster: (id, rosterTeamId) => api.post(`/emergencies/ops/incidents/${id}/teams/attach-roster`, { rosterTeamId }),
+  addWorker: (id, teamId, workerId) => api.post(`/emergencies/ops/incidents/${id}/teams/${teamId}/members`, { workerId }),
+  startResponse: (id, notes) => api.post(`/emergencies/ops/incidents/${id}/start-response`, { notes }),
+  progress: (id, percentage, note) => api.post(`/emergencies/ops/incidents/${id}/progress`, { percentage, note }),
+  blocker: (id, payload) => api.post(`/emergencies/ops/incidents/${id}/blockers`, payload),
+  escalate: (id, reason) => api.post(`/emergencies/ops/incidents/${id}/escalate`, { reason }),
+  completeFieldWork: (id, notes) => api.post(`/emergencies/ops/incidents/${id}/worker-complete`, { notes }),
+  completeResponse: (id, notes) => api.post(`/emergencies/ops/incidents/${id}/complete-response`, { notes }),
+  reviewCompletion: (id, notes) => api.post(`/emergencies/ops/incidents/${id}/review-completion`, { notes }),
+  close: (id, notes) => api.post(`/emergencies/ops/incidents/${id}/close`, { notes }),
+  cancel: (id, reason) => api.post(`/emergencies/ops/incidents/${id}/cancel`, { reason }),
+  directive: (id, text) => api.post(`/emergencies/ops/incidents/${id}/instructions`, { text })
+};
+
 export const facilityGroups = [
   { key: 'emergency', label: 'Emergency', types: ['emergency_center', 'ambulance', 'fire_station'] },
   { key: 'safety', label: 'Safety', types: ['police', 'safe_point', 'shelter', 'flood_shelter', 'hazard', 'road_blockage'] },

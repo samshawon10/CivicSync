@@ -21,6 +21,7 @@ import {
   formatOpsDate
 } from './DepartmentOpsUI.jsx';
 import CaseAssignmentPanel from './CaseAssignmentPanel.jsx';
+import TaskOperationsPanel from './TaskOperationsPanel.jsx';
 import CaseConversation, { CaseTimeline } from './CaseConversation.jsx';
 import ResolveEscalationModal from './ResolveEscalationModal.jsx';
 import useDepartmentSync from './useDepartmentSync.js';
@@ -53,6 +54,7 @@ function EscalateModal({ report, onClose, onDone }) {
       onClose={onClose}
       title="Escalate case to Department Head"
       subtitle="Escalation sets the case to urgent priority and notifies every head in the department."
+      icon="shieldAlert"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="escalate-form" disabled={busy} className={primaryButton}>{busy ? 'Escalating…' : 'Escalate case'}</button></>}
     >
       <form id="escalate-form" onSubmit={submit} className="space-y-4">
@@ -94,6 +96,7 @@ function HandoverModal({ report, staff, onClose, onDone }) {
       onClose={onClose}
       title="Hand over case"
       subtitle="The previous owner is recorded in the case handover history for audit."
+      icon="send"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="handover-form" disabled={busy} className={primaryButton}>{busy ? 'Transferring…' : 'Transfer case'}</button></>}
     >
       <form id="handover-form" onSubmit={submit} className="space-y-4">
@@ -141,6 +144,7 @@ function ReviewCompletionModal({ report, onClose, onDone }) {
       onClose={onClose}
       title="Review completion report"
       subtitle="Approving closes the case. Rejecting returns it to in progress."
+      icon="clipboard"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="review-form" disabled={busy} className={primaryButton}>{busy ? 'Saving…' : 'Submit review'}</button></>}
     >
       <form id="review-form" onSubmit={submit} className="space-y-4">
@@ -173,10 +177,6 @@ const workspaceTabs = [
   { id: 'activity', label: 'Activity' }
 ];
 
-/**
- * Unified case workspace: one place for the head, officer and field worker to see
- * SLA position, dispatch people/teams, escalate, hand over, message and review work.
- */
 export default function CaseWorkspace({ caseId, role, staff = [], onClose, onChanged }) {
   const isHead = role === 'department_head';
   const canManage = ['department_head', 'department_officer'].includes(role);
@@ -248,7 +248,6 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
       )}
     </>
   ) : null;
-
 
   return (
     <>
@@ -332,8 +331,7 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
               </div>
             )}
 
-
-            {tab === 'overview' && report.activeTask && (
+{tab === 'overview' && report.activeTask && (
               <Panel title="Linked field task" subtitle={report.activeTask.taskNumber || 'Field task'}>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusPill value={report.activeTask.status} kind="task" />
@@ -375,11 +373,20 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
             )}
 
             {tab === 'dispatch' && (
-              canManage ? (
+              <div className="space-y-5">
                 <CaseAssignmentPanel report={report} staff={staff} onChanged={() => { load(); onChanged?.(); }} />
-              ) : (
-                <EmptyPanel title="Dispatch is managed by department officers" message="You can see the current assignment but cannot change it from this role." />
-              )
+                <div className="border-t border-slate-200 pt-5">
+                  <h3 className="mb-1 text-sm font-black text-ink">Field execution</h3>
+                  <p className="mb-3 text-xs text-slate-500">
+                    Worker and team assignment is an Officer action on the task — it is not available from the case level.
+                  </p>
+                  <TaskOperationsPanel
+                    caseId={report._id}
+                    task={report.activeTask}
+                    onChanged={() => { load(); onChanged?.(); }}
+                  />
+                </div>
+              </div>
             )}
 
             {tab === 'messages' && <CaseConversation report={report} onPosted={() => { load(); onChanged?.(); }} />}

@@ -1,10 +1,3 @@
-/**
- * AI Copilot routes (task §12, §14, §22).
- *
- * All endpoints require authentication. The gateway itself performs rate limiting,
- * RBAC scoping, prompt-safety scanning and output grounding, so these handlers stay
- * deliberately thin.
- */
 
 import { Router } from 'express';
 import { requireAuth } from '../middleware/authMiddleware.js';

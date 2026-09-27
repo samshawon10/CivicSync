@@ -1,15 +1,3 @@
-/**
- * CivicSync role capability matrix.
- *
- * This file documents the capabilities that the BACKEND actually enforces
- * (see `middleware/authMiddleware.js`, the route guards in `routes/*.js`, and
- * the role checks inside the controllers). It is served to the Super Admin
- * dashboard so the Roles & Permissions screen reflects real enforcement
- * instead of a decorative front-end-only matrix.
- *
- * The frontend is never the security boundary: every entry below maps to a
- * server-side check that rejects unauthorised requests with 401/403.
- */
 
 export const roleOrder = [
   'admin',

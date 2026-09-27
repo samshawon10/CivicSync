@@ -1,13 +1,4 @@
-/**
- * CivicSync AI Gateway — error vocabulary.
- *
- * Every failure inside the AI platform is expressed as an AiError with a stable
- * `code`, so the gateway can degrade gracefully (see gateway/modelRouter.js) and
- * the controller can return an honest message without leaking provider detail.
- *
- * Codes are intentionally coarse: they describe what CivicSync can *observe*,
- * never what it assumes (no fabricated provider internals).
- */
+
 export const AI_ERROR_CODES = Object.freeze({
   // Request / caller problems (4xx)
   AI_DISABLED: { status: 503, message: 'CivicSync Intelligence is currently disabled by the platform administrator.' },

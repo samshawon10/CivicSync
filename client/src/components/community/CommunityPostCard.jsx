@@ -4,12 +4,6 @@ import { apiMessage, confirmAction, showSuccess } from '../../services/api.js';
 import { communityApi, communityMediaUrl } from '../../services/communityService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
-/**
- * One community post with its threaded discussion. Editing, deleting and
- * replying are all authorised server-side (see services/communityThread.js);
- * this card only shows the actions the viewer is allowed to use.
- */
-
 const categories = [['general', 'General'], ['local_issue', 'Local issues'], ['safety', 'Safety'], ['community_help', 'Community help'], ['lost_found', 'Lost & Found'], ['event', 'Events'], ['discussion', 'Discussions']];
 const time = (value) => new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 const indent = (depth = 0) => ({ marginLeft: `${Math.min(depth, 4) * 18}px` });

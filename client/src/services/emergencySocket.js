@@ -15,6 +15,20 @@ export const departmentEvents = [
   'TASK_COMPLETED', 'TEAM_ASSIGNMENT_CREATED', 'RESOURCE_REQUESTED', 'RESOURCE_APPROVED'
 ];
 
+export const departmentCatalogueEvents = [
+  'DEPARTMENT_CREATED',
+  'DEPARTMENT_UPDATED',
+  'DEPARTMENT_STATUS_CHANGED',
+  'DEPARTMENT_DELETED'
+];
+
+export const reportCategoryEvents = [
+  'REPORT_CATEGORY_CREATED',
+  'REPORT_CATEGORY_UPDATED',
+  'REPORT_CATEGORY_DELETED',
+  'REPORT_CATEGORY_RESTORED'
+];
+
 const events = [
   'EMERGENCY_CREATED', 'EMERGENCY_RECEIVED', 'EMERGENCY_ASSIGNED', 'OFFICER_ACCEPTED',
   'FIELD_WORKER_ASSIGNED', 'RESPONDER_LOCATION_UPDATED', 'EMERGENCY_STATUS_CHANGED',
@@ -23,14 +37,18 @@ const events = [
   'COMMUNITY_COMMENT_CREATED', 'COMMUNITY_COMMENT_UPDATED', 'COMMUNITY_COMMENT_DELETED',
   'COMMUNITY_REACTION_UPDATED', 'COMMUNITY_NOTIFICATION_CREATED', 'COMMUNITY_MODERATION_UPDATED',
   // Department Operations events
-  ...departmentEvents
+  ...departmentEvents,
+  // Department catalogue events
+  ...departmentCatalogueEvents,
+  // Report category catalogue events
+  ...reportCategoryEvents,
+  'emergencyCreated', 'emergencyAssigned', 'emergencyPriorityChanged', 'emergencyEscalated',
+  'emergencyOfficerAssigned', 'emergencyTeamCreated', 'emergencyWorkerAssigned',
+  'emergencyStarted', 'emergencyProgressUpdated', 'emergencyBlocked',
+  'emergencyResponseCompleted', 'emergencyClosed', 'emergencyWorkerReleased',
+  'emergencyNotificationCreated', 'EMERGENCY_OPS_UPDATED'
 ];
 
-/**
- * Subscribe to all emergency & department real-time events.
- * onChange(payload) fires on any event; onConnection({ connected }) reports
- * socket connect/disconnect so screens can show a live/reconnecting state.
- */
 export function subscribeToEmergencyEvents(onChange, onConnection) {
   const client = emergencySocket();
   for (const event of events) client.on(event, onChange);
@@ -51,11 +69,6 @@ export function subscribeToEmergencyEvents(onChange, onConnection) {
   };
 }
 
-/**
- * Subscribe to department operations events with the event name included.
- * onEvent(eventName, payload) is called for every department lifecycle event;
- * onConnection({ connected }) reports live connectivity for status badges.
- */
 export function subscribeToDepartmentEvents(onEvent, onConnection) {
   const client = emergencySocket();
   const handlers = departmentEvents.map((event) => {
@@ -80,3 +93,47 @@ export function subscribeToDepartmentEvents(onEvent, onConnection) {
   };
 }
 
+export function subscribeToDepartmentCatalogue(onCatalogueChange, onConnection) {
+  const client = emergencySocket();
+  const handler = () => onCatalogueChange?.();
+  for (const event of departmentCatalogueEvents) client.on(event, handler);
+  const onConnect = () => onConnection?.({ connected: true });
+  const onDisconnect = () => onConnection?.({ connected: false });
+  if (onConnection) {
+    client.on('connect', onConnect);
+    client.on('disconnect', onDisconnect);
+  }
+  client.connect();
+  if (onConnection && client.connected) onConnection({ connected: true });
+  return () => {
+    for (const event of departmentCatalogueEvents) client.off(event, handler);
+    if (onConnection) {
+      client.off('connect', onConnect);
+      client.off('disconnect', onDisconnect);
+    }
+  };
+}
+
+export function subscribeToReportCategories(onCatalogueChange, onConnection) {
+  const client = emergencySocket();
+  const handlers = reportCategoryEvents.map((event) => {
+    const handler = () => onCatalogueChange?.(event);
+    client.on(event, handler);
+    return [event, handler];
+  });
+  const onConnect = () => onConnection?.({ connected: true });
+  const onDisconnect = () => onConnection?.({ connected: false });
+  if (onConnection) {
+    client.on('connect', onConnect);
+    client.on('disconnect', onDisconnect);
+  }
+  client.connect();
+  if (onConnection && client.connected) onConnection({ connected: true });
+  return () => {
+    for (const [event, handler] of handlers) client.off(event, handler);
+    if (onConnection) {
+      client.off('connect', onConnect);
+      client.off('disconnect', onDisconnect);
+    }
+  };
+}

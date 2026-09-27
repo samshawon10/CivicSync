@@ -1,17 +1,7 @@
-/**
- * System prompt construction (task §7, §14, §15).
- *
- * One builder serves every provider so role framing, grounding rules and the
- * trust boundary can never drift between providers.
- */
+
 import { PROMPT_TRUST_RULES } from '../security/promptSafety.js';
 import { COMMON_LIMITS, playbookFor } from './rolePlaybooks.js';
 
-/**
- * The JSON contract the model must answer in. A textual contract is used
- * instead of provider-native function calling so every provider (and any future
- * local model) behaves identically and the server always validates one shape.
- */
 export const RESPONSE_CONTRACT = [
   'RESPONSE FORMAT — reply with ONE JSON object and nothing else.',
   'Answer: {"type":"answer","message":"<answer>","citations":[{"type":"case|emergency|service|facility|alert|community|department|profile","id":"<record id>","label":"<short label>"}],"suggestedActions":[{"label":"<short label>","prompt":"<follow-up question>"}],"disclaimers":["<optional>"]}',
@@ -29,15 +19,6 @@ function pageSection(pageContext) {
   return `CURRENT PAGE: ${bits.join(' · ')}`;
 }
 
-/**
- * Builds the full system prompt.
- *
- * @param {object} args
- * @param {string} args.role                existing CivicSync role
- * @param {object} args.capabilities        { toolGroups: { group: [{name, inputs}] }, actions: [names] }
- * @param {object|string} args.pageContext  current page descriptor
- * @param {boolean} args.structured         include the JSON response contract
- */
 export function buildSystemPrompt({ role, capabilities = {}, pageContext = '', structured = true }) {
   const playbook = playbookFor(role);
   const sections = [
@@ -72,13 +53,6 @@ export function buildSystemPrompt({ role, capabilities = {}, pageContext = '', s
   return sections.join('\n');
 }
 
-/**
- * The per-request context block.
- *
- * Everything a citizen or staff member wrote is fenced, so the model reads it as
- * reported data. The verified-context JSON is what the validator later treats as
- * the platform's ground truth.
- */
 export function buildContextMessage({ contextText = '', toolResults = [], question = '', summary = '' }) {
   const parts = ['=== CIVIC CONTEXT (authorized for this user, server-generated) ===', contextText || '{}'];
   if (toolResults.length) {

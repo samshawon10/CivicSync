@@ -1,14 +1,3 @@
-/**
- * Whitelisted Super Admin settings.
- *
- * Only the keys declared here can ever be read from or written to the
- * `SystemSetting` document. Anything else is ignored, so the settings API can
- * never be used to persist (or leak) unexpected data such as secrets.
- *
- * Feature flags are backend-authoritative: `readFeatureFlags()` is consumed by
- * the admin governance API, and the Super Admin surfaces disable themselves
- * from the server response rather than from local storage.
- */
 
 export const settingsDefaults = {
   general: { portalName: 'CivicSync', timezone: 'Asia/Dhaka', language: 'en', contactEmail: '' },
@@ -86,10 +75,6 @@ function coerce(rule, value) {
   return { ok: true, value: text };
 }
 
-/**
- * Merge stored settings with defaults and the incoming patch, applying field
- * validation. Returns { settings, errors, changed }.
- */
 export function sanitizeSettings(stored = {}, patch = {}) {
   const settings = {};
   const errors = [];

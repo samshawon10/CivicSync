@@ -1,25 +1,6 @@
-/**
- * Controller bridge (task §2, §41).
- *
- * CivicSync already implements platform analytics, system health, governance and
- * audit listing inside its existing controllers. Rather than re-deriving those
- * aggregations in the AI layer (which would create a second source of truth and
- * drift), the AI tools *wrap the same handlers* through a minimal request/response
- * adapter.
- *
- * Only pure read handlers are bridged. Nothing here bypasses the route guards:
- * a tool that uses the bridge declares the same role restrictions the route does
- * (admin-only), and toolRegistry.js still authorizes the caller first.
- */
+
 import { AiError } from '../errors.js';
 
-/**
- * Invokes an Express-style read handler and returns its JSON payload.
- *
- * @param {Function} handler (req, res, next) => any
- * @param {{ user?: object, query?: object, params?: object, body?: object }} request
- * @returns {Promise<{ ok: boolean, status: number, payload: object|null }>}
- */
 export async function invokeJsonHandler(handler, { user, query = {}, params = {}, body = {} } = {}) {
   if (typeof handler !== 'function') throw new AiError('INTERNAL', { message: 'The bridged CivicSync handler is unavailable.' });
   const state = { payload: null, status: 200, sent: false };

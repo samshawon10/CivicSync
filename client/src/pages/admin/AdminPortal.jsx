@@ -12,11 +12,6 @@ import { AnalyticsSection, EmergencyMapSection, SafetyHeatmapSection, SafetyInte
 import { ActivityLogsSection, AuditLogsSection, NotificationsSection, ProfileSection, SettingsSection } from './sections/GovernanceSections.jsx';
 import { FeatureFlagsSection, SecurityCenterSection, SystemHealthSection } from './sections/SystemSections.jsx';
 
-/**
- * Super Admin section registry. Each entry renders inside the shared
- * SuperAdminLayout, so every page inherits the same shell, chrome, command
- * palette, skeleton system and design language.
- */
 const registry = {
   dashboard: { Component: OverviewSection, title: 'Overview', subtitle: 'System-wide operational picture across citizens, complaints, emergencies and safety resources.' },
   'command-center': { Component: OverviewSection, title: 'Command Center', subtitle: 'Live governance command center: what is happening, where, who is responsible and what needs attention.' },

@@ -1,14 +1,4 @@
-/**
- * CivicSync Intelligence — copilot state machine.
- *
- * Owns the conversation thread, action confirmations and history. Kept apart
- * from the presentational shell so the drawer markup stays readable and this
- * logic can be reasoned about (and reused by inline page AI) in isolation.
- *
- * Security note: the browser never asserts a role, permission, or record it may
- * see. It sends a question plus non-sensitive page context; the gateway
- * independently re-authorizes every tool call and action.
- */
+
 import { useCallback, useEffect, useState } from 'react';
 import aiApi from '../../services/aiService.js';
 
@@ -22,17 +12,6 @@ export function useCivicAI() {
   const [open, setOpen] = useState(false);
   const [context, setContext] = useState({});
 
-  /**
-   * Opens the copilot, optionally pre-scoped to a page (case, service, map…).
-   *
-   * Accepts either a raw pageContext or a full page preset produced by
-   * `presetFor()`. A preset arrives as { title, prompts, context }, where only
-   * `context` is the envelope the gateway understands. We flatten it here so the
-   * conversation layer and the backend both always see route/caseId/emergencyId
-   * at the TOP level — previously they were nested one level too deep, so every
-   * contextual id (case, emergency, department) silently failed to reach the
-   * Context Engine and the AI answered without its page scope.
-   */
   const openCopilot = useCallback((preset = {}) => {
     const isPreset = Boolean(preset.context) || Array.isArray(preset.prompts) || Boolean(preset.title);
     const pageContext = isPreset ? preset.context || {} : preset;
@@ -176,10 +155,6 @@ export function useCivicAIConversation({ context = {} } = {}) {
   };
 }
 
-/**
- * Confirms or rejects a proposed action, then patches the thread in place.
- * Returns a status string so the caller can raise the right toast.
- */
 export function useCivicAIActions({ setMessages, setActionBusy, onNotice }) {
   const clearAction = (token) =>
     setMessages((current) =>

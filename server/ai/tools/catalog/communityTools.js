@@ -1,12 +1,4 @@
-/**
- * Community tools (task §20). Read-only.
- *
- * The visibility filter mirrors `visibleFilter` in controllers/communityController.js
- * (published posts, never a blocked author, public/community/followers+following
- * or the viewer's own post). The AI can read and summarize community content but
- * never publishes: posting stays in the community composer behind explicit user
- * confirmation.
- */
+
 import CommunityPost from '../../../models/CommunityPost.js';
 import CommunityInteraction from '../../../models/CommunityInteraction.js';
 import CommunityComment from '../../../models/CommunityComment.js';

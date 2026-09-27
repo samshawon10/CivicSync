@@ -1,11 +1,4 @@
-/**
- * CivicSync Intelligence — message-level building blocks.
- *
- * The tool trace is deliberately human-readable: raw tool names, database
- * queries and provider internals are never rendered in the browser. The gateway
- * only emits citations for records the caller was authorized to see, so the
- * "verified" badge is a trust signal rather than decoration.
- */
+
 import { Button } from '../ui/primitives.jsx';
 import { cx } from '../../utils/format.js';
 
@@ -27,11 +20,6 @@ export function AISourceBadge({ verified = false, label, count = 0 }) {
   );
 }
 
-/**
- * Loading-stage copy for the generic progress ticker. These are pacing hints
- * shown while a request is in flight, NOT claims about what the gateway did —
- * the real, sanitized tool trace replaces them once the response arrives.
- */
 const STAGE_COPY = {
   auth: 'Authentication verified',
   retrieve: 'Retrieving your CivicSync data',
@@ -76,11 +64,6 @@ export function AIToolExecution({ steps = [], done = false }) {
   );
 }
 
-/**
- * Structured record cards attached to a grounded answer (cases, services,
- * facilities). Each card is either a navigation affordance — routing to the
- * existing CivicSync page, never a new one — or a static reference.
- */
 export function AICards({ items = [], onOpen }) {
   if (!items.length) return null;
   return (
@@ -130,11 +113,6 @@ export function AICards({ items = [], onOpen }) {
   );
 }
 
-/**
- * Human-in-the-loop confirmation. This card is UX only: the backend re-checks
- * actor, role, scope and payload before executing, and rejects any token not
- * minted for this user.
- */
 export function AIActionCard({ action, onConfirm, onReject, busy = false }) {
   if (!action?.token) return null;
   const risky = action.risk === 'high_risk_write' || /emergency|dispatch/i.test(action.name || '');

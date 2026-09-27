@@ -12,11 +12,7 @@ import { formatRelative } from '../../utils/format.js';
 
 const typeTone = { report_status: 'info', system: 'neutral' };
 
-/**
- * Admin notification centre backed by the real notification API
- * (in-app delivery only — no email/SMS provider exists in this project).
- */
-export default function NotificationCenter({ open, onClose }) {
+export default function NotificationCenter({ open, onClose, showSettingsLink = true }) {
   const toast = useToast();
   const [state, setState] = useState({ loading: true, notifications: [], unreadCount: 0, error: '' });
 
@@ -113,9 +109,9 @@ export default function NotificationCenter({ open, onClose }) {
           ))}
         </ul>
       )}
-      <p className="mt-4 text-[11px] text-fg-subtle">
+      {showSettingsLink && <p className="mt-4 text-[11px] text-fg-subtle">
         Delivery channel: in-app only. See <Link to="/admin/settings" onClick={onClose} className="font-semibold text-civic-600">System Settings → Notifications</Link> for the recorded configuration.
-      </p>
+      </p>}
     </Drawer>
   );
 }

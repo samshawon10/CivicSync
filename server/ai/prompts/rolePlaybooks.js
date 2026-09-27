@@ -1,16 +1,3 @@
-/**
- * Role playbooks (task §7) — the single source of truth for what CivicSync
- * Intelligence offers each existing role.
- *
- * These are the platform's existing roles (config/permissions.js). The AI layer
- * introduces no new roles and no new permission model. A playbook powers:
- *   1. the system prompt (capability framing and hard limits),
- *   2. the client's suggested prompts (`/api/ai/capabilities`),
- *   3. the refusal behaviour enforced by the output validator and tools.
- *
- * `tools` lists capability *categories* only; concrete authorization is enforced
- * per tool in tools/toolRegistry.js.
- */
 
 export const CAPABILITY_CATEGORIES = Object.freeze({
   cases: 'civic case records',

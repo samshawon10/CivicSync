@@ -5,14 +5,6 @@ const pointSchema = new mongoose.Schema({
   coordinates: { type: [Number], default: undefined }
 }, { _id: false });
 
-/**
- * Official civic service information (eligibility, documents, fees, offices).
- *
- * Admin-governed by design: the platform never invents government data. Fields
- * an administrator has not filled in are reported by the API as missing rather
- * than guessed, and `requestEnabled` hands a service request into the EXISTING
- * citizen case workflow instead of a second parallel workflow.
- */
 const schema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 160 },
   slug: { type: String, trim: true, lowercase: true, unique: true, sparse: true },

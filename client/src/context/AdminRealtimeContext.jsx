@@ -3,11 +3,6 @@ import { subscribeToEmergencyEvents } from '../services/emergencySocket.js';
 
 const AdminRealtimeContext = createContext({ live: false, refreshKey: 0 });
 
-/**
- * One Socket.IO subscription for the whole Super Admin shell.
- * Pages consume the shared refresh signal instead of opening their own
- * listeners, which keeps the realtime channel free of duplicate handlers.
- */
 export function AdminRealtimeProvider({ children }) {
   const [live, setLive] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);

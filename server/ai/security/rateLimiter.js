@@ -1,9 +1,3 @@
-/**
- * Rate Limiter for AI platform (task §25).
- *
- * Implements sliding-window rate limits per user & per role.
- * Tracks per-minute and per-day request budgets.
- */
 
 import { limitsForRole, readAiConfig } from '../config/aiConfig.js';
 import { AiError } from '../errors.js';
@@ -24,10 +18,6 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000).unref();
 
-/**
- * Checks and records rate limit for a user request.
- * Throws AiError('RATE_LIMITED') if exceeded.
- */
 export async function enforceRateLimits(user) {
   if (!user?._id) return;
 

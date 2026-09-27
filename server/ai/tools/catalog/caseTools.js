@@ -1,11 +1,4 @@
-/**
- * Civic case tools (task §17). Read-only.
- *
- * Every query is scoped through `reportScopeFilter` / `canViewReport`, which
- * mirror controllers/reportController.js and controllers/departmentController.js.
- * A citizen can only ever reach their own cases; department staff only their
- * department and, for officer/field-worker roles, only their own assignments.
- */
+
 import Report from '../../../models/Report.js';
 import { calculateDepartmentSla } from '../../../services/departmentSla.js';
 import { getReportNextAction } from '../../../services/nextAction.js';
@@ -31,7 +24,7 @@ async function loadScopedReport(user, caseId) {
   return report;
 }
 
-const decorate = (report) => ({ ...report.toObject(), nextAction: getReportNextAction(report), sla: calculateDepartmentSla(report) });
+const decorate = (report) => ({ ...(typeof report.toObject === 'function' ? report.toObject() : report), nextAction: getReportNextAction(report), sla: calculateDepartmentSla(report) });
 const caseReference = (id) => `CASE-${String(id).slice(-6).toUpperCase()}`;
 const citationFor = (user, report) => ({
   type: 'case',

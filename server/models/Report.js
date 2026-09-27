@@ -1,12 +1,18 @@
 import mongoose from 'mongoose';
 import { reportCategories, reportDepartments, reportPriorities, reportStatuses } from '../config/reportOptions.js';
+import { REPORT_WORKFLOW_STAGES as reportWorkflowStages } from '../services/reportWorkflow.js';
 export { reportCategories, reportDepartments };
 
 const reportSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, minlength: 3, maxlength: 140 },
   description: { type: String, required: true, trim: true, minlength: 10, maxlength: 2000 },
-  category: { type: String, required: true, enum: reportCategories },
-  departmentName: { type: String, required: true, trim: true, enum: reportDepartments },
+  // `category` and `departmentName` are intentionally *not* hardcoded enums.
+  // Both are validated against the live catalogue in reportController
+  // (ReportCategory documents and active Department records) so an admin can
+  // add a category or a department from the dashboard and have it work
+  // immediately. The shape is still constrained here for storage safety.
+  category: { type: String, required: true, trim: true, lowercase: true, maxlength: 60 },
+  departmentName: { type: String, required: true, trim: true, maxlength: 120 },
   priority: { type: String, enum: reportPriorities, default: 'medium' },
   location: { area: { type: String, trim: true, maxlength: 100, default: '' }, address: { type: String, trim: true, maxlength: 300, default: '' }, landmark: { type: String, trim: true, maxlength: 150, default: '' }, latitude: { type: Number, min: -90, max: 90 }, longitude: { type: Number, min: -180, max: 180 } },
   // Where a case came from. Set only when the citizen explicitly confirms a
@@ -20,6 +26,25 @@ const reportSchema = new mongoose.Schema({
   },
   additionalInfo: { type: String, trim: true, maxlength: 1000, default: '' },
   status: { type: String, enum: reportStatuses, default: 'pending' },
+
+  workflowStage: {
+    type: String,
+    enum: reportWorkflowStages,
+    default: 'DEPARTMENT_HEAD_REVIEW',
+    index: true
+  },
+  workflowHistory: [
+    {
+      stage: { type: String, required: true },
+      previousStage: { type: String, default: '' },
+      actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      actorRole: { type: String, default: '' },
+      at: { type: Date, default: Date.now },
+      note: { type: String, default: '', maxlength: 500 }
+    }
+  ],
+
+  assignedDepartmentOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   assignedOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   citizenResolution: { status: { type: String, enum: ['pending', 'confirmed', 'reopen_requested'], default: 'pending' }, note: { type: String, trim: true, maxlength: 500, default: '' }, requestedAt: { type: Date, default: null }, resolvedAt: { type: Date, default: null } },
   citizenFeedback: { rating: { type: Number, min: 1, max: 5, default: null }, comment: { type: String, trim: true, maxlength: 1000, default: '' }, submittedAt: { type: Date, default: null } },

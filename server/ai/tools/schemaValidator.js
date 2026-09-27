@@ -1,13 +1,3 @@
-/**
- * Minimal JSON-Schema validator for tool inputs.
- *
- * CivicSync ships no schema library, and adding one just for tool inputs is not
- * justified: the subset below is the entire contract the AI tool registry uses
- * (object shapes, primitive types, enums, ranges, arrays and `additionalProperties`).
- *
- * Rejecting unknown properties is deliberate — a model that invents an extra
- * filter must not be able to smuggle it into a database query.
- */
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -25,10 +15,6 @@ function matchesType(value, type) {
   return actual === type;
 }
 
-/**
- * Validates `input` against `schema`.
- * @returns {{ ok: boolean, value?: object, errors: string[] }}
- */
 export function validateToolInput(input, schema = {}) {
   const errors = [];
   const value = isPlainObject(input) ? { ...input } : {};

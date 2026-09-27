@@ -31,6 +31,7 @@ export default function ResolveEscalationModal({ report, onClose, onResolved }) 
       onClose={onClose}
       title="Resolve escalation"
       subtitle={report.title}
+      icon="shieldCheck"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="resolve-escalation-form" disabled={busy} className={primaryButton}>{busy ? 'Resolving…' : 'Resolve escalation'}</button></>}
     >
       <form id="resolve-escalation-form" onSubmit={submit} className="space-y-4">

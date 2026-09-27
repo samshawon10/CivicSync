@@ -6,6 +6,7 @@ import Notification from '../models/Notification.js';
 import Department from '../models/Department.js';
 import { reportUploadDir } from '../middleware/uploadMiddleware.js';
 import { reportCategories, reportDepartments, reportPriorities, reportStatuses } from '../config/reportOptions.js';
+import { isReportCategory, isReportDepartment } from '../services/reportCatalogue.js';
 import { canCitizenReopenReport, canCitizenResolveReport, canTransitionReport } from '../services/reportLifecycle.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { normalizeReportLocation } from '../services/reportLocation.js';
@@ -86,7 +87,13 @@ export async function createReport(req, res, next) {
       await removeFiles(req.files);
       return res.status(400).json({ success: false, message: 'Title, description, category, priority, and department name are required.' });
     }
-    if (!reportCategories.includes(category) || !reportDepartments.includes(departmentName.trim()) || !reportPriorities.includes(priority)) {
+    // Validated against the live catalogue so admin-added categories and
+    // admin-created departments are accepted without a code change.
+    const [categoryOk, departmentOk] = await Promise.all([
+      isReportCategory(category),
+      isReportDepartment(departmentName.trim())
+    ]);
+    if (!categoryOk || !departmentOk || !reportPriorities.includes(priority)) {
       await removeFiles(req.files);
       return res.status(400).json({ success: false, message: 'Category, department, or priority is invalid.' });
     }
@@ -116,8 +123,11 @@ export async function listMyReports(req, res, next) {
     const { search = '', status = '', category = '', department = '', priority = '', page = 1, limit = 10, sort = 'newest' } = req.query;
     const filter = { createdBy: req.user._id };
     if (statuses.includes(status)) filter.status = status;
-    if (reportCategories.includes(category)) filter.category = category;
-    if (reportDepartments.includes(department)) filter.departmentName = department;
+    // These filter the caller's own reports, so any stored value is safe to
+    // match on — gating them against the legacy compile-time lists would hide
+    // categories and departments the admin added later.
+    if (String(category).trim()) filter.category = String(category).trim();
+    if (String(department).trim()) filter.departmentName = String(department).trim();
     if (reportPriorities.includes(priority)) filter.priority = priority;
     if (search.trim()) { const expression = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); filter.$or = [{ title: expression }, { description: expression }]; }
     const safePage = Math.max(1, Number(page) || 1); const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
@@ -170,7 +180,14 @@ export async function updateReport(req, res, next) {
     if (req.body.title !== undefined && (typeof req.body.title !== 'string' || req.body.title.trim().length < 3)) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Title must be at least 3 characters.' }); }
     if (req.body.description !== undefined && (typeof req.body.description !== 'string' || req.body.description.trim().length < 10)) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Description must be at least 10 characters.' }); }
     if (req.body.additionalInfo !== undefined && String(req.body.additionalInfo).trim().length > 1000) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Additional information must be 1,000 characters or fewer.' }); }
-    if (req.body.category && !reportCategories.includes(req.body.category) || req.body.priority && !reportPriorities.includes(req.body.priority) || req.body.departmentName && !reportDepartments.includes(req.body.departmentName.trim())) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Category, department, or priority is invalid.' }); }
+    // Only validate the fields the citizen actually sent, and validate them
+    // against the live catalogue so edited reports keep working after the
+    // admin adds categories or departments.
+    const [categoryOk, departmentOk] = await Promise.all([
+      req.body.category ? isReportCategory(req.body.category) : true,
+      req.body.departmentName ? isReportDepartment(req.body.departmentName.trim()) : true
+    ]);
+    if (!categoryOk || !departmentOk || (req.body.priority && !reportPriorities.includes(req.body.priority))) { await removeFiles(req.files); return res.status(400).json({ success: false, message: 'Category, department, or priority is invalid.' }); }
     for (const field of fields) if (req.body[field] !== undefined) report[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
     if (req.body.location !== undefined) {
       const locationResult = normalizeReportLocation(req.body.location);
@@ -214,7 +231,12 @@ export async function listAllReports(req, res, next) {
 
 export async function listDepartments(req, res, next) {
   try {
-    const departments = await Department.find({ status: 'active' }).sort({ name: 1 }).lean();
+    // Return full department objects so the citizen report form and picker
+    // can use icon, color, description and other display fields.
+    const departments = await Department.find({ status: 'active' })
+      .select('name code description icon color contactNumber email address scope')
+      .sort({ name: 1 })
+      .lean();
     return res.json({ success: true, departments });
   } catch (error) { next(error); }
 }

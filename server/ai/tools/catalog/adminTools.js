@@ -1,11 +1,4 @@
-/**
- * Super Admin platform tools (task §7). Read-only, admin-only.
- *
- * Every handler wraps the EXISTING admin controller (see tools/controllerBridge.js)
- * so the assistant explains exactly the numbers the Command Center shows. The AI
- * never mutates platform state: role changes, settings, deletions and permission
- * edits remain privileged screens (§36).
- */
+
 import { getAnalytics, getDashboardStats, listActivityLogs } from '../../../controllers/adminController.js';
 import { getGovernanceOverview, getOperationsAnalytics, getSystemHealth } from '../../../controllers/adminGovernanceController.js';
 import { TOOL_RISK } from '../toolRegistry.js';

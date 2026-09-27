@@ -90,6 +90,87 @@ const emergencySchema = new mongoose.Schema(
     resolutionNotes: { type: String, trim: true, maxlength: 2000, default: '' },
     citizenFeedback: { rating: { type: Number, min: 1, max: 5 }, comment: { type: String, maxlength: 1000, default: '' } },
     notes: { type: String, trim: true, maxlength: 1000, default: '' },
+
+    ops: {
+      workflowStatus: { type: String, default: 'SUBMITTED', index: true },
+      emergencyType: { type: String, default: 'OTHER' },
+      responseTypes: { type: [String], default: [] },
+      priority: { type: String, default: 'MEDIUM' },
+      priorityHistory: [{
+        priority: { type: String, default: '' },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        changedByRole: { type: String, default: '' },
+        reason: { type: String, trim: true, maxlength: 400, default: '' },
+        at: { type: Date, default: Date.now }
+      }],
+      reviewed: { type: Boolean, default: false },
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      reviewedAt: { type: Date, default: null },
+      reviewNotes: { type: String, trim: true, maxlength: 1000, default: '' },
+      // Emergency Department Officer holding the incident.
+      departmentOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      departmentOfficerAssignedAt: { type: Date, default: null },
+      departmentOfficerAssignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      // Emergency Officer leading the field response.
+      emergencyOfficer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      emergencyOfficerAssignedAt: { type: Date, default: null },
+      emergencyOfficerAssignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      acceptedAt: { type: Date, default: null },
+      teamFormedAt: { type: Date, default: null },
+      enRouteAt: { type: Date, default: null },
+      onSceneAt: { type: Date, default: null },
+      responseStartedAt: { type: Date, default: null },
+      completionPercent: { type: Number, min: 0, max: 100, default: 0 },
+      workCompletedAt: { type: Date, default: null },
+      workCompletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      resolvedAt: { type: Date, default: null },
+      resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      resolutionNotes: { type: String, trim: true, maxlength: 2000, default: '' },
+      closedAt: { type: Date, default: null },
+      closedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      closingNotes: { type: String, trim: true, maxlength: 2000, default: '' },
+      cancelledAt: { type: Date, default: null },
+      cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      cancellationReason: { type: String, trim: true, maxlength: 600, default: '' },
+      falseReportAt: { type: Date, default: null },
+      falseReportBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      falseReportReason: { type: String, trim: true, maxlength: 600, default: '' },
+      // Live escalation for the incident (history lives in EmergencyEscalation).
+      activeEscalation: {
+        id: { type: mongoose.Schema.Types.ObjectId, ref: 'EmergencyEscalation', default: null },
+        level: { type: String, default: '' },
+        previousStatus: { type: String, default: '' },
+        raisedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        raisedAt: { type: Date, default: null },
+        reason: { type: String, trim: true, maxlength: 600, default: '' }
+      },
+      progress: [{
+        text: { type: String, trim: true, maxlength: 600, default: '' },
+        percent: { type: Number, min: 0, max: 100, default: null },
+        by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        byRole: { type: String, default: '' },
+        team: { type: mongoose.Schema.Types.ObjectId, ref: 'EmergencyResponseTeam', default: null },
+        at: { type: Date, default: Date.now }
+      }],
+      blockers: [{
+        text: { type: String, trim: true, maxlength: 600, default: '' },
+        kind: { type: String, trim: true, maxlength: 40, default: 'OTHER' },
+        severity: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], default: 'MEDIUM' },
+        requiredResource: { type: String, trim: true, maxlength: 200, default: '' },
+        raisedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        raisedByRole: { type: String, default: '' },
+        raisedAt: { type: Date, default: Date.now },
+        resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        resolvedAt: { type: Date, default: null },
+        resolution: { type: String, trim: true, maxlength: 600, default: '' }
+      }],
+      instructions: [{
+        text: { type: String, trim: true, maxlength: 600, default: '' },
+        by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        byRole: { type: String, default: '' },
+        at: { type: Date, default: Date.now }
+      }]
+    },
     activity: [{
       action: { type: String, required: true },
       actorRole: { type: String, required: true },
@@ -112,5 +193,10 @@ emergencySchema.index({ type: 1, status: 1 });
 emergencySchema.index({ assignedOfficer: 1, status: 1 });
 emergencySchema.index({ assignedFieldWorker: 1, status: 1 });
 emergencySchema.index({ masterEmergency: 1, createdAt: -1 });
+// Emergency operations queue: command reads by status + priority, each level
+// reads the incidents it personally holds.
+emergencySchema.index({ 'ops.workflowStatus': 1, 'ops.priority': 1, createdAt: -1 });
+emergencySchema.index({ 'ops.departmentOfficer': 1, 'ops.workflowStatus': 1 });
+emergencySchema.index({ 'ops.emergencyOfficer': 1, 'ops.workflowStatus': 1 });
 
 export default mongoose.model('Emergency', emergencySchema);

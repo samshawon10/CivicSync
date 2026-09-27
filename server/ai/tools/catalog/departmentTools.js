@@ -1,12 +1,4 @@
-/**
- * Department operations tools (task §7) — Department Head / Officer / Field Worker.
- *
- * All reads are department-scoped and reuse the platform's own deterministic
- * engines: services/departmentSla.js for SLA position, services/nextAction.js for
- * workflow ownership and services/departmentTeamScoring.js for allocation
- * recommendations. The AI reports the same numbers the dashboard does and never
- * mutates a case (§36).
- */
+
 import Report from '../../../models/Report.js';
 import User from '../../../models/User.js';
 import DepartmentTeam from '../../../models/DepartmentTeam.js';

@@ -1,14 +1,4 @@
-/**
- * CivicSync Global CivicSearch — authorization + scoping rules.
- *
- * Pure functions only (no database access) so the permission rules can be
- * unit-tested directly: see civicSearchScope.test.js. The executor in
- * `services/civicSearch.js` translates these descriptors into Mongo filters.
- *
- * Security contract: a category is only offered when the role may see it, and
- * every category carries a scope descriptor that limits rows to data the role
- * owns. The search endpoint never falls back to "search everything".
- */
+
 import { emergencyRoleGroups } from '../config/emergencyOptions.js';
 
 /** Civic department staff (see controllers/reportController.js `staffRoles`). */
@@ -140,10 +130,6 @@ export function visibleCategories(user) {
   return searchCategoryIds.filter((key) => searchCategories[key].roles.includes(role));
 }
 
-/**
- * Resolves requested categories to the ones the role may actually use.
- * Unknown or unauthorized keys are dropped — never widened to "all".
- */
 export function resolveCategories(user, requested = []) {
   const allowed = visibleCategories(user);
   const normalized = (requested || []).map((value) => String(value || '').trim()).filter(Boolean);
@@ -151,11 +137,6 @@ export function resolveCategories(user, requested = []) {
   return allowed.filter((key) => normalized.includes(key));
 }
 
-/**
- * True when a category's rows may expose contact/identity detail to the role.
- * Operational categories (citizen accounts, audit trail) and restricted
- * emergencies are always treated as non-public.
- */
 export function isCategoryPublic(role, category) {
   if (category === 'emergencies') return emergencyRoles.includes(role);
   if (category === 'audit' || category === 'citizens') return false;

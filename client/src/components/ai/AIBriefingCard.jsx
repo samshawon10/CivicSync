@@ -1,23 +1,9 @@
-/**
- * CivicSync Intelligence — inline contextual entry point.
- *
- * Used on dashboards and record detail pages to offer page-aware AI without
- * duplicating the copilot. It opens the SAME global drawer pre-scoped to the
- * page's preset, so there is exactly one conversation engine in the product.
- *
- * All figures shown come from props that the page already fetched through its
- * authorized API call. Nothing here invents, estimates or caches numbers.
- */
+
 import { Button, Card, CardBody, Spinner } from '../ui/primitives.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCivicAIContext } from './CivicAIProvider.jsx';
 import { presetFor } from './aiPrompts.js';
 
-/**
- * @param {string}   presetKey  key into PAGE_PRESETS (case, emergency, service…)
- * @param {object}   context    extra pageContext (ids/labels only)
- * @param {Array}    stats      [{ label, value }] real values from the page's data
- */
 export default function AIBriefingCard({
   presetKey,
   context = {},

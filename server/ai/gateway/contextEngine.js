@@ -1,9 +1,4 @@
-/**
- * Context Engine (task §11, §13).
- *
- * Injects role-authorized civic ground truth into prompt context before tool execution.
- * Pre-retrieves scoped records so the model can ground its answers deterministically.
- */
+
 import Report from '../../models/Report.js';
 import Emergency from '../../models/Emergency.js';
 import EmergencyResponseAssignment from '../../models/EmergencyResponseAssignment.js';

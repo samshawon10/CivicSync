@@ -1,9 +1,3 @@
-/**
- * Model Router (task §6, §16).
- *
- * Provides resilient provider resolution, multi-tier fallback routing,
- * health tracking, circuit-breaker-like fault recovery, and deterministic degradation.
- */
 
 import { readAiConfig, providerIds, providerLabels } from '../config/aiConfig.js';
 import { createGeminiProvider } from './providers/geminiProvider.js';
@@ -84,9 +78,6 @@ export function buildProvider(providerId, config = readAiConfig()) {
   }
 }
 
-/**
- * Model Router instance managing provider lifecycle, chat execution, and automatic failover.
- */
 export class ModelRouter {
   constructor(config = null) {
     this.customConfig = config;
@@ -111,9 +102,6 @@ export class ModelRouter {
     });
   }
 
-  /**
-   * Executes a chat completion across the provider chain with automatic fallback.
-   */
   async chat({ system, messages = [], temperature, maxTokens, user = null, signal = null }) {
     const config = this.getConfig();
     const chain = this.getChain();

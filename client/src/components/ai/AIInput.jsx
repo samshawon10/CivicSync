@@ -1,9 +1,4 @@
-/**
- * CivicSync Intelligence — composer.
- *
- * Enter submits, Shift+Enter inserts a newline, and the textarea grows with
- * content up to a cap so it never pushes the message list off screen.
- */
+
 import { useEffect, useRef } from 'react';
 import { Button } from '../ui/primitives.jsx';
 import { cx } from '../../utils/format.js';

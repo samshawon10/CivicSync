@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 import { subscribeToEmergencyEvents } from '../services/emergencySocket.js';
 
-/**
- * Subscribes to emergency socket events and browser connectivity.
- * Returns { online, live, refreshKey } — refreshKey changes whenever an
- * emergency event arrives so callers can reload their data.
- */
 export default function useEmergencyEvents(onEvent) {
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [live, setLive] = useState(false);

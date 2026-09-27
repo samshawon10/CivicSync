@@ -1,8 +1,3 @@
-/**
- * Pure, database-free helpers for the community comment threads.
- * Kept out of the controller so the permission and ordering rules can be
- * unit-tested directly (see communityThread.test.js).
- */
 
 /** Compares a raw id against a reference that may be populated ({ _id }) or raw. */
 export function sameId(value, id) {
@@ -16,10 +11,6 @@ export function canEditComment(viewer, comment) {
   return sameId(comment.author, viewer._id);
 }
 
-/**
- * A comment can be removed by its author, by the author of the post it belongs
- * to (their thread to moderate) or by a platform admin.
- */
 export function canDeleteComment(viewer, comment, post) {
   if (!viewer || !comment || comment.status !== 'published') return false;
   return sameId(comment.author, viewer._id) || sameId(post?.author, viewer._id) || viewer.role === 'admin';
@@ -27,13 +18,6 @@ export function canDeleteComment(viewer, comment, post) {
 
 const createdAt = (comment) => new Date(comment.createdAt || 0).getTime();
 
-/**
- * Orders a flat comment list into reading order: every root comment followed by
- * its replies (parents before children), then the next root. Each entry is
- * tagged with its `depth` and its direct `replyCount` so the client can render
- * indentation without recursing. Replies whose parent is missing or no longer
- * published are promoted to roots so a thread never vanishes from the UI.
- */
 export function threadComments(comments = []) {
   const published = comments.filter((comment) => comment?.status === 'published').sort((a, b) => createdAt(a) - createdAt(b));
   const known = new Set(published.map((comment) => String(comment._id)));
@@ -54,10 +38,6 @@ export function threadComments(comments = []) {
   return ordered;
 }
 
-/**
- * Ids of every descendant of `rootId`, transitively. Deleting a comment removes
- * its whole subtree so no reply is left orphaned.
- */
 export function descendantIds(comments = [], rootId) {
   const childrenOf = new Map();
   comments.forEach((comment) => {

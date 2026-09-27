@@ -67,7 +67,7 @@ export function FacilitiesSection() {
       const latitude = Number(form.latitude);
       const longitude = Number(form.longitude);
       if (!form.name.trim()) throw new Error('Facility name is required.');
-      if (!form.latitude.trim() || !form.longitude.trim() || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error('Enter valid latitude and longitude values.');
+      if (String(form.latitude).trim() === '' || String(form.longitude).trim() === '' || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new Error('Enter valid latitude and longitude values.');
       const payload = {
         ...form,
         latitude,
@@ -124,6 +124,9 @@ export function FacilitiesSection() {
       )
     }
   ];
+  const coordinatesReady = String(form.latitude).trim() !== '' && String(form.longitude).trim() !== ''
+    && Number.isFinite(Number(form.latitude)) && Number.isFinite(Number(form.longitude));
+
   return (
     <div className="space-y-5">
       <SectionHeading
@@ -154,55 +157,82 @@ export function FacilitiesSection() {
       <Modal
         open={createOpen}
         onClose={() => { setCreateOpen(false); setEditTarget(null); }}
+        size="lg"
         title={editTarget ? `Edit ${editTarget.name}` : 'Add safety facility'}
         subtitle="Coordinates are required so citizens and responders can locate the facility."
+        icon={editTarget ? 'pencil' : 'hospital'}
         footer={
           <>
+            {formError ? <ErrorState className="mr-auto min-w-0 flex-1" title="This facility was not saved" message={formError} /> : null}
             <Button onClick={() => { setCreateOpen(false); setEditTarget(null); }} disabled={busy}>Cancel</Button>
             <Button variant="primary" loading={busy} onClick={saveFacility}>{editTarget ? 'Save changes' : 'Add facility'}</Button>
           </>
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name" required className="sm:col-span-2">
-            <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} maxLength={140} />
-          </Field>
-          <Field label="Type" required>
-            <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}>
-              {facilityTypes.map((value) => <option key={value} value={value}>{labelize(value)}</option>)}
-            </select>
-          </Field>
-          <Field label="Status">
-            <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
-              {['operational', 'degraded', 'offline'].map((value) => <option key={value} value={value}>{labelize(value)}</option>)}
-            </select>
-          </Field>
-          <Field label="Description" className="sm:col-span-2">
-            <textarea rows={2} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={1000} />
-          </Field>
-          <Field label="Phone"><input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} maxLength={30} /></Field>
-          <Field label="Emergency phone"><input value={form.emergencyPhone} onChange={(event) => setForm((current) => ({ ...current, emergencyPhone: event.target.value }))} maxLength={30} /></Field>
-          <Field label="Email"><input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} maxLength={120} /></Field>
-          <Field label="Opening hours"><input value={form.openingHours} onChange={(event) => setForm((current) => ({ ...current, openingHours: event.target.value }))} maxLength={160} placeholder="e.g. 24 hours" /></Field>
-          <Field label="Address" className="sm:col-span-2">
-            <input value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} maxLength={300} />
-          </Field>
-          <Field label="Latitude" required hint="-90 to 90">
-            <input value={form.latitude} onChange={(event) => setForm((current) => ({ ...current, latitude: event.target.value }))} inputMode="decimal" />
-          </Field>
-          <Field label="Longitude" required hint="-180 to 180">
-            <input value={form.longitude} onChange={(event) => setForm((current) => ({ ...current, longitude: event.target.value }))} inputMode="decimal" />
-          </Field>
-          <Toggle checked={form.emergencyServiceAvailable} onChange={(value) => setForm((current) => ({ ...current, emergencyServiceAvailable: value }))} label="Emergency service available" hint="Shown to citizens when selecting urgent help." />
-          <Toggle checked={form.available} onChange={(value) => setForm((current) => ({ ...current, available: value }))} label="Currently available" hint="Receiving patients, callers or visitors right now." />
-          <Toggle checked={form.active} onChange={(value) => setForm((current) => ({ ...current, active: value }))} label="Active listing" hint="Shown on citizen nearby-services screens." />
+        <div className="space-y-6">
+          <section className="space-y-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-fg-subtle">Identity</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Facility name" required className="sm:col-span-2" hint="Shown on the public map, nearest-help search and incident routing.">
+                <input data-autofocus value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} maxLength={140} placeholder="e.g. Central City Hospital" />
+              </Field>
+              <Field label="Type" required hint="Controls the icon citizens see on the map.">
+                <select value={form.type} onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}>
+                  {facilityTypes.map((value) => <option key={value} value={value}>{labelize(value)}</option>)}
+                </select>
+              </Field>
+              <Field label="Operational status" hint="Use degraded or offline while a service is disrupted.">
+                <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
+                  {['operational', 'degraded', 'offline'].map((value) => <option key={value} value={value}>{labelize(value)}</option>)}
+                </select>
+              </Field>
+              <Field label="Description" className="sm:col-span-2" hint="Optional. Summarise the services available here.">
+                <textarea rows={3} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} maxLength={1000} placeholder="Emergency department, 24-hour triage, ambulance bay…" />
+              </Field>
+            </div>
+          </section>
+          <section className="space-y-3 border-t border-line pt-5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-fg-subtle">Contact &amp; hours</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Phone"><input type="tel" inputMode="tel" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} maxLength={30} placeholder="+1 555 0100" /></Field>
+              <Field label="Emergency phone" hint="Dialled by citizens requesting urgent help."><input type="tel" inputMode="tel" value={form.emergencyPhone} onChange={(event) => setForm((current) => ({ ...current, emergencyPhone: event.target.value }))} maxLength={30} placeholder="+1 555 0111" /></Field>
+              <Field label="Email"><input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} maxLength={120} placeholder="contact@example.org" /></Field>
+              <Field label="Opening hours"><input value={form.openingHours} onChange={(event) => setForm((current) => ({ ...current, openingHours: event.target.value }))} maxLength={160} placeholder="e.g. 24 hours" /></Field>
+            </div>
+          </section>
+
+          <section className="space-y-3 border-t border-line pt-5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-fg-subtle">Location</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Address" className="sm:col-span-2" hint="Street, area and city as citizens would search for it.">
+                <input value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} maxLength={300} placeholder="12 Independence Avenue, Central District" />
+              </Field>
+              <Field label="Latitude" required hint="-90 to 90">
+                <input value={form.latitude} onChange={(event) => setForm((current) => ({ ...current, latitude: event.target.value }))} inputMode="decimal" placeholder="e.g. 23.8103" />
+              </Field>
+              <Field label="Longitude" required hint="-180 to 180">
+                <input value={form.longitude} onChange={(event) => setForm((current) => ({ ...current, longitude: event.target.value }))} inputMode="decimal" placeholder="e.g. 90.4125" />
+              </Field>
+            </div>
+            <div className="rounded-xl border border-line p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[12px] font-semibold text-fg">Pin the exact spot</p>
+                <span className="tabular text-[11px] text-fg-subtle">{coordinatesReady ? `${Number(form.latitude).toFixed(5)}, ${Number(form.longitude).toFixed(5)}` : 'No point selected yet'}</span>
+              </div>
+              <EmergencyMap showControls={false} cluster={false} autoFit={false} height="h-56" onMapClick={(point) => setForm((current) => ({ ...current, latitude: String(point.latitude), longitude: String(point.longitude) }))} center={coordinatesReady ? [Number(form.latitude), Number(form.longitude)] : undefined} />
+              <p className="mt-2 text-[11px] text-fg-subtle">Click the map to set the coordinates, or type them above — both stay in sync.</p>
+            </div>
+          </section>
+
+          <section className="space-y-3 border-t border-line pt-5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-fg-subtle">Availability</p>
+            <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+              <Toggle checked={form.emergencyServiceAvailable} onChange={(value) => setForm((current) => ({ ...current, emergencyServiceAvailable: value }))} label="Emergency service available" hint="Shown to citizens when selecting urgent help." />
+              <Toggle checked={form.available} onChange={(value) => setForm((current) => ({ ...current, available: value }))} label="Currently available" hint="Receiving patients, callers or visitors right now." />
+              <Toggle checked={form.active} onChange={(value) => setForm((current) => ({ ...current, active: value }))} label="Active listing" hint="Shown on citizen nearby-services screens." />
+            </div>
+          </section>
         </div>
-        <div className="mt-4 rounded-xl border border-line p-3">
-          <p className="mb-2 text-[12px] font-semibold text-fg">Choose on map</p>
-          <EmergencyMap showControls={false} cluster={false} autoFit={false} height="h-48" onMapClick={(point) => setForm((current) => ({ ...current, latitude: String(point.latitude), longitude: String(point.longitude) }))} center={form.latitude !== '' && form.longitude !== '' ? [Number(form.latitude), Number(form.longitude)] : undefined} />
-          <p className="mt-2 text-[11px] text-fg-subtle">Click the map to replace the coordinates. Manual latitude and longitude remain available above.</p>
-        </div>
-        {formError ? <div className="mt-4"><ErrorState message={formError} /></div> : null}
       </Modal>
 
       <ConfirmDialog
@@ -397,6 +427,7 @@ function CategoryManagementSection({ responseTimeOnly = false }) {
         onClose={() => { setCreateOpen(false); setEditTarget(null); }}
         title={editTarget ? `Edit ${editTarget.label}` : 'New emergency category'}
         subtitle="Keys are lowercase_snake_case. Subcategories are one per line as key:Label."
+        icon={editTarget ? 'pencil' : 'siren'}
         footer={
           <>
             <Button onClick={() => { setCreateOpen(false); setEditTarget(null); }} disabled={busy}>Cancel</Button>
@@ -605,6 +636,7 @@ export function ResponseTeamsSection() {
         onClose={() => { setCreateOpen(false); setEditTarget(null); }}
         title={editTarget ? `Edit ${editTarget.name}` : 'New response team'}
         subtitle="Members must be active emergency officers or field workers — the backend enforces this."
+        icon={editTarget ? 'pencil' : 'users'}
         size="lg"
         footer={
           <>
@@ -812,6 +844,7 @@ export function ServiceConfigSection() {
         onClose={() => setRoutingTarget(null)}
         title={`Emergency routing · ${routingTarget?.name || ''}`}
         subtitle="At least one type is required. Civic departments are promoted to hybrid when routing is saved."
+        icon="route"
         footer={
           <>
             <Button onClick={() => setRoutingTarget(null)} disabled={busy}>Cancel</Button>

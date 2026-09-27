@@ -5,6 +5,7 @@ import EmergencyAlert from '../models/EmergencyAlert.js';
 import EmergencyContact from '../models/EmergencyContact.js';
 import EmergencyCategory from '../models/EmergencyCategory.js';
 import EmergencyResponseAssignment from '../models/EmergencyResponseAssignment.js';
+import EmergencyResponseTeam from '../models/EmergencyResponseTeam.js';
 import EmergencyResponderLocation from '../models/EmergencyResponderLocation.js';
 import ResponseTeam from '../models/ResponseTeam.js';
 import Notification from '../models/Notification.js';
@@ -32,6 +33,13 @@ async function validCategory(value) {
 }
 
 function commandAccess(user) { return commandRoles.includes(user.role); }
+function denyLegacyOpsWrite(req, res, emergency) {
+  if (req.user.role !== 'admin' && req.user.role.startsWith('emergency_') && emergency?.ops?.workflowStatus) {
+    res.status(403).json({ success: false, message: 'Use the Emergency Operations workflow endpoint for this action.' });
+    return true;
+  }
+  return false;
+}
 function sameId(value, userId) {
   const id = value?._id || value;
   return Boolean(id && String(id) === String(userId));
@@ -97,7 +105,16 @@ function emergencyForViewer(emergency, viewer, summary = false) {
 async function scopedEmergency(req, res) {
   if (!isId(req.params.id)) { res.status(404).json({ success: false, message: 'Emergency not found.' }); return null; }
   const emergency = await populatedEmergency(req.params.id);
-  if (!emergency || (!commandAccess(req.user) && !participant(emergency, req.user._id))) { res.status(404).json({ success: false, message: 'Emergency not found.' }); return null; }
+  const operationsAssigned = emergency && (
+    sameId(emergency.ops?.departmentOfficer, req.user._id)
+    || sameId(emergency.ops?.emergencyOfficer, req.user._id)
+    || (req.user.role === 'emergency_field_worker' && await EmergencyResponseTeam.exists({
+      emergency: emergency._id,
+      status: 'FORMED',
+      members: { $elemMatch: { user: req.user._id, status: { $ne: 'RELEASED' } } }
+    }))
+  );
+  if (!emergency || (!commandAccess(req.user) && !participant(emergency, req.user._id) && !operationsAssigned)) { res.status(404).json({ success: false, message: 'Emergency not found.' }); return null; }
   return emergency;
 }
 
@@ -224,10 +241,12 @@ export async function mergeEmergency(req, res, next) {
   try {
     if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Only emergency command can merge related incidents.' });
     const master = await scopedEmergency(req, res); if (!master) return;
+    if (denyLegacyOpsWrite(req, res, master)) return;
     const duplicateIds = [...new Set((Array.isArray(req.body.emergencyIds) ? req.body.emergencyIds : []).filter(isId).map(String))].filter((id) => id !== String(master._id));
     if (!duplicateIds.length) return res.status(400).json({ success: false, message: 'Select at least one related incident.' });
     const duplicates = await Emergency.find({ _id: { $in: duplicateIds } });
     if (duplicates.length !== duplicateIds.length) return res.status(404).json({ success: false, message: 'One or more incidents were not found.' });
+    if (duplicates.some((incident) => incident.ops?.workflowStatus) && req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Use the Emergency Operations workflow to merge active incidents.' });
     await Emergency.updateMany({ _id: { $in: duplicateIds } }, { masterEmergency: master._id, status: 'reassigned' });
     master.relatedEmergencies = [...new Set([...master.relatedEmergencies.map(String), ...duplicateIds])]; master.activity.push({ action: 'Related incidents merged', actorRole: req.user.role, note: `${duplicates.length} report(s) retained and linked to this incident.` }); await master.save();
     await Promise.all(duplicates.map((incident) => notify(incident.citizen, incident, `Your report ${incident.emergencyId} was linked to related incident ${master.emergencyId}; it remains part of the response record.`)));
@@ -238,6 +257,15 @@ export async function mergeEmergency(req, res, next) {
 export async function uploadEvidence(req, res, next) {
   try {
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
+    if (req.user.role !== 'citizen' && req.user.role !== 'emergency_field_worker') return res.status(403).json({ success: false, message: 'Only the citizen or an assigned Emergency Field Worker may upload evidence.' });
+    if (req.user.role === 'emergency_field_worker') {
+      const activeWork = await EmergencyResponseTeam.exists({
+        emergency: emergency._id,
+        status: 'FORMED',
+        members: { $elemMatch: { user: req.user._id, status: 'ACTIVE', fieldWorkStartedAt: { $ne: null } } }
+      });
+      if (!activeWork) return res.status(403).json({ success: false, message: 'Evidence can only be uploaded during your active field work.' });
+    }
     const files = req.files || [];
     if (!files.length) return res.status(400).json({ success: false, message: 'Select at least one evidence file.' });
     emergency.evidence.push(...files.map((file) => ({ filename: file.filename, originalName: clean(file.originalname, 180), mediaType: file.mimetype.split('/')[0], url: `/api/emergencies/${emergency._id}/evidence/${file.filename}` })));
@@ -265,6 +293,9 @@ export async function updateResponderLocation(req, res, next) {
 export async function updateEmergency(req, res, next) {
   try {
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
+    if (req.user.role === 'emergency_department_head' && emergency.ops?.workflowStatus && (req.body.category !== undefined || req.body.severity !== undefined || req.body.priority !== undefined)) {
+      return res.status(403).json({ success: false, message: 'Use the Emergency Operations classification endpoint to change emergency type or priority.' });
+    }
     const command = commandAccess(req.user); const ownDraft = sameId(emergency.citizen, req.user._id) && ['reported', 'received'].includes(emergency.status);
     if (!command && !ownDraft) return res.status(403).json({ success: false, message: 'This emergency can no longer be edited by the citizen.' });
     const reclassified = {};
@@ -316,6 +347,7 @@ export async function updateEmergency(req, res, next) {
 
 export async function assignEmergency(req, res, next) {
   try {
+    if (req.user.role === 'emergency_department_head') return res.status(403).json({ success: false, message: 'The Emergency Head may assign only an Emergency Department Officer through the Emergency Operations workflow.' });
     if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Only emergency command can dispatch response teams.' });
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
     if (!activeEmergencyStatuses.includes(emergency.status)) return res.status(409).json({ success: false, message: 'Closed or terminal incidents cannot be dispatched.' });
@@ -357,6 +389,7 @@ export async function updateStatus(req, res, next) {
   try {
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
     if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Only emergency command can update the incident status.' });
+    if (denyLegacyOpsWrite(req, res, emergency)) return;
     const { status, note = '' } = req.body;
     if (!emergencyStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid emergency status.' });
     const previous = emergency.status;
@@ -399,11 +432,12 @@ export async function updateStatus(req, res, next) {
 }
 
 export async function escalateEmergency(req, res, next) {
-  try { if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Only emergency command can escalate an incident.' }); const emergency = await scopedEmergency(req, res); if (!emergency) return; if (!activeEmergencyStatuses.includes(emergency.status) || emergency.status === 'escalated' || !canTransitionEmergency(emergency.status, 'escalated')) return res.status(409).json({ success: false, message: 'This incident cannot be escalated from its current status.' }); emergency.status = 'escalated'; emergency.severity = 'critical'; emergency.priority = 'critical'; emergency.escalation = { escalatedAt: new Date(), escalatedBy: req.user._id, reason: clean(req.body.reason, 1000) }; emergency.activity.push({ action: 'Emergency escalated', actorRole: req.user.role, note: clean(req.body.reason, 500) }); await emergency.save(); await audit(req.user, 'emergency_escalated', emergency, emergency.escalation.reason); emitEmergencyEvent('EMERGENCY_ESCALATED', { emergencyId: emergency._id, publicId: emergency.emergencyId, reason: emergency.escalation.reason }, { userIds: participantIds(emergency), roles: commandRoles }); res.json({ success: true, emergency: emergencyForViewer(await populatedEmergency(emergency._id), req.user) }); } catch (error) { next(error); }
+  try { if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Only emergency command can escalate an incident.' }); const emergency = await scopedEmergency(req, res); if (!emergency) return; if (denyLegacyOpsWrite(req, res, emergency)) return; if (!activeEmergencyStatuses.includes(emergency.status) || emergency.status === 'escalated' || !canTransitionEmergency(emergency.status, 'escalated')) return res.status(409).json({ success: false, message: 'This incident cannot be escalated from its current status.' }); emergency.status = 'escalated'; emergency.severity = 'critical'; emergency.priority = 'critical'; emergency.escalation = { escalatedAt: new Date(), escalatedBy: req.user._id, reason: clean(req.body.reason, 1000) }; emergency.activity.push({ action: 'Emergency escalated', actorRole: req.user.role, note: clean(req.body.reason, 500) }); await emergency.save(); await audit(req.user, 'emergency_escalated', emergency, emergency.escalation.reason); emitEmergencyEvent('EMERGENCY_ESCALATED', { emergencyId: emergency._id, publicId: emergency.emergencyId, reason: emergency.escalation.reason }, { userIds: participantIds(emergency), roles: commandRoles }); res.json({ success: true, emergency: emergencyForViewer(await populatedEmergency(emergency._id), req.user) }); } catch (error) { next(error); }
 }
 export async function backupEmergency(req, res, next) {
   try {
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
+    if (denyLegacyOpsWrite(req, res, emergency)) return;
     if (!staffRoles.includes(req.user.role)) return res.status(403).json({ success: false, message: 'Only emergency staff can request backup.' });
     if (!activeEmergencyStatuses.includes(emergency.status) || emergency.status === 'requires_backup' || !canTransitionEmergency(emergency.status, 'requires_backup')) return res.status(409).json({ success: false, message: 'Backup cannot be requested from the current incident status.' });
     emergency.status = 'requires_backup';
@@ -606,7 +640,6 @@ function alertPayload(body = {}) {
   return { value: { title: clean(body.title, 160), message: clean(body.message, 1000), category, severity: emergencySeverities.includes(body.severity) ? body.severity : 'medium', status, startAt, endAt, affectedArea: clean(body.affectedArea, 160), radiusKm, location: { address: clean(body.location?.address, 300), ...(latitude !== null ? { latitude, longitude } : {}) }, active: status === 'active' } };
 }
 
-
 function effectiveAlertState(payload, now = new Date()) {
   let status = payload.status;
   if (status === 'active' && payload.startAt && payload.startAt > now) status = 'scheduled';
@@ -756,11 +789,6 @@ export async function responderLocations(req, res, next) {
   } catch (error) { next(error); }
 }
 
-/**
- * Limited community verification. Standard-visibility incidents only; restricted
- * incidents are visible solely to their reporter and emergency command. No private
- * incident details are returned — only aggregate confirmation counts.
- */
 export async function communityVerify(req, res, next) {
   try {
     if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Emergency not found.' });
@@ -832,6 +860,7 @@ export async function safetyIntelligence(req, res, next) {
 export async function updateAssignmentStatus(req, res, next) {
   try {
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
+    if (denyLegacyOpsWrite(req, res, emergency)) return;
     let assignment = emergency.responseAssignments.find((item) => String(item._id) === req.params.assignmentId);
     if (!assignment) return res.status(404).json({ success: false, message: 'Assignment not found.' });
     const command = commandAccess(req.user);
@@ -886,6 +915,7 @@ export async function updateAssignmentStatus(req, res, next) {
 export async function addAssignmentWorkers(req, res, next) {
   try {
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
+    if (denyLegacyOpsWrite(req, res, emergency)) return;
     const assignment = emergency.responseAssignments.find((item) => String(item._id) === req.params.assignmentId);
     if (!assignment) return res.status(404).json({ success: false, message: 'Assignment not found.' });
     const command = commandAccess(req.user);

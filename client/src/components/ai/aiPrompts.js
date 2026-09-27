@@ -1,12 +1,3 @@
-/**
- * CivicSync Intelligence — role-aware prompt catalogue and page-context presets.
- *
- * These are *suggestions only*: each one is just a natural-language question sent
- * to the gateway, which decides independently which tools to run and which
- * records the caller is allowed to see. Nothing here grants access to data.
- *
- * Roles mirror server/utils/roles.js exactly. No new roles are invented.
- */
 
 const DASHBOARD_GROUPS = {
   citizen: ['My Cases', 'Services', 'Safety', 'Community'],
@@ -63,12 +54,6 @@ export function suggestionGroupsFor(role) {
 
 /* ------------------------------------------------------- Page-context presets */
 
-/**
- * Contextual prompts per surface. `context` is the pageContext envelope sent with
- * the message; the gateway's Context Engine uses it to pre-fetch ground truth.
- * Only non-sensitive identifiers (an id, a type, a label) are ever sent — never
- * the record body — so the browser cannot smuggle data past RBAC.
- */
 export const PAGE_PRESETS = {
   citizen_dashboard: {
     title: 'CivicSync Intelligence',

@@ -1,12 +1,4 @@
-/**
- * Civic service hub tools (task §19). Read-only.
- *
- * Services are official civic data owned by the Super Admin. The AI layer only
- * ever reads published records and reports missing fields as missing, using the
- * same `missingInformation` helper as controllers/civicServiceController.js.
- * The model is therefore structurally unable to invent a document, fee or
- * processing time.
- */
+
 import CivicService from '../../../models/CivicService.js';
 import { missingInformation } from '../../../services/civicServiceRules.js';
 import { TOOL_RISK } from '../toolRegistry.js';

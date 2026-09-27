@@ -1,10 +1,3 @@
-/**
- * Pure rules for the Civic Service Hub: input normalisation, publish readiness,
- * nearby-search parameters and honest "not recorded" reporting.
- *
- * No database access, so every rule below is unit-tested directly
- * (see civicServiceRules.test.js).
- */
 
 export const serviceStatuses = ['draft', 'published', 'archived'];
 export const nearbyRadiusKm = { min: 1, max: 50, default: 5 };
@@ -69,10 +62,6 @@ export function normalizeService(body = {}) {
   };
 }
 
-/**
- * Official information is only published once the essentials exist — the
- * platform must not publish a half-invented service record.
- */
 export function publishBlockers(service = {}) {
   const blockers = [];
   if (!text(service.name, 160)) blockers.push('A service name is required.');

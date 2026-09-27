@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import User from '../models/User.js';
-import Department from '../models/Department.js';
+import Department, { DEPARTMENT_ASSIGNABLE_ROLES } from '../models/Department.js';
 import Report from '../models/Report.js';
 import Emergency from '../models/Emergency.js';
 import ActivityLog from '../models/ActivityLog.js';
@@ -9,6 +9,7 @@ import { canTransitionReport } from '../services/reportLifecycle.js';
 import { reportPriorities, reportStatuses } from '../config/reportOptions.js';
 import { emergencyStatuses } from '../config/emergencyOptions.js';
 import { sanitizeSettings } from '../config/settingsDefaults.js';
+import { emitDepartmentEvent } from '../realtime/emergencyRealtime.js';
 
 const roles = ['citizen', 'admin', 'department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker'];
 const departmentHeadRoles = ['department_head', 'emergency_department_head'];
@@ -16,7 +17,6 @@ const emergencyRoles = ['emergency_department_head', 'emergency_department_offic
 const userStatuses = ['active', 'suspended'];
 const emergencyTypes = ['police', 'fire', 'medical', 'accident', 'disaster', 'other'];
 const statusLabels = Object.fromEntries(reportStatuses.map((value) => [value, value.replaceAll('_', ' ')]));
-
 
 function objectId(value) { return mongoose.Types.ObjectId.isValid(value); }
 function escapeRegex(value = '') { return value.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -87,21 +87,460 @@ export async function deleteUser(req, res, next) { try { if (!objectId(req.param
 
 export async function listDepartmentsForCitizen(req, res, next) {
   try {
-    const departments = await Department.find({ status: 'active' }).sort({ name: 1 }).lean();
+    const departments = await Department.find({ status: 'active' })
+      .select('name code description icon color contactNumber email address scope')
+      .sort({ name: 1 })
+      .lean();
     res.json({ success: true, departments });
   } catch (error) { next(error); }
 }
 
-export async function listDepartments(req, res, next) { try { const filter = {}; if (req.query.status === 'active' || req.query.status === 'inactive') filter.status = req.query.status; if (['civic', 'emergency', 'hybrid'].includes(req.query.scope)) filter.scope = req.query.scope; if (req.query.search?.trim()) filter.name = new RegExp(escapeRegex(req.query.search), 'i'); const page = pageOf(req.query.page); const limit = limitOf(req.query.limit); const [departments, total] = await Promise.all([Department.find(filter).populate('head', 'name email photoURL').populate('emergencyHead', 'name email photoURL').sort({ name: 1 }).skip((page - 1) * limit).limit(limit).lean(), Department.countDocuments(filter)]); res.json({ success: true, departments, pagination: { page, limit, total, pages: Math.ceil(total / limit) } }); } catch (error) { next(error); } }
-export async function getDepartmentDetail(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' }); const department = await Department.findById(req.params.id).populate('head', 'name email phone photoURL').populate('emergencyHead', 'name email phone photoURL').lean(); if (!department) return res.status(404).json({ success: false, message: 'Department not found.' }); const [team, rows, monthly] = await Promise.all([User.find({ department: department._id, role: { $in: ['department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker'] } }).select('name email phone photoURL role status').lean(), Report.aggregate([{ $match: { departmentName: department.name } }, { $group: { _id: '$status', count: { $sum: 1 } } }]), Report.aggregate([{ $match: { departmentName: department.name } }, { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, total: { $sum: 1 }, resolved: { $sum: { $cond: [{ $in: ['$status', ['completed', 'closed']] }, 1, 0] } } } }, { $sort: { _id: 1 } }, { $limit: 12 }])]); const stats = Object.fromEntries(rows.map((row) => [row._id, row.count])); const total = rows.reduce((sum, row) => sum + row.count, 0); const resolved = (stats.completed || 0) + (stats.closed || 0); res.json({ success: true, department, team, stats: { total, pending: stats.pending || 0, active: (stats.assigned || 0) + (stats.in_progress || 0) + (stats.under_review || 0), completed: resolved, resolutionRate: total ? Math.round(resolved / total * 100) : 0, byStatus: rows }, monthly }); } catch (error) { next(error); } }
-function departmentPayload(body) { const routingTypes = Array.isArray(body.emergencyTypes) ? body.emergencyTypes.filter((type) => emergencyTypes.includes(type)) : []; return { name: body.name?.trim(), type: body.type?.trim() || '', description: body.description?.trim() || '', contactNumber: body.contactNumber?.trim() || '', email: body.email?.trim().toLowerCase() || '', address: body.address?.trim() || '', status: body.status === 'inactive' ? 'inactive' : 'active', scope: ['civic', 'emergency', 'hybrid'].includes(body.scope) ? body.scope : 'civic', emergencyTypes: routingTypes }; }
-function validDepartment(payload) { return payload.name && payload.name.length <= 120 && (!payload.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) && (!payload.contactNumber || /^[+()\-\s\d]{6,30}$/.test(payload.contactNumber)); }
-export async function createDepartment(req, res, next) { try { const payload = departmentPayload(req.body); if (!validDepartment(payload)) return res.status(400).json({ success: false, message: 'Provide a department name, valid email, and valid contact number.' }); const department = await Department.create(payload); await log(req.user, 'department_created', 'department', department._id, department.name, 'Department created.'); res.status(201).json({ success: true, message: 'Department created.', department }); } catch (error) { next(error); } }
-export async function updateDepartment(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' }); const department = await Department.findById(req.params.id); if (!department) return res.status(404).json({ success: false, message: 'Department not found.' }); const payload = departmentPayload({ ...department.toObject(), ...req.body }); if (!validDepartment(payload)) return res.status(400).json({ success: false, message: 'Provide a department name, valid email, and valid contact number.' }); const oldName = department.name; Object.assign(department, payload); await department.save(); if (oldName !== department.name) await Promise.all([User.updateMany({ department: department._id }, { $set: { departmentName: department.name } }), Report.updateMany({ departmentName: oldName }, { $set: { departmentName: department.name } })]); await log(req.user, 'department_updated', 'department', department._id, department.name, 'Department details updated.'); res.json({ success: true, message: 'Department updated.', department }); } catch (error) { next(error); } }
-export async function assignDepartmentHead(req, res, next) { try { const { userId } = req.body; if (!objectId(req.params.id) || !objectId(userId)) return res.status(400).json({ success: false, message: 'Select a valid department and registered user.' }); const [department, candidate] = await Promise.all([Department.findById(req.params.id), User.findById(userId)]); if (!department || !candidate) return res.status(404).json({ success: false, message: 'Department or user not found.' }); if (candidate.status !== 'active' || candidate.role === 'admin') return res.status(400).json({ success: false, message: 'Only active non-admin users are eligible to lead a department.' }); const oldHead = department.head ? await User.findById(department.head) : null; await Department.updateMany({ head: candidate._id, _id: { $ne: department._id } }, { $set: { head: null } }); if (oldHead && !oldHead._id.equals(candidate._id)) { oldHead.role = 'citizen'; oldHead.department = null; oldHead.departmentName = ''; await oldHead.save(); } candidate.role = 'department_head'; candidate.department = department._id; candidate.departmentName = department.name; await candidate.save(); department.head = candidate._id; await department.save(); await log(req.user, oldHead ? 'department_head_changed' : 'department_head_assigned', 'department', department._id, department.name, `${candidate.name} assigned as department head.`, { previousHead: oldHead?._id || null, newHead: candidate._id }); await department.populate('head', 'name email phone photoURL'); res.json({ success: true, message: oldHead ? 'Department head changed.' : 'Department head assigned.', department }); } catch (error) { next(error); } }
-export async function assignEmergencyDepartmentHead(req, res, next) { try { const { userId } = req.body; if (!objectId(req.params.id) || !objectId(userId)) return res.status(400).json({ success: false, message: 'Select a valid emergency department and registered user.' }); const [department, candidate] = await Promise.all([Department.findById(req.params.id), User.findById(userId)]); if (!department || !candidate) return res.status(404).json({ success: false, message: 'Department or user not found.' }); if (!['emergency', 'hybrid'].includes(department.scope) || candidate.status !== 'active' || candidate.role === 'admin') return res.status(400).json({ success: false, message: 'Choose an active non-admin user and an emergency-enabled department.' }); const previous = department.emergencyHead ? await User.findById(department.emergencyHead) : null; await Department.updateMany({ emergencyHead: candidate._id, _id: { $ne: department._id } }, { $set: { emergencyHead: null } }); if (previous && !previous._id.equals(candidate._id)) { previous.role = 'citizen'; previous.department = null; previous.departmentName = ''; await previous.save(); } candidate.role = 'emergency_department_head'; candidate.department = department._id; candidate.departmentName = department.name; await candidate.save(); department.emergencyHead = candidate._id; await department.save(); await log(req.user, previous ? 'emergency_department_head_changed' : 'emergency_department_head_assigned', 'department', department._id, department.name, `${candidate.name} assigned as emergency department head.`, { previousHead: previous?._id || null, newHead: candidate._id }); await department.populate('emergencyHead', 'name email phone photoURL'); res.json({ success: true, message: 'Emergency department head assigned.', department }); } catch (error) { next(error); } }
-export async function updateEmergencyRouting(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' }); const department = await Department.findById(req.params.id); if (!department) return res.status(404).json({ success: false, message: 'Department not found.' }); const types = Array.isArray(req.body.emergencyTypes) ? req.body.emergencyTypes.filter((type) => emergencyTypes.includes(type)) : []; if (!types.length) return res.status(400).json({ success: false, message: 'Select at least one valid emergency type.' }); department.scope = department.scope === 'civic' ? 'hybrid' : department.scope; department.emergencyTypes = [...new Set(types)]; await department.save(); await log(req.user, 'emergency_routing_updated', 'department', department._id, department.name, 'Emergency routing responsibilities updated.', { emergencyTypes: department.emergencyTypes }); res.json({ success: true, message: 'Emergency routing updated.', department }); } catch (error) { next(error); } }
-export async function deleteDepartment(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' }); const department = await Department.findById(req.params.id); if (!department) return res.status(404).json({ success: false, message: 'Department not found.' }); await User.updateMany({ department: department._id }, { $set: { role: 'citizen', department: null, departmentName: '' } }); await log(req.user, 'department_deleted', 'department', department._id, department.name, 'Department deleted.'); await department.deleteOne(); res.json({ success: true, message: 'Department deleted.' }); } catch (error) { next(error); } }
+export async function listDepartments(req, res, next) {
+  try {
+    const filter = {};
+    if (req.query.status === 'active' || req.query.status === 'inactive') filter.status = req.query.status;
+    if (['civic', 'emergency', 'hybrid'].includes(req.query.scope)) filter.scope = req.query.scope;
+    if (req.query.search?.trim()) filter.name = new RegExp(escapeRegex(req.query.search), 'i');
+
+    const page = pageOf(req.query.page);
+    const limit = limitOf(req.query.limit);
+
+    const [departments, total, activeCount, inactiveCount] = await Promise.all([
+      Department.find(filter)
+        .populate('head', 'name email photoURL')
+        .populate('emergencyHead', 'name email photoURL')
+        .sort({ name: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Department.countDocuments(filter),
+      Department.countDocuments({ status: 'active' }),
+      Department.countDocuments({ status: 'inactive' })
+    ]);
+
+    // Attach live staff counts per department (single aggregation)
+    const deptIds = departments.map((d) => d._id);
+    const staffCounts = await User.aggregate([
+      { $match: { department: { $in: deptIds }, status: 'active' } },
+      { $group: { _id: '$department', count: { $sum: 1 } } }
+    ]);
+    const staffMap = Object.fromEntries(staffCounts.map((row) => [String(row._id), row.count]));
+
+    res.json({
+      success: true,
+      departments: departments.map((d) => ({
+        ...d,
+        staffCount: staffMap[String(d._id)] || 0
+      })),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      counts: { total: activeCount + inactiveCount, active: activeCount, inactive: inactiveCount }
+    });
+  } catch (error) { next(error); }
+}
+
+export async function getDepartmentDetail(req, res, next) {
+  try {
+    if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' });
+    const department = await Department.findById(req.params.id)
+      .populate('head', 'name email phone photoURL')
+      .populate('emergencyHead', 'name email phone photoURL')
+      .lean();
+    if (!department) return res.status(404).json({ success: false, message: 'Department not found.' });
+
+    const [team, rows, monthly] = await Promise.all([
+      User.find({ department: department._id, role: { $in: DEPARTMENT_ASSIGNABLE_ROLES } })
+        .select('name email phone photoURL role status')
+        .lean(),
+      Report.aggregate([
+        { $match: { departmentName: department.name } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+      Report.aggregate([
+        { $match: { departmentName: department.name } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+            total: { $sum: 1 },
+            resolved: { $sum: { $cond: [{ $in: ['$status', ['completed', 'closed']] }, 1, 0] } }
+          }
+        },
+        { $sort: { _id: 1 } },
+        { $limit: 12 }
+      ])
+    ]);
+    const stats = Object.fromEntries(rows.map((row) => [row._id, row.count]));
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
+    const resolved = (stats.completed || 0) + (stats.closed || 0);
+    res.json({
+      success: true,
+      department,
+      team,
+      stats: {
+        total,
+        pending: stats.pending || 0,
+        active: (stats.assigned || 0) + (stats.in_progress || 0) + (stats.under_review || 0),
+        completed: resolved,
+        resolutionRate: total ? Math.round((resolved / total) * 100) : 0,
+        byStatus: rows
+      },
+      monthly
+    });
+  } catch (error) { next(error); }
+}
+
+// ─── Department payload helpers ────────────────────────────────────────────
+const VALID_EMERGENCY_TYPES = ['police', 'fire', 'medical', 'accident', 'disaster', 'other'];
+
+function buildDepartmentPayload(body, existing = {}) {
+  const routingTypes = Array.isArray(body.emergencyTypes)
+    ? body.emergencyTypes.filter((type) => VALID_EMERGENCY_TYPES.includes(type))
+    : (existing.emergencyTypes || []);
+
+  // Sanitize and validate assignedRoles: only accept known department-level roles
+  const assignedRoles = Array.isArray(body.assignedRoles)
+    ? [...new Set(body.assignedRoles.filter((role) => DEPARTMENT_ASSIGNABLE_ROLES.includes(role)))]
+    : (existing.assignedRoles || []);
+
+  const code = body.code?.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 40) || existing.code || null;
+
+  return {
+    name: body.name?.trim() ?? existing.name,
+    code,
+    type: body.type !== undefined ? String(body.type).trim().slice(0, 80) : (existing.type || ''),
+    description: body.description !== undefined ? String(body.description).trim().slice(0, 2000) : (existing.description || ''),
+    icon: body.icon !== undefined ? String(body.icon).trim().slice(0, 80) : (existing.icon || 'building2'),
+    color: body.color !== undefined ? String(body.color).trim().slice(0, 20) : (existing.color || '#2563eb'),
+    contactNumber: body.contactNumber !== undefined ? String(body.contactNumber).trim().slice(0, 30) : (existing.contactNumber || ''),
+    email: body.email !== undefined ? String(body.email).trim().toLowerCase().slice(0, 120) : (existing.email || ''),
+    address: body.address !== undefined ? String(body.address).trim().slice(0, 300) : (existing.address || ''),
+    status: body.status === 'inactive' ? 'inactive' : 'active',
+    scope: ['civic', 'emergency', 'hybrid'].includes(body.scope) ? body.scope : (existing.scope || 'civic'),
+    emergencyTypes: routingTypes,
+    assignedRoles
+  };
+}
+
+function validateDepartmentPayload(payload) {
+  if (!payload.name || payload.name.length > 120) return 'Department name is required (max 120 characters).';
+  if (payload.name.length < 2) return 'Department name must be at least 2 characters.';
+  if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return 'Enter a valid email address.';
+  if (payload.contactNumber && !/^[+()\-\s\d]{6,30}$/.test(payload.contactNumber)) return 'Enter a valid contact number (6–30 characters, digits and +()-).';
+  if (payload.color && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(payload.color)) return 'Color must be a valid hex value (e.g. #2563eb).';
+  if ((payload.scope === 'emergency' || payload.scope === 'hybrid') && !payload.emergencyTypes.length) {
+    return 'Emergency and hybrid departments must handle at least one emergency type.';
+  }
+  return null;
+}
+
+export async function createDepartment(req, res, next) {
+  try {
+    const payload = buildDepartmentPayload(req.body);
+    const error = validateDepartmentPayload(payload);
+    if (error) return res.status(400).json({ success: false, message: error });
+
+    // Duplicate name check (model has unique index, but provide a clear message)
+    const existing = await Department.findOne({ name: payload.name }).lean();
+    if (existing) return res.status(409).json({ success: false, message: `A department named "${payload.name}" already exists.` });
+
+    // Duplicate code check
+    if (payload.code) {
+      const codeConflict = await Department.findOne({ code: payload.code }).lean();
+      if (codeConflict) return res.status(409).json({ success: false, message: `Department code "${payload.code}" is already in use.` });
+    }
+
+    const department = await Department.create({ ...payload, createdBy: req.user._id });
+    await log(req.user, 'department_created', 'department', department._id, department.name, `Department "${department.name}" created.`);
+
+    // Notify all admin sockets and citizen role so their pickers update
+    emitDepartmentEvent('DEPARTMENT_CREATED', {
+      departmentId: department._id,
+      name: department.name,
+      code: department.code,
+      status: department.status,
+      icon: department.icon,
+      color: department.color
+    }, { roles: ['admin', 'citizen'] });
+
+    res.status(201).json({ success: true, message: `Department "${department.name}" created.`, department });
+  } catch (error) {
+    if (error.code === 11000) {
+      const field = error.keyPattern?.code ? 'code' : 'name';
+      return res.status(409).json({ success: false, message: `A department with this ${field} already exists.` });
+    }
+    next(error);
+  }
+}
+
+export async function updateDepartment(req, res, next) {
+  try {
+    if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' });
+    const department = await Department.findById(req.params.id);
+    if (!department) return res.status(404).json({ success: false, message: 'Department not found.' });
+
+    const payload = buildDepartmentPayload(req.body, department.toObject());
+    const error = validateDepartmentPayload(payload);
+    if (error) return res.status(400).json({ success: false, message: error });
+
+    // Duplicate name check (excluding self)
+    if (payload.name !== department.name) {
+      const conflict = await Department.findOne({ name: payload.name, _id: { $ne: department._id } }).lean();
+      if (conflict) return res.status(409).json({ success: false, message: `A department named "${payload.name}" already exists.` });
+    }
+    // Duplicate code check (excluding self)
+    if (payload.code && payload.code !== department.code) {
+      const codeConflict = await Department.findOne({ code: payload.code, _id: { $ne: department._id } }).lean();
+      if (codeConflict) return res.status(409).json({ success: false, message: `Department code "${payload.code}" is already in use.` });
+    }
+
+    const oldName = department.name;
+    Object.assign(department, payload);
+    await department.save();
+
+    // Cascade name change to all staff and reports
+    if (oldName !== department.name) {
+      await Promise.all([
+        User.updateMany({ department: department._id }, { $set: { departmentName: department.name } }),
+        Report.updateMany({ departmentName: oldName }, { $set: { departmentName: department.name } })
+      ]);
+    }
+
+    await log(req.user, 'department_updated', 'department', department._id, department.name, `Department "${department.name}" details updated.`);
+
+    emitDepartmentEvent('DEPARTMENT_UPDATED', {
+      departmentId: department._id,
+      name: department.name,
+      code: department.code,
+      status: department.status,
+      icon: department.icon,
+      color: department.color,
+      oldName: oldName !== department.name ? oldName : undefined
+    }, { roles: ['admin', 'citizen'], department: department.name });
+
+    res.json({ success: true, message: `Department "${department.name}" updated.`, department });
+  } catch (error) {
+    if (error.code === 11000) {
+      const field = error.keyPattern?.code ? 'code' : 'name';
+      return res.status(409).json({ success: false, message: `A department with this ${field} already exists.` });
+    }
+    next(error);
+  }
+}
+
+export async function toggleDepartmentStatus(req, res, next) {
+  try {
+    if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' });
+    const department = await Department.findById(req.params.id);
+    if (!department) return res.status(404).json({ success: false, message: 'Department not found.' });
+
+    const newStatus = req.body.status === 'inactive' ? 'inactive' : 'active';
+    if (department.status === newStatus) {
+      return res.json({ success: true, message: `Department is already ${newStatus}.`, department });
+    }
+
+    department.status = newStatus;
+    await department.save();
+
+    await log(
+      req.user,
+      newStatus === 'active' ? 'department_activated' : 'department_deactivated',
+      'department',
+      department._id,
+      department.name,
+      `Department "${department.name}" ${newStatus === 'active' ? 'activated' : 'deactivated'}.`
+    );
+
+    emitDepartmentEvent('DEPARTMENT_STATUS_CHANGED', {
+      departmentId: department._id,
+      name: department.name,
+      status: department.status
+    }, { roles: ['admin', 'citizen'] });
+
+    res.json({ success: true, message: `Department "${department.name}" is now ${newStatus}.`, department });
+  } catch (error) { next(error); }
+}
+
+const DEPARTMENT_HEAD_SLOTS = {
+  head: {
+    key: 'head',
+    role: 'department_head',
+    label: 'Department Head',
+    noun: 'department head',
+    scopes: ['civic', 'hybrid']
+  },
+  emergencyHead: {
+    key: 'emergencyHead',
+    role: 'emergency_department_head',
+    label: 'Emergency Head',
+    noun: 'emergency department head',
+    scopes: ['emergency', 'hybrid']
+  }
+};
+
+async function setDepartmentHeadSlot(req, res, next, slotKey) {
+  const slot = DEPARTMENT_HEAD_SLOTS[slotKey];
+  const opposite = DEPARTMENT_HEAD_SLOTS[slotKey === 'head' ? 'emergencyHead' : 'head'];
+  try {
+    if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' });
+    const department = await Department.findById(req.params.id);
+    if (!department) return res.status(404).json({ success: false, message: 'Department not found.' });
+
+    const rawUserId = req.body?.userId;
+    const holder = department[slot.key] ? await User.findById(department[slot.key]) : null;
+
+    // ── Clear the slot: change or demote the leader without naming a replacement.
+    // This runs even for a slot the scope no longer supports, which is the only
+    // way out of a department that ended up with a legacy head it should not have.
+    if (rawUserId === null || rawUserId === undefined || rawUserId === '') {
+      if (!holder) return res.json({ success: true, message: `"${department.name}" has no ${slot.label}.`, department });
+      if (holder.role === slot.role) { holder.role = 'citizen'; holder.department = null; holder.departmentName = ''; await holder.save(); }
+      department[slot.key] = null;
+      await department.save();
+      await log(req.user, `${slot.role}_removed`, 'department', department._id, department.name, `${holder.name} removed as ${slot.noun} of "${department.name}".`, { previousHead: holder._id });
+      emitDepartmentEvent('DEPARTMENT_UPDATED', { departmentId: department._id, name: department.name }, { roles: ['admin'], department: department.name });
+      await department.populate({ path: slot.key, select: 'name email phone photoURL' });
+      return res.json({ success: true, message: `${slot.label} removed from "${department.name}".`, department });
+    }
+
+    // ── Assign the slot.
+    // The scope decides which leadership role the department actually needs.
+    if (!slot.scopes.includes(department.scope)) {
+      return res.status(400).json({
+        success: false,
+        message: `"${department.name}" is a ${department.scope} department, so it is led by ${opposite.label.startsWith('E') ? 'an' : 'a'} ${opposite.label}. ${holder ? `Remove the ${slot.label} first, then assign the ${opposite.label}.` : ''} Use Routing to change what this department handles when both kinds of leadership are needed.`
+      });
+    }
+    if (!objectId(rawUserId)) return res.status(400).json({ success: false, message: `Select a registered user to assign as ${slot.label}.` });
+    const candidate = await User.findById(rawUserId);
+    if (!candidate) return res.status(404).json({ success: false, message: 'User not found.' });
+    if (candidate.status !== 'active') return res.status(400).json({ success: false, message: 'Only active non-admin users are eligible to lead a department.' });
+    if (candidate.role === 'admin') return res.status(400).json({ success: false, message: 'Administrator accounts cannot lead a department.' });
+
+    // One role per account: release the candidate from every other department first.
+    await Promise.all([
+      Department.updateMany({ _id: { $ne: department._id }, head: candidate._id }, { $set: { head: null } }),
+      Department.updateMany({ _id: { $ne: department._id }, emergencyHead: candidate._id }, { $set: { emergencyHead: null } })
+    ]);
+
+    const replacing = Boolean(holder && !holder._id.equals(candidate._id));
+    if (replacing) { holder.role = 'citizen'; holder.department = null; holder.departmentName = ''; await holder.save(); }
+
+    // A single role cannot fill both leadership slots of the same department.
+    const movedFromOpposite = Boolean(department[opposite.key] && String(department[opposite.key]) === String(candidate._id));
+
+    candidate.role = slot.role;
+    candidate.department = department._id;
+    candidate.departmentName = department.name;
+    await candidate.save();
+
+    department[slot.key] = candidate._id;
+    if (movedFromOpposite) department[opposite.key] = null;
+    await department.save();
+
+    await log(
+      req.user,
+      replacing ? `${slot.role}_changed` : `${slot.role}_assigned`,
+      'department',
+      department._id,
+      department.name,
+      `${candidate.name} assigned as ${slot.noun} of "${department.name}".`,
+      { previousHead: replacing ? holder._id : null, newHead: candidate._id, movedFrom: movedFromOpposite ? opposite.key : null }
+    );
+    emitDepartmentEvent('DEPARTMENT_UPDATED', { departmentId: department._id, name: department.name }, { roles: ['admin'], department: department.name });
+    await department.populate({ path: slot.key, select: 'name email phone photoURL' });
+    const released = movedFromOpposite ? ` ${candidate.name} no longer holds the ${opposite.label} role because one account has one role.` : '';
+    const samePerson = Boolean(holder && holder._id.equals(candidate._id));
+    const message = samePerson
+      ? `${candidate.name} is already the ${slot.label} of "${department.name}".`
+      : `${slot.label} ${replacing ? 'changed for' : 'assigned to'} "${department.name}".${released}`;
+    res.json({ success: true, message, department });
+  } catch (error) { next(error); }
+}
+
+export async function assignDepartmentHead(req, res, next) { return setDepartmentHeadSlot(req, res, next, 'head'); }
+
+export async function assignEmergencyDepartmentHead(req, res, next) { return setDepartmentHeadSlot(req, res, next, 'emergencyHead'); }
+
+export async function updateEmergencyRouting(req, res, next) {
+  try {
+    if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' });
+    const department = await Department.findById(req.params.id);
+    if (!department) return res.status(404).json({ success: false, message: 'Department not found.' });
+    const types = Array.isArray(req.body.emergencyTypes) ? req.body.emergencyTypes.filter((type) => VALID_EMERGENCY_TYPES.includes(type)) : [];
+    if (!types.length) return res.status(400).json({ success: false, message: 'Select at least one valid emergency type.' });
+    department.scope = department.scope === 'civic' ? 'hybrid' : department.scope;
+    department.emergencyTypes = [...new Set(types)];
+    await department.save();
+    await log(req.user, 'emergency_routing_updated', 'department', department._id, department.name, 'Emergency routing responsibilities updated.', { emergencyTypes: department.emergencyTypes });
+    res.json({ success: true, message: 'Emergency routing updated.', department });
+  } catch (error) { next(error); }
+}
+
+export async function deleteDepartment(req, res, next) {
+  try {
+    if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Department not found.' });
+    const department = await Department.findById(req.params.id);
+    if (!department) return res.status(404).json({ success: false, message: 'Department not found.' });
+
+    // Safety check: if reports or emergencies reference this department, require explicit confirmation
+    const force = req.query.force === 'true';
+    if (!force) {
+      const [reportCount, emergencyCount] = await Promise.all([
+        Report.countDocuments({ departmentName: department.name }),
+        Emergency.countDocuments({ assignedDepartment: department._id })
+      ]);
+      if (reportCount > 0 || emergencyCount > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `This department has ${reportCount} report(s) and ${emergencyCount} emergency record(s). Deactivate it instead, or pass ?force=true to permanently delete.`,
+          counts: { reports: reportCount, emergencies: emergencyCount }
+        });
+      }
+    }
+
+    const name = department.name;
+    await User.updateMany({ department: department._id }, { $set: { role: 'citizen', department: null, departmentName: '' } });
+    await log(req.user, 'department_deleted', 'department', department._id, department.name, `Department "${department.name}" permanently deleted.`);
+    await department.deleteOne();
+
+    emitDepartmentEvent('DEPARTMENT_DELETED', { name }, { roles: ['admin', 'citizen'] });
+
+    res.json({ success: true, message: `Department "${name}" deleted. Staff accounts reset to citizen.` });
+  } catch (error) { next(error); }
+}
+
+export async function listAssignableRoles(req, res, next) {
+  try {
+    const roleDescriptions = {
+      department_head: 'Leads the department. Manages officers, reviews completions, and has full case authority.',
+      department_officer: 'Manages assigned citizen reports and handles department operations.',
+      officer: 'General officer role for civic departments. Can be assigned to cases.',
+      field_worker: 'Receives and updates assigned field tasks for on-site work.',
+      emergency_department_head: 'Leads emergency response within the department. Manages dispatch and escalations.',
+      emergency_department_officer: 'Coordinates emergency response assignments and monitors active incidents.',
+      emergency_officer: 'Responds to dispatched emergency incidents in the field.',
+      emergency_field_worker: 'Frontline field responder for emergency and disaster situations.'
+    };
+    const roleGroups = {
+      department_head: 'Civic Leadership',
+      department_officer: 'Civic Operations',
+      officer: 'Civic Operations',
+      field_worker: 'Civic Operations',
+      emergency_department_head: 'Emergency Leadership',
+      emergency_department_officer: 'Emergency Operations',
+      emergency_officer: 'Emergency Operations',
+      emergency_field_worker: 'Emergency Operations'
+    };
+    res.json({
+      success: true,
+      roles: DEPARTMENT_ASSIGNABLE_ROLES.map((key) => ({
+        key,
+        label: key.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        description: roleDescriptions[key] || '',
+        group: roleGroups[key] || 'Other'
+      }))
+    });
+  } catch (error) { next(error); }
+}
 
 export async function listComplaints(req, res, next) { try { const filter = reportFilter(req.query); const page = pageOf(req.query.page); const limit = limitOf(req.query.limit); const [complaints, total] = await Promise.all([reportQuery(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), Report.countDocuments(filter)]); res.json({ success: true, complaints, pagination: { page, limit, total, pages: Math.ceil(total / limit) } }); } catch (error) { next(error); } }
 export async function getComplaintDetail(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await reportQuery({ _id: req.params.id }).populate('completionReport.submittedBy', 'name email photoURL').lean(); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); res.json({ success: true, complaint }); } catch (error) { next(error); } }

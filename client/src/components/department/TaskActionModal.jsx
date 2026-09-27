@@ -2,10 +2,6 @@ import { useState } from 'react';
 import { Modal } from '../../components/ui/Overlays.jsx';
 import { OpsError, TextField, inputClass, primaryButton, secondaryButton } from './DepartmentOpsUI.jsx';
 
-/**
- * Collects the structured payload the server requires for the transitions that
- * cannot be expressed as a single click (complete / block / reject).
- */
 export default function TaskActionModal({ task, kind, onClose, onSubmit }) {
   const [draft, setDraft] = useState({
     summary: '', result: '', materialsUsed: '', remainingIssues: '', evidenceUrls: '',
@@ -43,6 +39,9 @@ export default function TaskActionModal({ task, kind, onClose, onSubmit }) {
     try { await onSubmit(payload); } catch (err) { setError(err?.message || 'Unable to update the task.'); } finally { setBusy(false); }
   }
 
+  /* Badge icon for the dialog header — mirrors the department-style dialogs. */
+  const icons = { complete: 'checkCircle', block: 'alertTriangle', reject: 'xCircle' };
+
   const titles = {
     complete: { title: `Complete ${task.taskNumber || task.title}`, subtitle: 'Submit the field completion report. This moves the parent case to review.' },
     block: { title: `Report blocker on ${task.taskNumber || task.title}`, subtitle: 'Blockers are routed to the department officer for resolution.' },
@@ -55,6 +54,7 @@ export default function TaskActionModal({ task, kind, onClose, onSubmit }) {
       onClose={onClose}
       title={titles.title}
       subtitle={titles.subtitle}
+      icon={icons[kind] || 'zap'}
       size="lg"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="task-action-form" disabled={busy} className={primaryButton}>{busy ? 'Submitting…' : 'Submit'}</button></>}
     >

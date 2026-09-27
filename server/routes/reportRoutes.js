@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createReport, deleteReport, getLegacyReportAttachment, getReport, getReportAttachment, listDepartments, listMyReports, reportStats, updateReport, verifyReportResolution, submitReportFeedback } from '../controllers/reportController.js';
+import { listReportCategories } from '../controllers/reportCategoryController.js';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
 import { uploadReportMedia } from '../middleware/uploadMiddleware.js';
 
@@ -9,6 +10,7 @@ reportFileRouter.use(requireAuth);
 reportFileRouter.get('/:id/attachments/:filename', getReportAttachment);
 router.use(requireAuth, requireRole('citizen'));
 router.get('/departments', listDepartments);
+router.get('/categories', listReportCategories);
 router.post('/', uploadReportMedia, createReport);
 router.get('/my/stats', reportStats);
 router.get('/my', listMyReports);

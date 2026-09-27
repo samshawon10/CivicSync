@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/**
- * Geolocation hook with honest state handling:
- *  - `location` is null until a real fix is obtained,
- *  - `error` explains exactly why capture failed (unsupported / denied / timeout),
- *  - `watch` streams updates for live responder tracking.
- */
 export default function useGeolocation({ auto = false, timeout = 10000 } = {}) {
   const [location, setLocation] = useState(null);
   const [error, setError] = useState('');

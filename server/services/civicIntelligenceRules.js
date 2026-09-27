@@ -1,14 +1,6 @@
-/**
- * Pure civic intelligence advisory classifier & context answerer.
- * Rules-driven, deterministic, fully auditable.
- * NEVER makes state changes. Always explicitly advisory.
- */
 
 export const CIVIC_ADVISORY_DISCLAIMER = 'Advisory guidance only — system actions require explicit user confirmation and authorized staff review.';
 
-/**
- * Keyword-based department & service matcher for civic issues.
- */
 const CIVIC_ROUTING_RULES = [
   {
     keywords: ['road', 'pothole', 'street', 'asphalt', 'sidewalk', 'traffic light', 'flyover', 'bridge', 'pavement'],

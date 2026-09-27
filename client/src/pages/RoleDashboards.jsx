@@ -6,13 +6,6 @@ import { mediaUrl } from '../services/reportService.js';
 import { dashboardPathFor, roleLabels, roles } from '../utils/roles.js';
 import DepartmentDashboard from './department/DepartmentDashboard.jsx';
 
-const content = {
-  citizen: ['My Profile', 'My Reports', 'Notifications'],
-  department_head: ['Department Overview', 'Assigned Staff', 'Reports'],
-  department_officer: ['Assigned Reports', 'Tasks', 'Status'],
-  field_worker: ['Assigned Tasks', 'Field Work', 'Completed Tasks']
-};
-
 export function DashboardLayout({ children, title, items }) {
   const { user, logout } = useAuth(); const navigate = useNavigate();
   async function signOut() { await logout(); navigate('/login'); }
@@ -20,8 +13,6 @@ export function DashboardLayout({ children, title, items }) {
 }
 
 export function ProfileHeader() { const { user } = useAuth(); return <section className="rounded-2xl bg-ink p-6 text-white"><p className="text-civic-100">Welcome back,</p><h2 className="mt-1 text-3xl font-bold">{user.name}</h2><div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-300"><span>Email: {user.email}</span><span>Role: {roleLabels[user.role]}</span>{user.department && <span>Department: {String(user.department)}</span>}</div></section>; }
-
-function PlaceholderDashboard({ role }) { const label = roleLabels[role]; const items = content[role]; const nav = role === 'citizen' ? ['Dashboard', 'Profile', 'My Reports'] : role === 'department_head' ? ['Dashboard', 'Department', 'Staff', 'Reports'] : role === 'department_officer' ? ['Dashboard', 'Assigned Reports', 'Tasks'] : ['Dashboard', 'Tasks', 'Completed']; return <DashboardLayout title={`${label} Dashboard`} items={nav}><ProfileHeader /><section className="mt-7 grid gap-4 sm:grid-cols-3">{items.map((item) => <article key={item} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm font-bold text-ink">{item}</p><p className="mt-2 text-sm text-slate-500">This workspace is ready for its next CivicSync phase.</p></article>)}</section></DashboardLayout>; }
 
 function AdminUsers({ onReports }) {
   const { user } = useAuth(); const [users, setUsers] = useState([]); const [search, setSearch] = useState(''); const [role, setRole] = useState(''); const [loading, setLoading] = useState(true); const [error, setError] = useState('');

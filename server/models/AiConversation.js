@@ -1,11 +1,5 @@
 import mongoose from 'mongoose';
 
-/**
- * Persisted AI Copilot conversation threads.
- *
- * Stores role-scoped conversations with safety redaction, tool traces,
- * token accounting, and citations for auditing and context resumption.
- */
 const aiMessageSchema = new mongoose.Schema(
   {
     role: {

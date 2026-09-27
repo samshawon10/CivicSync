@@ -1,24 +1,7 @@
-/**
- * Deterministic department team scoring (SLA-safe allocation support).
- *
- * Extracted from `recommendTeams` in controllers/departmentController.js so both
- * the Department Dashboard and the CivicSync AI Gateway use ONE scoring
- * implementation. The AI must never invent an allocation rule (§36, §41): it
- * reads the same score and reasons the officer sees on screen.
- *
- * The function is pure: it takes the team documents, the active-task counts and
- * the case category, and returns a ranked copy. It performs no writes and makes
- * no decision on the user's behalf.
- */
 
 /** Task states that count as live work for a team's workload. */
 export const activeTaskStatuses = Object.freeze(['assigned', 'accepted', 'traveling', 'arrived', 'in_progress', 'blocked']);
 
-/**
- * Scores teams for a case.
- * @param {{ teams?: object[], taskCounts?: Record<string, number>, category?: string }} args
- * @returns {Array<object>} the teams, ranked, each with score, reasons and workload
- */
 export function scoreTeamsForCase({ teams = [], taskCounts = {}, category = '' } = {}) {
   const wanted = String(category || '').toLowerCase();
   const scored = teams.map((team) => {

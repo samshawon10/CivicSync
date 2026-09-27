@@ -1,14 +1,4 @@
-/**
- * Action Registry (task §10).
- *
- * Defines the state-changing actions the AI model is allowed to PROPOSE.
- * In accordance with CivicSync safety architecture:
- *  - The model NEVER executes an action directly.
- *  - Actions return type: "action_confirmation" with an explanation and payload.
- *  - When the user confirms, the Action Executor verifies RBAC, scopes, and executes.
- *  - High-risk operations (dispatching responders, modifying users/permissions,
- *    deleting records, resolving emergencies) are prohibited from the AI action catalog.
- */
+
 import { AiError } from '../errors.js';
 import { TOOL_RISK } from '../tools/toolRegistry.js';
 import { roleOrder } from '../../config/permissions.js';

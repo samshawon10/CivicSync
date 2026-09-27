@@ -1,10 +1,4 @@
-/**
- * Self-service tools (task §7). Read-only.
- *
- * `getNotifications` and `getMyProfile` are strictly self-scoped: they take the
- * user from the authenticated request and never accept an id argument, so a
- * prompt can never turn them into a way to read someone else's data.
- */
+
 import Notification from '../../../models/Notification.js';
 import User from '../../../models/User.js';
 import { departmentSlaTargets } from '../../../services/departmentSla.js';

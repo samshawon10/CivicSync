@@ -5,10 +5,6 @@ import { ErrorState } from './EmergencyCard.jsx';
 
 const accepted = 'image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/mp4,audio/wav,audio/webm,application/pdf';
 
-/**
- * Evidence uploader with real progress tracking. Evidence files are stored
- * privately and served through an authenticated endpoint — never public static URLs.
- */
 export default function EvidenceUploader({ emergencyId, evidence = [], canUpload = true, onChanged }) {
   const [files, setFiles] = useState([]);
   const [progress, setProgress] = useState(null);

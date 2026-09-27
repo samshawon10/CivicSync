@@ -1,9 +1,5 @@
 import api from './api.js';
 
-/**
- * Super Admin API surface. Every method maps to an existing backend route —
- * nothing here is stubbed or mocked.
- */
 export const adminApi = {
   // Overview, governance and intelligence
   dashboard: (params) => api.get('/admin/dashboard', { params }),
@@ -33,11 +29,23 @@ export const adminApi = {
   department: (id) => api.get(`/admin/departments/${id}`),
   createDepartment: (payload) => api.post('/admin/departments', payload),
   updateDepartment: (id, payload) => api.patch(`/admin/departments/${id}`, payload),
+  toggleDepartmentStatus: (id, status) => api.patch(`/admin/departments/${id}/status`, { status }),
   assignHead: (id, userId) => api.post(`/admin/departments/${id}/head`, { userId }),
   assignEmergencyHead: (id, userId) => api.post(`/admin/departments/${id}/emergency-head`, { userId }),
+  // Clearing a leadership slot reuses the assign endpoints with a null userId.
+  removeHead: (id) => api.post(`/admin/departments/${id}/head`, { userId: null }),
+  removeEmergencyHead: (id) => api.post(`/admin/departments/${id}/emergency-head`, { userId: null }),
   updateEmergencyRouting: (id, payload) => api.patch(`/admin/departments/${id}/emergency-routing`, payload),
-  deleteDepartment: (id) => api.delete(`/admin/departments/${id}`),
+  deleteDepartment: (id, force = false) => api.delete(`/admin/departments/${id}${force ? '?force=true' : ''}`),
   citizenDepartments: () => api.get('/admin/departments/citizen-list'),
+  assignableRoles: () => api.get('/admin/departments/assignable-roles'),
+
+  // Report categories (the citizen-facing complaint catalogue)
+  reportCategories: () => api.get('/admin/report-categories'),
+  createReportCategory: (payload) => api.post('/admin/report-categories', payload),
+  updateReportCategory: (id, payload) => api.patch(`/admin/report-categories/${id}`, payload),
+  deleteReportCategory: (id) => api.delete(`/admin/report-categories/${id}`),
+  restoreReportCategories: () => api.post('/admin/report-categories/restore-defaults'),
 
   // Complaints
   complaints: (params) => api.get('/admin/complaints', { params }),

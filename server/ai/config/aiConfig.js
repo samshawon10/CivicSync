@@ -1,13 +1,3 @@
-/**
- * CivicSync AI Gateway — environment configuration.
- *
- * Design rule (task §5): the browser never sees a provider key. Every value here
- * is read from the server environment only, and `publicAiConfig()` exposes just
- * the facts a client may know (provider label, model label, limits).
- *
- * The config is read through a function (not a module-level constant) so tests
- * and the Super Admin view can observe environment changes without a restart.
- */
 
 /** Provider identifiers understood by the Model Router. */
 export const providerIds = Object.freeze(['gemini', 'groq', 'openrouter', 'local', 'civic_rules']);
@@ -20,11 +10,6 @@ export const providerLabels = Object.freeze({
   civic_rules: 'CivicSync deterministic reasoning (rules engine)'
 });
 
-/**
- * Indicative pricing in USD per 1M tokens, used only to *estimate* spend.
- * Unknown models cost 0 — CivicSync reports an estimate, never a billing claim.
- * Override per deployment with AI_PRICING_OVERRIDES (JSON).
- */
 export const modelPricing = Object.freeze({
   'gemini:gemini-2.0-flash': { input: 0.1, output: 0.4 },
   'gemini:gemini-2.5-flash': { input: 0.3, output: 2.5 },
@@ -34,10 +19,6 @@ export const modelPricing = Object.freeze({
   'local:any': { input: 0, output: 0 }
 });
 
-/**
- * Per-role AI limits (task §25). A Super Admin may be configured more
- * generously, a public citizen conservatively. Values are enforced server-side.
- */
 export const roleLimits = Object.freeze({
   citizen: { perMinute: 8, perDay: 120, maxToolCalls: 3, maxOutputTokens: 700 },
   admin: { perMinute: 30, perDay: 1200, maxToolCalls: 6, maxOutputTokens: 1200 },
@@ -67,10 +48,6 @@ const int = (value, fallback, min, max) => {
 };
 const list = (value = '') => String(value).split(',').map((item) => item.trim().toLowerCase()).filter(Boolean);
 
-/**
- * Reads the AI configuration from an environment object (defaults to process.env).
- * Never throws: an invalid value falls back to a documented default.
- */
 export function readAiConfig(env = process.env) {
   const provider = String(env.AI_PROVIDER || 'gemini').trim().toLowerCase();
   const primary = providerIds.includes(provider) ? provider : 'gemini';

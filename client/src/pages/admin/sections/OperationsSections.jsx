@@ -545,6 +545,7 @@ export function AlertsSection() {
         onClose={() => setCreateOpen(false)}
         title={editTarget ? `Edit “${editTarget.title}”` : 'New public safety broadcast'}
         subtitle={editTarget ? 'Updates are persisted and active citizens are notified in-app when the alert is active.' : 'In-app delivery only. Scheduled alerts remain inactive until their start time.'}
+        icon={editTarget ? 'pencil' : 'megaphone'}
         footer={
           <>
             <Button onClick={() => setCreateOpen(false)} disabled={busy}>Cancel</Button>

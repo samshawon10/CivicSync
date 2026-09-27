@@ -1,15 +1,4 @@
-/**
- * AI Tool Registry Catalog index.
- * Aggregates all role-scoped tool definitions across the 7 domains:
- * - caseTools (cases, reports, SLA, history)
- * - departmentTools (department queues, teams, scoring, field tasks)
- * - emergencyTools (incidents, responder rosters, emergency triage)
- * - serviceTools (civic services, requirements, eligibility)
- * - civicTools (facilities, alerts, safety stats)
- * - communityTools (discussions, moderation, posts)
- * - selfTools (notifications, profile, role destinations)
- * - adminTools (platform health, analytics, governance, audit logs)
- */
+
 import { caseTools } from './catalog/caseTools.js';
 import { departmentTools } from './catalog/departmentTools.js';
 import { emergencyTools } from './catalog/emergencyTools.js';

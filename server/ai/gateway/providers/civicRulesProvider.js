@@ -1,15 +1,3 @@
-/**
- * CivicSync Deterministic Rule Engine Provider.
- *
- * Implements the Provider Interface (gateway/providers/providerInterface.js)
- * without calling any external LLM APIs.
- *
- * This guarantees:
- *  1. CivicSync AI platform works out of the box even with zero API keys.
- *  2. Offline / air-gapped / provider outage fallback safety.
- *  3. Deterministic civic classification and advice grounded directly in
- *     CivicSync database context and civic intelligence rules.
- */
 
 import { analyzeCivicQuery, CIVIC_ADVISORY_DISCLAIMER } from '../../../services/civicIntelligenceRules.js';
 

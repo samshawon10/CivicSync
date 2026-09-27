@@ -4,11 +4,6 @@ import { distanceKm, emergencyApi, label } from '../../services/emergencyService
 import { subscribeToEmergencyEvents } from '../../services/emergencySocket.js';
 import { EmptyState, ErrorState } from './EmergencyCard.jsx';
 
-/**
- * Live responder tracking for one incident. Polls positions and refreshes on
- * RESPONDER_LOCATION_UPDATED socket events. Distance is shown relative to the
- * incident location; only authorized viewers can fetch these positions.
- */
 export default function ResponderTracker({ emergency, refreshKey = 0 }) {
   const [positions, setPositions] = useState([]);
   const [error, setError] = useState('');

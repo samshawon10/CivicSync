@@ -1,17 +1,3 @@
-/**
- * Action Executor (task §10).
- *
- * Implements the Human-in-the-Loop state-changing action workflow for CivicSync AI:
- *  1. Propose action: Issue an action confirmation token stored in AiConfirmation with TTL.
- *  2. Confirm action: User approves with confirmation token.
- *     - Verifies token validity, expiration, and user ownership.
- *     - Enforces RBAC permissions against role.
- *     - Dispatches to the underlying domain service/model.
- *     - Records audit trail (ai.action.confirmed, ai.action.executed).
- *  3. Reject action: User declines with confirmation token.
- *     - Invalidates token.
- *     - Records audit trail (ai.action.rejected).
- */
 
 import crypto from 'crypto';
 import AiConfirmation from '../../models/AiConfirmation.js';
@@ -23,10 +9,8 @@ import { readAiConfig } from '../config/aiConfig.js';
 import { auditAi, AI_AUDIT_ACTIONS } from '../security/audit.js';
 import { AiError } from '../errors.js';
 import { reportCategories, reportDepartments, reportPriorities } from '../../config/reportOptions.js';
+import { defaultDepartmentFor, isReportCategory, isReportDepartment } from '../../services/reportCatalogue.js';
 
-/**
- * Creates and persists a pending action confirmation record for human-in-the-loop review.
- */
 export async function createActionConfirmation({ user, actionName, payload = {}, explanation = '' }) {
   if (!user?._id) {
     throw new AiError('INVALID_STATE', { message: 'User context is required to prepare an action.' });
@@ -86,9 +70,6 @@ export async function createActionConfirmation({ user, actionName, payload = {},
   };
 }
 
-/**
- * Confirms and executes an action previously prepared by the AI assistant.
- */
 export async function confirmAction({ token, user }) {
   if (!token || typeof token !== 'string') {
     throw new AiError('INVALID_CONFIRMATION', { message: 'Confirmation token is required.' });
@@ -131,8 +112,16 @@ export async function confirmAction({ token, user }) {
       case ACTION_NAMES.createReport: {
         const { title, description, category, departmentName, priority = 'medium' } = record.payload;
         
-        const resolvedCategory = reportCategories.includes(category) ? category : 'other';
-        const resolvedDept = reportDepartments.includes(departmentName) ? departmentName : 'Other';
+        // Resolved against the live catalogue so an admin-added category or
+        // department is usable from the copilot, and so a missing department
+        // falls back to the category's own default owner rather than "Other".
+        const [categoryOk, departmentOk, categoryDefault] = await Promise.all([
+          isReportCategory(category),
+          isReportDepartment(departmentName),
+          defaultDepartmentFor(reportCategories.includes(category) ? category : 'other')
+        ]);
+        const resolvedCategory = categoryOk ? category : 'other';
+        const resolvedDept = departmentOk ? departmentName : categoryDefault || 'Other';
         const resolvedPriority = reportPriorities.includes(priority) ? priority : 'medium';
 
         const report = await Report.create({
@@ -231,9 +220,6 @@ export async function confirmAction({ token, user }) {
   }
 }
 
-/**
- * Rejects an action confirmation token.
- */
 export async function rejectAction({ token, user, reason = '' }) {
   if (!token || typeof token !== 'string') {
     throw new AiError('INVALID_CONFIRMATION', { message: 'Confirmation token is required.' });
