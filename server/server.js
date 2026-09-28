@@ -30,9 +30,11 @@ import aiRoutes from './routes/aiRoutes.js';
 import { initializeRealtime } from './realtime/emergencyRealtime.js';
 import { seedReportCatalogue } from './services/reportCatalogue.js';
 import { ensureSingletonHeadIndex } from './services/emergencyOps.js';
+import { logFirebaseAdminStatus } from './config/firebaseAdmin.js';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(serverDir, '.env') });
+logFirebaseAdminStatus();
 
 const app = express();
 const httpServer = http.createServer(app);

@@ -2,66 +2,84 @@ import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin
 import { getAuth } from 'firebase-admin/auth';
 
 const explicitCredentialNames = ['FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY'];
-let initializationLogged = false;
 
 export class FirebaseAdminConfigurationError extends Error {
-  constructor(code) {
+  constructor(diagnosticCode, firebaseErrorCode) {
     super('Firebase Admin could not be initialized.');
     this.name = 'FirebaseAdminConfigurationError';
-    this.code = code;
+    this.diagnosticCode = diagnosticCode;
+    this.firebaseErrorCode = firebaseErrorCode;
   }
 }
 
-function configurationError(code) {
-  const error = new Error('Firebase Admin configuration is incomplete.');
-  error.code = code;
-  throw error;
+function configured(name) {
+  return typeof process.env[name] === 'string' && process.env[name].trim().length > 0;
+}
+
+function selectedCredentialSource() {
+  const hasExplicitCredentials = explicitCredentialNames.every(configured);
+  const hasPartialExplicitCredentials = explicitCredentialNames.some(configured);
+  if (hasExplicitCredentials || hasPartialExplicitCredentials) return 'explicit-env';
+  if (configured('GOOGLE_APPLICATION_CREDENTIALS')) return 'ADC';
+  return 'unconfigured';
+}
+
+function configurationError(diagnosticCode, firebaseErrorCode) {
+  throw new FirebaseAdminConfigurationError(diagnosticCode, firebaseErrorCode);
 }
 
 export function getFirebaseAdminAuth() {
   try {
     let app = getApps()[0];
-    if (!app) {
-      const projectId = process.env.FIREBASE_PROJECT_ID;
-      if (!projectId) configurationError('missing-project-id');
+    const projectId = configured('FIREBASE_PROJECT_ID') ? process.env.FIREBASE_PROJECT_ID.trim() : '';
+    if (!projectId) configurationError('FIREBASE_ADMIN_NOT_INITIALIZED', 'missing-project-id');
 
-      const explicitValues = explicitCredentialNames.map((name) => process.env[name]);
-      const hasSomeExplicitCredentials = explicitValues.some(Boolean);
+    if (app?.options.projectId && app.options.projectId !== projectId) {
+      configurationError('FIREBASE_PROJECT_MISMATCH', 'configured-project-mismatch');
+    }
+
+    if (!app) {
       let credential;
-      if (explicitValues.every(Boolean)) {
+      if (explicitCredentialNames.every(configured)) {
         credential = cert({
           projectId,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
           privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
         });
-      } else if (hasSomeExplicitCredentials) {
-        configurationError('incomplete-explicit-credentials');
-      } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      } else if (explicitCredentialNames.some(configured)) {
+        configurationError('FIREBASE_CREDENTIAL_ERROR', 'incomplete-explicit-credentials');
+      } else if (selectedCredentialSource() === 'ADC') {
         credential = applicationDefault();
       } else {
-        configurationError('missing-admin-credentials');
+        configurationError('FIREBASE_ADMIN_NOT_INITIALIZED', 'missing-admin-credentials');
       }
 
       app = initializeApp({ credential, projectId });
     }
-
-    if (!initializationLogged) {
-      console.info('Firebase Admin initialized.', {
-        initialized: true,
-        projectId: app.options.projectId || process.env.FIREBASE_PROJECT_ID || 'unknown'
-      });
-      initializationLogged = true;
-    }
     return getAuth(app);
   } catch (error) {
-    const code = typeof error?.code === 'string' ? error.code : error?.name || 'configuration-error';
-    if (!(error instanceof FirebaseAdminConfigurationError)) {
-      console.error('Firebase Admin initialization failed.', {
-        code,
-        projectId: process.env.FIREBASE_PROJECT_ID || 'not-configured'
-      });
-    }
     if (error instanceof FirebaseAdminConfigurationError) throw error;
-    throw new FirebaseAdminConfigurationError(code);
+    const firebaseErrorCode = typeof error?.code === 'string' ? error.code : error?.name || 'configuration-error';
+    throw new FirebaseAdminConfigurationError('FIREBASE_CREDENTIAL_ERROR', firebaseErrorCode);
   }
+}
+
+export function logFirebaseAdminStatus() {
+  let initialized = false;
+  let diagnosticCode;
+  let firebaseErrorCode;
+  try {
+    getFirebaseAdminAuth();
+    initialized = true;
+  } catch (error) {
+    diagnosticCode = error.diagnosticCode || 'FIREBASE_ADMIN_NOT_INITIALIZED';
+    firebaseErrorCode = error.firebaseErrorCode || error.name || 'unknown';
+  }
+
+  console.info(`Firebase Admin initialized: ${initialized}`);
+  console.info(`Firebase project configured: ${configured('FIREBASE_PROJECT_ID')}`);
+  console.info(`Firebase client email configured: ${configured('FIREBASE_CLIENT_EMAIL')}`);
+  console.info(`Firebase private key configured: ${configured('FIREBASE_PRIVATE_KEY')}`);
+  console.info(`Firebase credential source: ${selectedCredentialSource()}`);
+  if (!initialized) console.error('Firebase auth diagnostic.', { diagnosticCode, firebaseErrorCode });
 }

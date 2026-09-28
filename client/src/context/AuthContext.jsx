@@ -19,7 +19,7 @@ export function AuthProvider({ children }) {
     return () => { alive = false; unsubscribe(); };
   }, []);
   async function establishSession(currentUser) {
-    const firebaseToken = await currentUser.getIdToken();
+    const firebaseToken = await currentUser.getIdToken(true);
     const { data } = await api.post('/auth/firebase', {}, { headers: { Authorization: `Bearer ${firebaseToken}` } });
     setUser(data.user);
     return data.user;

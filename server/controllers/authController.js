@@ -29,7 +29,11 @@ export async function exchangeFirebaseIdentity(req, res, next) {
     }
     if (['suspended', 'disabled'].includes(user.status)) return res.status(403).json({ success: false, message: 'This CivicSync account is suspended.' });
     return res.cookie('civicsync_token', tokenFor(user), cookieOptions()).json({ success: true, message: 'CivicSync session established.', user: user.toSafeObject() });
-  } catch (error) { next(error); }
+  } catch (error) {
+    const code = typeof error?.code === 'string' || typeof error?.code === 'number' ? String(error.code) : error?.name || 'unknown';
+    console.error('Firebase auth diagnostic.', { diagnosticCode: 'FIREBASE_USER_SYNC_ERROR', firebaseErrorCode: /^[a-z0-9/_-]+$/i.test(code) ? code : 'unknown' });
+    next(error);
+  }
 }
 
 export function me(req, res) {
