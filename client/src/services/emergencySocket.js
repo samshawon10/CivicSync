@@ -1,10 +1,10 @@
 import { io } from 'socket.io-client';
+import { API_ORIGIN } from './api.js';
 
 let socket;
 export function emergencySocket() {
   if (!socket) {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-    socket = io(apiUrl.replace(/\/api\/?$/, ''), { withCredentials: true, autoConnect: false });
+    socket = io(API_ORIGIN, { withCredentials: true, autoConnect: false });
   }
   return socket;
 }

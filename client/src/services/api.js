@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { confirmAction, showCriticalError, showError, showSuccess } from '../utils/sweetAlert.js';
 
-const apiBaseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const api = axios.create({ baseURL: apiBaseURL, headers: { 'Content-Type': 'application/json' }, withCredentials: true });
+const configuredApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
+export const API_BASE_URL = `${configuredApiUrl.replace(/(?:\/api)+$/i, '')}/api`;
+export const API_ORIGIN = API_BASE_URL.replace(/\/api$/i, '');
+const api = axios.create({ baseURL: API_BASE_URL, headers: { 'Content-Type': 'application/json' }, withCredentials: true });
 
 api.interceptors.response.use(
   (response) => response,
