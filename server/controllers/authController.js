@@ -1,8 +1,10 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-const isProduction = process.env.NODE_ENV === 'production';
-function cookieOptions() { return { httpOnly: true, secure: isProduction, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 2, path: '/' }; }
+function cookieOptions() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  return { httpOnly: true, secure: isProduction, sameSite: isProduction ? 'none' : 'lax', maxAge: 1000 * 60 * 60 * 2, path: '/' };
+}
 function tokenFor(user) { return jwt.sign({ userId: user._id, firebaseUid: user.firebaseUid, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '2h' }); }
 
 export async function exchangeFirebaseIdentity(req, res, next) {
@@ -41,5 +43,6 @@ export function me(req, res) {
 }
 
 export function logout(req, res) {
-  return res.clearCookie('civicsync_token', { httpOnly: true, secure: isProduction, sameSite: 'lax', path: '/' }).json({ success: true, message: 'Logged out successfully.' });
+  const { httpOnly, secure, sameSite, path } = cookieOptions();
+  return res.clearCookie('civicsync_token', { httpOnly, secure, sameSite, path }).json({ success: true, message: 'Logged out successfully.' });
 }
