@@ -66,7 +66,7 @@ export async function requireFirebaseAuth(req, res, next) {
 
   let decoded;
   try {
-    decoded = await firebaseAuth.verifyIdToken(match[1]);
+    decoded = await firebaseAuth.verifyIdToken(match[1], true);
   } catch (error) {
     const failure = verificationFailure(error);
     logDiagnostic(failure.diagnosticCode, failure.firebaseErrorCode);

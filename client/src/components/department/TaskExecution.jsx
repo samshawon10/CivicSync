@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ClipboardList, MapPin, Clock, RefreshCw, ArrowRight, User } from 'lucide-react';
+import { ClipboardList, MapPin, Clock, RefreshCw, ArrowRight, User, Users } from 'lucide-react';
 import { departmentApi } from '../../services/departmentService.js';
 import { apiMessage } from '../../services/api.js';
 import { showSuccess, showError } from '../../utils/sweetAlert.js';
@@ -51,8 +51,22 @@ function EvidenceList({ urls = [] }) {
   );
 }
 
-function TaskCard({ task, canAct, busyTransition, onTransition, onOpenCase }) {
-  const options = taskTransitions[task.status] || [];
+function TaskCard({ task, canAct, role, userId, busyTransition, onTransition, onOpenCase }) {
+  const hasWorkerAssignments = Boolean(task.team || task.workerAssignments?.length);
+  const ownAssignment = task.workerAssignments?.find((assignment) =>
+    String(assignment.worker?._id || assignment.worker) === String(userId)
+  );
+  const workerOptions = ownAssignment?.status === 'assigned'
+    ? ['accepted']
+    : ownAssignment?.status === 'accepted'
+      ? ['in_progress']
+      : [];
+  const options = (role === 'field_worker' ? workerOptions : taskTransitions[task.status] || []).filter((next) => {
+    if (next === 'verified' && !(role === 'officer' && String(task.teamLeader?._id || task.teamLeader) === String(userId))) return false;
+    if (hasWorkerAssignments && role !== 'field_worker'
+      && ['accepted', 'traveling', 'arrived', 'in_progress', 'completed'].includes(next)) return false;
+    return true;
+  });
   const report = task.report || {};
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -72,9 +86,21 @@ function TaskCard({ task, canAct, busyTransition, onTransition, onOpenCase }) {
       <dl className="mt-3 grid gap-1.5 text-xs text-slate-600 sm:grid-cols-2">
         <div className="flex items-center gap-1.5"><Clock size={12} className="text-slate-400" aria-hidden="true" /><dd className="font-semibold">Due {formatOpsDate(task.targetDueAt || report.dueAt)}</dd></div>
         <div className="flex items-center gap-1.5"><MapPin size={12} className="text-slate-400" aria-hidden="true" /><dd className="truncate font-semibold">{task.location?.address || report.location?.address || 'Location not recorded'}</dd></div>
-        <div className="flex items-center gap-1.5"><User size={12} className="text-slate-400" aria-hidden="true" /><dd className="truncate font-semibold">{task.assignedWorker?.name || 'Unassigned worker'}{task.team?.name ? ` · ${task.team.name}` : ''}</dd></div>
+        <div className="flex items-center gap-1.5"><User size={12} className="text-slate-400" aria-hidden="true" /><dd className="truncate font-semibold">{task.teamLeader?.name || task.assignedWorker?.name || 'Unassigned worker'}{task.team?.name ? ` · ${task.team.name}` : ''}</dd></div>
         <div className="flex items-center gap-1.5"><ClipboardList size={12} className="text-slate-400" aria-hidden="true" /><dd className="truncate font-semibold">Case: {report.title || 'Linked case'}</dd></div>
+        <div className="flex items-center gap-1.5"><Users size={12} className="text-slate-400" aria-hidden="true" /><dd className="truncate font-semibold">{task.masterReportCount || 1} citizen report{task.masterReportCount === 1 ? '' : 's'} linked</dd></div>
       </dl>
+      {!!task.workerAssignments?.length && (
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {task.workerAssignments.map((assignment) => (
+            <li key={assignment.worker?._id || assignment.worker} className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
+              <span className="font-bold text-ink">{assignment.worker?.name || 'Worker'}</span>
+              <span className="ml-2 text-slate-600">{assignment.status.replaceAll('_', ' ')} · {assignment.progressPercent}%</span>
+              {assignment.completionSummary && <p className="mt-1 text-slate-600">{assignment.completionSummary}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {task.status === 'blocked' && task.blockedInfo?.reason && (
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
@@ -125,7 +151,7 @@ function TaskCard({ task, canAct, busyTransition, onTransition, onOpenCase }) {
   );
 }
 
-export default function TaskExecution({ role, onOpenCase }) {
+export default function TaskExecution({ role, userId, onOpenCase }) {
   const canAct = ['field_worker', 'officer', 'department_officer', 'department_head'].includes(role);
   const [tasks, setTasks] = useState([]);
   const [filterId, setFilterId] = useState('active');
@@ -167,7 +193,7 @@ export default function TaskExecution({ role, onOpenCase }) {
   async function runDirect(task, next) {
     setBusy(`${task._id}:${next}`);
     try {
-      await departmentApi.updateTaskStatus(task._id, { status: next });
+      await departmentApi.transitionTask(task._id, { status: next });
       showSuccess('Task updated', `${task.taskNumber || 'Task'} → ${next.replaceAll('_', ' ')}.`);
       await load();
     } catch (err) { showError('Unable to update task', apiMessage(err)); } finally { setBusy(''); }
@@ -184,7 +210,7 @@ export default function TaskExecution({ role, onOpenCase }) {
     setBusy(`${task._id}:${payload.status}`);
     try {
       if (payload.status === 'completed') await departmentApi.completeTask(task._id, payload);
-      else await departmentApi.updateTaskStatus(task._id, payload);
+      else await departmentApi.transitionTask(task._id, payload);
       showSuccess('Task updated', `${task.taskNumber || 'Task'} → ${payload.status.replaceAll('_', ' ')}.`);
       setPending(null);
       await load();
@@ -244,6 +270,8 @@ export default function TaskExecution({ role, onOpenCase }) {
                 key={task._id}
                 task={task}
                 canAct={canAct}
+                role={role}
+                userId={userId}
                 busyTransition={busy.startsWith(`${task._id}:`) ? busy.split(':')[1] : ''}
                 onTransition={onTransition}
                 onOpenCase={onOpenCase}
@@ -259,4 +287,3 @@ export default function TaskExecution({ role, onOpenCase }) {
     </div>
   );
 }
-

@@ -4,8 +4,8 @@ import { getEmergencyNextAction, getReportNextAction } from './nextAction.js';
 
 test('report next action follows workflow ownership and keeps the configured due date', () => {
   const dueAt = new Date('2026-09-25T12:00:00Z');
-  const action = getReportNextAction({ status: 'in_progress', assignedFieldWorker: 'worker-1', assignedOfficer: 'officer-1', dueAt, priority: 'high' });
-  assert.equal(action.action, 'Submit completion report');
+  const action = getReportNextAction({ status: 'in_progress', activeTask: { status: 'in_progress', assignedWorker: 'worker-1' }, dueAt, priority: 'high' });
+  assert.equal(action.action, 'Upload Evidence & Complete Task');
   assert.equal(action.responsibleRole, 'field_worker');
   assert.equal(action.responsibleUser, 'worker-1');
   assert.equal(action.deadline, dueAt);
@@ -17,6 +17,9 @@ test('unassigned and terminal reports do not invent an individual owner or actio
   assert.equal(unassigned.action, 'Assign an officer');
   assert.equal(unassigned.responsibleUser, null);
   assert.equal(getReportNextAction({ status: 'closed' }), null);
+  const missingTask = getReportNextAction({ status: 'assigned', assignedFieldWorker: 'unbooked-worker', assignedOfficer: 'leader-1' });
+  assert.equal(missingTask.responsibleRole, 'officer');
+  assert.equal(missingTask.responsibleUser, 'leader-1');
 });
 
 test('emergency next action prioritizes live assignment state over the incident summary state', () => {

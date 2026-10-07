@@ -10,6 +10,8 @@ import VolunteerOpportunity from '../models/VolunteerOpportunity.js';
 import CivicFeedback from '../models/CivicFeedback.js';
 import VerificationRecord from '../models/VerificationRecord.js';
 import ActivityLog from '../models/ActivityLog.js';
+import Emergency from '../models/Emergency.js';
+import mongoose from 'mongoose';
 
 const router = Router();
 router.use(requireAuth);
@@ -124,9 +126,11 @@ router.post('/groups/:id/join', async (req, res, next) => {
   try {
     const group = await CommunityGroup.findById(req.params.id);
     if (!group) return res.status(404).json({ success: false, message: 'Group not found' });
+    if (group.status !== 'active') return res.status(409).json({ success: false, message: 'This group is archived.' });
 
     const isMember = group.members.some(m => m.user.toString() === req.user._id.toString());
     if (isMember) {
+      if (String(group.createdBy) === String(req.user._id)) return res.status(409).json({ success: false, message: 'The group owner cannot leave their group.' });
       group.members = group.members.filter(m => m.user.toString() !== req.user._id.toString());
       group.memberCount = Math.max(0, group.members.length);
       await group.save();
@@ -189,6 +193,7 @@ router.post('/volunteers/:id/participate', async (req, res, next) => {
   try {
     const opp = await VolunteerOpportunity.findById(req.params.id);
     if (!opp) return res.status(404).json({ success: false, message: 'Opportunity not found' });
+    if (opp.status !== 'open') return res.status(409).json({ success: false, message: 'This opportunity is no longer open.' });
 
     const isParticipating = opp.participants.some(p => p.user.toString() === req.user._id.toString());
     if (isParticipating) {
@@ -212,6 +217,14 @@ router.post('/feedback', async (req, res, next) => {
   try {
     const { targetType, targetId, rating, comment, aspectRatings } = req.body;
     const numRating = Number(rating);
+    const type = targetType || 'report';
+    const model = { report: Report, service: CivicService, emergency: Emergency }[type];
+    if (!model || !mongoose.Types.ObjectId.isValid(targetId)) return res.status(400).json({ success: false, message: 'A valid feedback target is required.' });
+    const filter = { _id: targetId };
+    if (type === 'report') filter.createdBy = req.user._id;
+    if (type === 'emergency') filter.citizen = req.user._id;
+    if (type === 'service') filter.status = 'published';
+    if (!await model.exists(filter)) return res.status(404).json({ success: false, message: 'Feedback target not found.' });
     if (!Number.isInteger(numRating) || numRating < 1 || numRating > 5) {
       return res.status(400).json({ success: false, message: 'Rating must be an integer between 1 and 5' });
     }
@@ -235,7 +248,7 @@ router.get('/transparency', async (req, res, next) => {
   try {
     const [totalReports, resolvedReports, feedbackStats, totalAlerts, totalFacilities] = await Promise.all([
       Report.countDocuments(),
-      Report.countDocuments({ status: 'resolved' }),
+      Report.countDocuments({ $or: [{ status: 'closed' }, { workflowStage: 'RESOLVED' }] }),
       CivicFeedback.aggregate([
         { $group: { _id: null, avgRating: { $avg: '$rating' }, totalFeedback: { $sum: 1 } } }
       ]),
@@ -244,7 +257,7 @@ router.get('/transparency', async (req, res, next) => {
     ]);
 
     const resolutionRate = totalReports > 0 ? Math.round((resolvedReports / totalReports) * 100) : 0;
-    const avgSatisfaction = feedbackStats[0]?.avgRating ? Number(feedbackStats[0].avgRating.toFixed(1)) : 4.8;
+    const avgSatisfaction = feedbackStats[0]?.avgRating ? Number(feedbackStats[0].avgRating.toFixed(1)) : null;
 
     res.json({
       success: true,
@@ -295,11 +308,13 @@ router.post('/verifications', requireRole(['admin']), async (req, res, next) => 
     });
 
     await ActivityLog.create({
-      user: req.user._id,
+      admin: req.user._id,
+      actorRole: req.user.role,
       action: 'verification_granted',
-      targetType: 'system',
+      targetType: 'civic_verification',
       targetId: record._id,
-      details: { verificationType, targetType, targetId }
+      metadata: { verificationType, targetType, targetId },
+      result: 'success'
     });
 
     res.status(201).json({ success: true, record });

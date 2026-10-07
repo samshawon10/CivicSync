@@ -1,8 +1,8 @@
 node_modules/
 dist/
-.env
-.env.*
 !.env.example
 *.log
 server/uploads/
 server/storage/
+docs
+config.bat

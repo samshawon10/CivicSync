@@ -1,15 +1,24 @@
 import mongoose from 'mongoose';
 import User from '../models/User.js';
+import { assertUserManagementSafe } from '../services/userManagementSafety.js';
+import { replaceEmergencyHead } from '../services/replaceEmergencyHead.js';
+import { assertUnreferencedRecord } from '../services/referenceSafety.js';
+import DepartmentTask from '../models/DepartmentTask.js';
+import DepartmentTeam from '../models/DepartmentTeam.js';
+import DepartmentResource from '../models/DepartmentResource.js';
+import ReportCategory from '../models/ReportCategory.js';
 import Department, { DEPARTMENT_ASSIGNABLE_ROLES } from '../models/Department.js';
 import Report from '../models/Report.js';
 import Emergency from '../models/Emergency.js';
 import ActivityLog from '../models/ActivityLog.js';
 import SystemSetting from '../models/SystemSetting.js';
 import { canTransitionReport } from '../services/reportLifecycle.js';
+import { canTransitionEmergency } from '../services/emergencyLifecycle.js';
 import { reportPriorities, reportStatuses } from '../config/reportOptions.js';
 import { emergencyStatuses } from '../config/emergencyOptions.js';
 import { sanitizeSettings } from '../config/settingsDefaults.js';
-import { emitDepartmentEvent } from '../realtime/emergencyRealtime.js';
+import { emitDepartmentEvent, invalidateUserSockets } from '../realtime/emergencyRealtime.js';
+import { roleLabel } from '../config/roleLabels.js';
 
 const roles = ['citizen', 'admin', 'department_head', 'department_officer', 'officer', 'field_worker', 'emergency_department_head', 'emergency_department_officer', 'emergency_officer', 'emergency_field_worker'];
 const departmentHeadRoles = ['department_head', 'emergency_department_head'];
@@ -81,9 +90,9 @@ export async function getAnalytics(req, res, next) {
 export async function listUsers(req, res, next) { try { const filter = {}; const { search = '', role = '', status = '' } = req.query; if (roles.includes(role)) filter.role = role; if (userStatuses.includes(status)) filter.status = status; if (search.trim()) { const expression = new RegExp(escapeRegex(search), 'i'); filter.$or = [{ name: expression }, { email: expression }, { phone: expression }]; } const page = pageOf(req.query.page); const limit = limitOf(req.query.limit); const [items, total] = await Promise.all([User.find(filter).populate('department', 'name').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), User.countDocuments(filter)]); res.json({ success: true, users: items.map(safeUser), pagination: { page, limit, total, pages: Math.ceil(total / limit) } }); } catch (error) { next(error); } }
 export async function selectUsers(req, res, next) { try { const filter = { status: 'active' }; if (req.query.q?.trim()) { const expression = new RegExp(escapeRegex(req.query.q), 'i'); filter.$or = [{ name: expression }, { email: expression }]; } const users = await User.find(filter).select('name email role department departmentName photoURL').populate('department', 'name').sort({ name: 1 }).limit(20).lean(); res.json({ success: true, users: users.map(safeUser) }); } catch (error) { next(error); } }
 export async function getUserDetail(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'User not found.' }); const user = await User.findById(req.params.id).populate('department', 'name').lean(); if (!user) return res.status(404).json({ success: false, message: 'User not found.' }); const [complaints, complaintStats, emergencies, activity] = await Promise.all([Report.countDocuments({ createdBy: user._id }), Report.aggregate([{ $match: { createdBy: user._id } }, { $group: { _id: '$status', count: { $sum: 1 } } }]), Emergency.countDocuments({ citizen: user._id }), ActivityLog.find({ targetId: user._id }).populate('admin', 'name email photoURL').sort({ createdAt: -1 }).limit(10).lean()]); res.json({ success: true, user: safeUser(user), stats: { complaints, complaintByStatus: complaintStats, emergencies }, activity }); } catch (error) { next(error); } }
-export async function updateUserRole(req, res, next) { try { const { role, departmentId } = req.body; if (!roles.includes(role) || departmentHeadRoles.includes(role)) return res.status(400).json({ success: false, message: 'Department heads must be assigned from their department.' }); if (!objectId(req.params.id) || req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'This user role cannot be changed.' }); const user = await User.findById(req.params.id); if (!user) return res.status(404).json({ success: false, message: 'User not found.' }); let department = null; if (departmentId) { if (!objectId(departmentId)) return res.status(400).json({ success: false, message: 'Invalid department.' }); department = await Department.findById(departmentId); if (!department) return res.status(404).json({ success: false, message: 'Department not found.' }); if (emergencyRoles.includes(role) && !['emergency', 'hybrid'].includes(department.scope)) return res.status(400).json({ success: false, message: 'Emergency staff must belong to an emergency-enabled department.' }); if (!emergencyRoles.includes(role) && role !== 'citizen' && department.scope === 'emergency') return res.status(400).json({ success: false, message: 'Civic staff must belong to a civic or hybrid department.' }); } else if (role !== 'citizen' && role !== 'admin') return res.status(400).json({ success: false, message: 'A department is required for this operational role.' }); const previousRole = user.role; await Department.updateMany({ $or: [{ head: user._id }, { emergencyHead: user._id }] }, { $set: { head: null, emergencyHead: null } }); user.role = role; user.department = department?._id || null; user.departmentName = department?.name || ''; await user.save(); await log(req.user, 'role_changed', 'user', user._id, user.name, `Role changed from ${previousRole} to ${role}.`, { previousRole, role }); res.json({ success: true, message: 'User role updated.', user: safeUser(user) }); } catch (error) { next(error); } }
-export async function updateUserStatus(req, res, next) { try { if (!userStatuses.includes(req.body.status) || !objectId(req.params.id) || req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'This account status cannot be changed.' }); const user = await User.findById(req.params.id); if (!user) return res.status(404).json({ success: false, message: 'User not found.' }); user.status = req.body.status; await user.save(); await log(req.user, user.status === 'suspended' ? 'user_blocked' : 'user_unblocked', 'user', user._id, user.name, `Account ${user.status}.`); res.json({ success: true, message: 'Account status updated.', user: safeUser(user) }); } catch (error) { next(error); } }
-export async function deleteUser(req, res, next) { try { if (!objectId(req.params.id) || req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'This user cannot be deleted.' }); const user = await User.findById(req.params.id); if (!user) return res.status(404).json({ success: false, message: 'User not found.' }); if (user.role === 'admin') return res.status(400).json({ success: false, message: 'Administrator accounts cannot be deleted.' }); await Department.updateMany({ $or: [{ head: user._id }, { emergencyHead: user._id }] }, { $set: { head: null, emergencyHead: null } }); await log(req.user, 'user_deleted', 'user', user._id, user.name, `User ${user.email} deleted.`); await user.deleteOne(); res.json({ success: true, message: 'User deleted.' }); } catch (error) { next(error); } }
+export async function updateUserRole(req, res, next) { try { const { role } = req.body; const departmentId = ['citizen', 'admin'].includes(role) ? null : req.body.departmentId; if (!roles.includes(role) || departmentHeadRoles.includes(role)) return res.status(400).json({ success: false, message: 'Department heads must be assigned from their department.' }); if (!objectId(req.params.id) || req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'This user role cannot be changed.' }); const user = await User.findById(req.params.id); if (!user) return res.status(404).json({ success: false, message: 'User not found.' }); let department = null; if (departmentId) { if (!objectId(departmentId)) return res.status(400).json({ success: false, message: 'Invalid department.' }); department = await Department.findById(departmentId); if (!department || department.status !== 'active') return res.status(400).json({ success: false, message: 'Choose an active department.' }); if (emergencyRoles.includes(role) && !['emergency', 'hybrid'].includes(department.scope)) return res.status(400).json({ success: false, message: 'Emergency staff must belong to an emergency-enabled department.' }); if (!emergencyRoles.includes(role) && role !== 'citizen' && department.scope === 'emergency') return res.status(400).json({ success: false, message: 'Civic staff must belong to a civic or hybrid department.' }); } else if (role !== 'citizen' && role !== 'admin') return res.status(400).json({ success: false, message: 'A department is required for this operational role.' }); await assertUserManagementSafe(user, { role, department: department?._id || null }); const previousRole = user.role; await Promise.all([Department.updateMany({ head: user._id }, { $set: { head: null } }), Department.updateMany({ emergencyHead: user._id }, { $set: { emergencyHead: null } })]); user.role = role; user.department = department?._id || null; user.departmentName = department?.name || ''; await user.save(); invalidateUserSockets(user._id); await log(req.user, 'role_changed', 'user', user._id, user.name, `Role changed from ${previousRole} to ${role}.`, { previousRole, role }); res.json({ success: true, message: 'User role updated.', user: safeUser(user) }); } catch (error) { next(error); } }
+export async function updateUserStatus(req, res, next) { try { if (!userStatuses.includes(req.body.status) || !objectId(req.params.id) || req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'This account status cannot be changed.' }); const user = await User.findById(req.params.id); if (!user) return res.status(404).json({ success: false, message: 'User not found.' }); await assertUserManagementSafe(user, { status: req.body.status }); user.status = req.body.status; await user.save(); invalidateUserSockets(user._id); await log(req.user, user.status === 'suspended' ? 'user_blocked' : 'user_unblocked', 'user', user._id, user.name, `Account ${user.status}.`); res.json({ success: true, message: 'Account status updated.', user: safeUser(user) }); } catch (error) { next(error); } }
+export async function deleteUser(req, res, next) { try { if (!objectId(req.params.id) || req.user._id.equals(req.params.id)) return res.status(400).json({ success: false, message: 'This user cannot be deleted.' }); const user = await User.findById(req.params.id); if (!user) return res.status(404).json({ success: false, message: 'User not found.' }); if (user.role === 'admin') return res.status(400).json({ success: false, message: 'Administrator accounts cannot be deleted.' }); await assertUserManagementSafe(user, { deleting: true }); await Promise.all([Department.updateMany({ head: user._id }, { $set: { head: null } }), Department.updateMany({ emergencyHead: user._id }, { $set: { emergencyHead: null } })]); await log(req.user, 'user_deleted', 'user', user._id, user.name, `User ${user.email} deleted.`); await user.deleteOne(); invalidateUserSockets(user._id); res.json({ success: true, message: 'User deleted.' }); } catch (error) { next(error); } }
 
 export async function listDepartmentsForCitizen(req, res, next) {
   try {
@@ -192,6 +201,11 @@ export async function getDepartmentDetail(req, res, next) {
 const VALID_EMERGENCY_TYPES = ['police', 'fire', 'medical', 'accident', 'disaster', 'other'];
 
 function buildDepartmentPayload(body, existing = {}) {
+  if (['name', 'code'].some((key) => body[key] !== undefined && typeof body[key] !== 'string')
+    || (body.status !== undefined && !['active', 'inactive'].includes(body.status))
+    || (body.scope !== undefined && !['civic', 'emergency', 'hybrid'].includes(body.scope))) {
+    throw Object.assign(new Error('Department name, code, status, or scope is invalid.'), { statusCode: 400 });
+  }
   const routingTypes = Array.isArray(body.emergencyTypes)
     ? body.emergencyTypes.filter((type) => VALID_EMERGENCY_TYPES.includes(type))
     : (existing.emergencyTypes || []);
@@ -213,7 +227,7 @@ function buildDepartmentPayload(body, existing = {}) {
     contactNumber: body.contactNumber !== undefined ? String(body.contactNumber).trim().slice(0, 30) : (existing.contactNumber || ''),
     email: body.email !== undefined ? String(body.email).trim().toLowerCase().slice(0, 120) : (existing.email || ''),
     address: body.address !== undefined ? String(body.address).trim().slice(0, 300) : (existing.address || ''),
-    status: body.status === 'inactive' ? 'inactive' : 'active',
+    status: body.status ?? existing.status ?? 'active',
     scope: ['civic', 'emergency', 'hybrid'].includes(body.scope) ? body.scope : (existing.scope || 'civic'),
     emergencyTypes: routingTypes,
     assignedRoles
@@ -280,6 +294,16 @@ export async function updateDepartment(req, res, next) {
     const payload = buildDepartmentPayload(req.body, department.toObject());
     const error = validateDepartmentPayload(payload);
     if (error) return res.status(400).json({ success: false, message: error });
+    if (department.emergencyHead && (payload.status !== 'active' || payload.scope === 'civic')) return res.status(409).json({ success: false, message: 'The department holding the global Emergency Head must remain active and emergency-enabled.' });
+    if (department.head && payload.scope === 'emergency') return res.status(409).json({ success: false, message: 'Remove or transfer civic leadership before changing department scope.' });
+    if (payload.scope !== department.scope && payload.scope !== 'hybrid') {
+      const roles = payload.scope === 'civic' ? emergencyRoles : ['department_head', 'department_officer', 'officer', 'field_worker'];
+      const [staff, work] = await Promise.all([
+        User.exists({ department: department._id, role: { $in: roles } }),
+        payload.scope === 'civic' ? Emergency.exists({ assignedDepartment: department._id }) : Report.exists({ departmentName: department.name })
+      ]);
+      if (staff || work) return res.status(409).json({ success: false, message: 'Transfer staff and preserve the existing workflow scope before narrowing this department.' });
+    }
 
     // Duplicate name check (excluding self)
     if (payload.name !== department.name) {
@@ -294,14 +318,26 @@ export async function updateDepartment(req, res, next) {
 
     const oldName = department.name;
     Object.assign(department, payload);
-    await department.save();
-
-    // Cascade name change to all staff and reports
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const current = await Department.findById(department._id).session(session);
+        if (!current || current.__v !== department.__v) throw Object.assign(new Error('This department changed. Refresh and try again.'), { statusCode: 409 });
+        Object.assign(current, payload);
+        await current.save({ session });
+        if (oldName !== department.name) {
+          await User.updateMany({ department: department._id }, { $set: { departmentName: department.name } }, { session });
+          await Report.updateMany({ departmentName: oldName }, { $set: { departmentName: department.name } }, { session });
+          await DepartmentTask.updateMany({ departmentName: oldName }, { $set: { departmentName: department.name } }, { session });
+          await DepartmentTeam.updateMany({ department: department._id }, { $set: { departmentName: department.name } }, { session });
+          await DepartmentResource.updateMany({ department: department._id }, { $set: { departmentName: department.name } }, { session });
+          await ReportCategory.updateMany({ defaultDepartment: oldName }, { $set: { defaultDepartment: department.name } }, { session });
+        }
+      });
+    } finally { await session.endSession(); }
     if (oldName !== department.name) {
-      await Promise.all([
-        User.updateMany({ department: department._id }, { $set: { departmentName: department.name } }),
-        Report.updateMany({ departmentName: oldName }, { $set: { departmentName: department.name } })
-      ]);
+      const staff = await User.find({ department: department._id }).select('_id');
+      staff.forEach((user) => invalidateUserSockets(user._id));
     }
 
     await log(req.user, 'department_updated', 'department', department._id, department.name, `Department "${department.name}" details updated.`);
@@ -332,7 +368,9 @@ export async function toggleDepartmentStatus(req, res, next) {
     const department = await Department.findById(req.params.id);
     if (!department) return res.status(404).json({ success: false, message: 'Department not found.' });
 
-    const newStatus = req.body.status === 'inactive' ? 'inactive' : 'active';
+    if (!['active', 'inactive'].includes(req.body.status)) return res.status(400).json({ success: false, message: 'Choose active or inactive department status.' });
+    const newStatus = req.body.status;
+    if (newStatus === 'inactive' && department.emergencyHead) return res.status(409).json({ success: false, message: 'The department holding the global Emergency Head must remain active.' });
     if (department.status === newStatus) {
       return res.json({ success: true, message: `Department is already ${newStatus}.`, department });
     }
@@ -392,9 +430,11 @@ async function setDepartmentHeadSlot(req, res, next, slotKey) {
     // way out of a department that ended up with a legacy head it should not have.
     if (rawUserId === null || rawUserId === undefined || rawUserId === '') {
       if (!holder) return res.json({ success: true, message: `"${department.name}" has no ${slot.label}.`, department });
+      await assertUserManagementSafe(holder, { role: 'citizen', department: null });
       if (holder.role === slot.role) { holder.role = 'citizen'; holder.department = null; holder.departmentName = ''; await holder.save(); }
       department[slot.key] = null;
       await department.save();
+      invalidateUserSockets(holder._id);
       await log(req.user, `${slot.role}_removed`, 'department', department._id, department.name, `${holder.name} removed as ${slot.noun} of "${department.name}".`, { previousHead: holder._id });
       emitDepartmentEvent('DEPARTMENT_UPDATED', { departmentId: department._id, name: department.name }, { roles: ['admin'], department: department.name });
       await department.populate({ path: slot.key, select: 'name email phone photoURL' });
@@ -414,6 +454,20 @@ async function setDepartmentHeadSlot(req, res, next, slotKey) {
     if (!candidate) return res.status(404).json({ success: false, message: 'User not found.' });
     if (candidate.status !== 'active') return res.status(400).json({ success: false, message: 'Only active non-admin users are eligible to lead a department.' });
     if (candidate.role === 'admin') return res.status(400).json({ success: false, message: 'Administrator accounts cannot lead a department.' });
+    await assertUserManagementSafe(candidate, { role: slot.role, department: department._id });
+    if (slotKey === 'emergencyHead') {
+      const globalHead = await User.findOne({ role: slot.role, status: 'active' });
+      if (globalHead && !globalHead._id.equals(candidate._id) && !globalHead._id.equals(holder?._id)) {
+        return res.status(409).json({ success: false, message: 'Replace the existing global Emergency Department Head in their current department.' });
+      }
+      const result = await replaceEmergencyHead(department._id, candidate._id);
+      await log(req.user, 'emergency_department_head_assigned', 'department', department._id, department.name, 'Global Emergency Department Head appointed.', { previousHead: result.previousHead, newHead: result.newHead });
+      await result.department.populate({ path: 'emergencyHead', select: 'name email phone photoURL' });
+      emitDepartmentEvent('DEPARTMENT_UPDATED', { departmentId: department._id, name: department.name }, { roles: ['admin'], department: department.name });
+      return res.json({ success: true, message: 'Global Emergency Department Head assigned.', department: result.department });
+    }
+
+    if (holder && !holder._id.equals(candidate._id)) await assertUserManagementSafe(holder, { role: 'citizen', department: null });
 
     // One role per account: release the candidate from every other department first.
     await Promise.all([
@@ -435,6 +489,8 @@ async function setDepartmentHeadSlot(req, res, next, slotKey) {
     department[slot.key] = candidate._id;
     if (movedFromOpposite) department[opposite.key] = null;
     await department.save();
+    invalidateUserSockets(candidate._id);
+    if (replacing) invalidateUserSockets(holder._id);
 
     await log(
       req.user,
@@ -482,23 +538,26 @@ export async function deleteDepartment(req, res, next) {
     if (!department) return res.status(404).json({ success: false, message: 'Department not found.' });
 
     // Safety check: if reports or emergencies reference this department, require explicit confirmation
-    const force = req.query.force === 'true';
-    if (!force) {
-      const [reportCount, emergencyCount] = await Promise.all([
+    {
+      const [reportCount, emergencyCount, staffCount, teamCount, taskCount, resourceCount, categoryCount] = await Promise.all([
         Report.countDocuments({ departmentName: department.name }),
-        Emergency.countDocuments({ assignedDepartment: department._id })
+        Emergency.countDocuments({ assignedDepartment: department._id }),
+        User.countDocuments({ department: department._id }),
+        DepartmentTeam.countDocuments({ department: department._id }),
+        DepartmentTask.countDocuments({ departmentName: department.name }),
+        DepartmentResource.countDocuments({ department: department._id }),
+        ReportCategory.countDocuments({ defaultDepartment: department.name })
       ]);
-      if (reportCount > 0 || emergencyCount > 0) {
+      if (reportCount || emergencyCount || staffCount || teamCount || taskCount || resourceCount || categoryCount || department.head || department.emergencyHead) {
         return res.status(409).json({
           success: false,
-          message: `This department has ${reportCount} report(s) and ${emergencyCount} emergency record(s). Deactivate it instead, or pass ?force=true to permanently delete.`,
+          message: 'This department has linked records or staff. Reassign them or deactivate the department to preserve history.',
           counts: { reports: reportCount, emergencies: emergencyCount }
         });
       }
     }
 
     const name = department.name;
-    await User.updateMany({ department: department._id }, { $set: { role: 'citizen', department: null, departmentName: '' } });
     await log(req.user, 'department_deleted', 'department', department._id, department.name, `Department "${department.name}" permanently deleted.`);
     await department.deleteOne();
 
@@ -513,9 +572,9 @@ export async function listAssignableRoles(req, res, next) {
     const roleDescriptions = {
       department_head: 'Leads the department. Manages officers, reviews completions, and has full case authority.',
       department_officer: 'Manages assigned citizen reports and handles department operations.',
-      officer: 'General officer role for civic departments. Can be assigned to cases.',
+      officer: 'Team Leader who organizes workers and manages assigned operational field tasks.',
       field_worker: 'Receives and updates assigned field tasks for on-site work.',
-      emergency_department_head: 'Leads emergency response within the department. Manages dispatch and escalations.',
+      emergency_department_head: 'The single global Emergency Department Head overseeing emergency review, routing, escalation, and closure.',
       emergency_department_officer: 'Coordinates emergency response assignments and monitors active incidents.',
       emergency_officer: 'Responds to dispatched emergency incidents in the field.',
       emergency_field_worker: 'Frontline field responder for emergency and disaster situations.'
@@ -534,7 +593,7 @@ export async function listAssignableRoles(req, res, next) {
       success: true,
       roles: DEPARTMENT_ASSIGNABLE_ROLES.map((key) => ({
         key,
-        label: key.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        label: roleLabel(key),
         description: roleDescriptions[key] || '',
         group: roleGroups[key] || 'Other'
       }))
@@ -544,12 +603,12 @@ export async function listAssignableRoles(req, res, next) {
 
 export async function listComplaints(req, res, next) { try { const filter = reportFilter(req.query); const page = pageOf(req.query.page); const limit = limitOf(req.query.limit); const [complaints, total] = await Promise.all([reportQuery(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), Report.countDocuments(filter)]); res.json({ success: true, complaints, pagination: { page, limit, total, pages: Math.ceil(total / limit) } }); } catch (error) { next(error); } }
 export async function getComplaintDetail(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await reportQuery({ _id: req.params.id }).populate('completionReport.submittedBy', 'name email photoURL').lean(); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); res.json({ success: true, complaint }); } catch (error) { next(error); } }
-export async function updateComplaint(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await Report.findById(req.params.id); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const { status, priority, departmentName, officerId, fieldWorkerId, note = '' } = req.body; if (status !== undefined) { if (!reportStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid complaint status.' }); if (status !== complaint.status && !canTransitionReport(complaint.status, status)) return res.status(409).json({ success: false, message: `Invalid complaint status transition from ${statusLabels[complaint.status] || complaint.status}.` }); complaint.status = status; } if (priority !== undefined) { if (!reportPriorities.includes(priority)) return res.status(400).json({ success: false, message: 'Invalid priority.' }); complaint.priority = priority; } if (departmentName !== undefined) { const department = await Department.findOne({ name: departmentName, status: 'active', scope: { $in: ['civic', 'hybrid'] } }); if (!department) return res.status(400).json({ success: false, message: 'Choose an active civic department.' }); complaint.departmentName = department.name; } const assignedDepartment = complaint.departmentName; if (officerId !== undefined) { const officer = officerId ? await User.findOne({ _id: officerId, role: { $in: ['department_officer', 'officer'] }, departmentName: assignedDepartment, status: 'active' }) : null; if (officerId && !officer) return res.status(400).json({ success: false, message: 'Selected officer is not active in this department.' }); complaint.assignedOfficer = officer?._id || null; } if (fieldWorkerId !== undefined) { const worker = fieldWorkerId ? await User.findOne({ _id: fieldWorkerId, role: 'field_worker', departmentName: assignedDepartment, status: 'active' }) : null; if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Selected field worker is not active in this department.' }); complaint.assignedFieldWorker = worker?._id || null; } if ((officerId || fieldWorkerId) && ['pending', 'verified'].includes(complaint.status)) complaint.status = 'assigned'; complaint.activity.push({ action: 'Updated by administrator', actorRole: 'admin', note: String(note).slice(0, 500) }); await complaint.save(); await log(req.user, 'complaint_updated', 'report', complaint._id, complaint.title, 'Complaint management data updated.'); await complaint.populate('createdBy', 'name email phone photoURL'); await complaint.populate('assignedOfficer', 'name email photoURL'); await complaint.populate('assignedFieldWorker', 'name email photoURL'); res.json({ success: true, message: 'Complaint updated.', complaint }); } catch (error) { next(error); } }
-export async function deleteComplaint(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await Report.findById(req.params.id); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); await log(req.user, 'complaint_deleted', 'report', complaint._id, complaint.title, 'Complaint deleted.'); await complaint.deleteOne(); res.json({ success: true, message: 'Complaint deleted.' }); } catch (error) { next(error); } }
+export async function updateComplaint(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await Report.findById(req.params.id); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const { status, priority, departmentName, officerId, fieldWorkerId, note = '' } = req.body; if (officerId !== undefined || fieldWorkerId !== undefined) return res.status(409).json({ success: false, message: 'Assign staff through the department case and task workflow.' }); if (complaint.activeTask && (status !== undefined || departmentName !== undefined)) return res.status(409).json({ success: false, message: 'Update the active operational task or use the department handover workflow.' }); if (status !== undefined) { if (!reportStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid complaint status.' }); if (status !== complaint.status && !canTransitionReport(complaint.status, status)) return res.status(409).json({ success: false, message: `Invalid complaint status transition from ${statusLabels[complaint.status] || complaint.status}.` }); complaint.status = status; } if (priority !== undefined) { if (!reportPriorities.includes(priority)) return res.status(400).json({ success: false, message: 'Invalid priority.' }); complaint.priority = priority; } if (departmentName !== undefined) { const department = await Department.findOne({ name: departmentName, status: 'active', scope: { $in: ['civic', 'hybrid'] } }); if (!department) return res.status(400).json({ success: false, message: 'Choose an active civic department.' }); complaint.departmentName = department.name; } const assignedDepartment = complaint.departmentName; if (officerId !== undefined) { const officer = officerId ? await User.findOne({ _id: officerId, role: { $in: ['department_officer', 'officer'] }, departmentName: assignedDepartment, status: 'active' }) : null; if (officerId && !officer) return res.status(400).json({ success: false, message: 'Selected officer is not active in this department.' }); complaint.assignedOfficer = officer?._id || null; } if (fieldWorkerId !== undefined) { const worker = fieldWorkerId ? await User.findOne({ _id: fieldWorkerId, role: 'field_worker', departmentName: assignedDepartment, status: 'active' }) : null; if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Selected field worker is not active in this department.' }); complaint.assignedFieldWorker = worker?._id || null; } if ((officerId || fieldWorkerId) && ['pending', 'verified'].includes(complaint.status)) complaint.status = 'assigned'; complaint.activity.push({ action: 'Updated by administrator', actorRole: 'admin', note: String(note).slice(0, 500) }); await complaint.save(); await log(req.user, 'complaint_updated', 'report', complaint._id, complaint.title, 'Complaint management data updated.'); await complaint.populate('createdBy', 'name email phone photoURL'); await complaint.populate('assignedOfficer', 'name email photoURL'); await complaint.populate('assignedFieldWorker', 'name email photoURL'); res.json({ success: true, message: 'Complaint updated.', complaint }); } catch (error) { next(error); } }
+export async function deleteComplaint(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' }); const complaint = await Report.findById(req.params.id); if (!complaint) return res.status(404).json({ success: false, message: 'Complaint not found.' }); await assertUnreferencedRecord('Report', complaint._id); await log(req.user, 'complaint_deleted', 'report', complaint._id, complaint.title, 'Complaint deleted.'); await complaint.deleteOne(); res.json({ success: true, message: 'Complaint deleted.' }); } catch (error) { next(error); } }
 
 export async function listEmergencies(req, res, next) { try { const filter = {}; if (emergencyStatuses.includes(req.query.status)) filter.status = req.query.status; if (req.query.type) filter.type = req.query.type; if (req.query.search?.trim()) { const exp = new RegExp(escapeRegex(req.query.search), 'i'); filter.$or = [{ title: exp }, { citizenName: exp }, { 'location.address': exp }]; } const page = pageOf(req.query.page); const limit = limitOf(req.query.limit); const [emergencies, total] = await Promise.all([Emergency.find(filter).populate('citizen', 'name email phone photoURL').populate('assignedDepartment', 'name').populate('assignedOfficer', 'name email photoURL').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), Emergency.countDocuments(filter)]); res.json({ success: true, emergencies, pagination: { page, limit, total, pages: Math.ceil(total / limit) } }); } catch (error) { next(error); } }
 export async function getEmergencyDetail(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Emergency not found.' }); const emergency = await Emergency.findById(req.params.id).populate('citizen', 'name email phone photoURL').populate('assignedDepartment', 'name').populate('assignedOfficer', 'name email phone photoURL').lean(); if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found.' }); res.json({ success: true, emergency }); } catch (error) { next(error); } }
-export async function updateEmergency(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Emergency not found.' }); const emergency = await Emergency.findById(req.params.id); if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found.' }); const { status, departmentId, officerId, fieldWorkerId, notes } = req.body; if (status !== undefined && !emergencyStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid emergency status.' }); if (departmentId !== undefined) { const department = departmentId ? await Department.findById(departmentId) : null; if (departmentId && (!department || !['emergency', 'hybrid'].includes(department.scope) || !department.emergencyTypes.includes(emergency.type))) return res.status(400).json({ success: false, message: 'Choose an emergency-enabled department configured for this emergency type.' }); emergency.assignedDepartment = department?._id || null; } else if (!emergency.assignedDepartment) { const department = await Department.findOne({ status: 'active', scope: { $in: ['emergency', 'hybrid'] }, emergencyTypes: emergency.type }); if (department) emergency.assignedDepartment = department._id; } const assignmentDepartment = emergency.assignedDepartment; if (officerId !== undefined) { const officer = officerId ? await User.findOne({ _id: officerId, department: assignmentDepartment, status: 'active', role: { $in: ['emergency_department_officer', 'emergency_officer'] } }) : null; if (officerId && !officer) return res.status(400).json({ success: false, message: 'Officer is not active in the assigned emergency department.' }); emergency.assignedOfficer = officer?._id || null; } if (fieldWorkerId !== undefined) { const worker = fieldWorkerId ? await User.findOne({ _id: fieldWorkerId, department: assignmentDepartment, status: 'active', role: 'emergency_field_worker' }) : null; if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Field worker is not active in the assigned emergency department.' }); emergency.assignedFieldWorker = worker?._id || null; } if (status) { if (status === 'resolved' && !emergency.resolvedAt) { emergency.resolvedAt = new Date(); } emergency.status = status; } if (notes !== undefined) emergency.notes = String(notes).slice(0, 1000); emergency.activity.push({ action: 'Emergency updated by administrator', actorRole: 'admin', note: String(notes || '').slice(0, 500) }); await emergency.save(); await log(req.user, 'emergency_updated', 'emergency', emergency._id, emergency.title, 'Emergency updated.'); res.json({ success: true, message: 'Emergency updated.', emergency }); } catch (error) { next(error); } }
+export async function updateEmergency(req, res, next) { try { if (!objectId(req.params.id)) return res.status(404).json({ success: false, message: 'Emergency not found.' }); const emergency = await Emergency.findById(req.params.id); if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found.' }); const { status, departmentId, officerId, fieldWorkerId, notes } = req.body; if (emergency.ops?.workflowStatus && [status, departmentId, officerId, fieldWorkerId].some((value) => value !== undefined)) return res.status(409).json({ success: false, message: 'Use the Emergency Operations workflow to change status or assignments.' }); if (status !== undefined && status !== emergency.status && !canTransitionEmergency(emergency.status, status)) return res.status(409).json({ success: false, message: 'Invalid emergency status transition.' }); if (status !== undefined && !emergencyStatuses.includes(status)) return res.status(400).json({ success: false, message: 'Invalid emergency status.' }); if (departmentId !== undefined) { const department = departmentId ? await Department.findById(departmentId) : null; if (departmentId && (!department || !['emergency', 'hybrid'].includes(department.scope) || !department.emergencyTypes.includes(emergency.type))) return res.status(400).json({ success: false, message: 'Choose an emergency-enabled department configured for this emergency type.' }); emergency.assignedDepartment = department?._id || null; } else if (!emergency.assignedDepartment) { const department = await Department.findOne({ status: 'active', scope: { $in: ['emergency', 'hybrid'] }, emergencyTypes: emergency.type }); if (department) emergency.assignedDepartment = department._id; } const assignmentDepartment = emergency.assignedDepartment; if (officerId !== undefined) { const officer = officerId ? await User.findOne({ _id: officerId, department: assignmentDepartment, status: 'active', role: { $in: ['emergency_department_officer', 'emergency_officer'] } }) : null; if (officerId && !officer) return res.status(400).json({ success: false, message: 'Officer is not active in the assigned emergency department.' }); emergency.assignedOfficer = officer?._id || null; } if (fieldWorkerId !== undefined) { const worker = fieldWorkerId ? await User.findOne({ _id: fieldWorkerId, department: assignmentDepartment, status: 'active', role: 'emergency_field_worker' }) : null; if (fieldWorkerId && !worker) return res.status(400).json({ success: false, message: 'Field worker is not active in the assigned emergency department.' }); emergency.assignedFieldWorker = worker?._id || null; } if (status) { if (status === 'resolved' && !emergency.resolvedAt) { emergency.resolvedAt = new Date(); } emergency.status = status; } if (notes !== undefined) emergency.notes = String(notes).slice(0, 1000); emergency.activity.push({ action: 'Emergency updated by administrator', actorRole: 'admin', note: String(notes || '').slice(0, 500) }); await emergency.save(); await log(req.user, 'emergency_updated', 'emergency', emergency._id, emergency.title, 'Emergency updated.'); res.json({ success: true, message: 'Emergency updated.', emergency }); } catch (error) { next(error); } }
 
 export async function listActivityLogs(req, res, next) {
   try {

@@ -68,7 +68,7 @@ export async function resolveAssignableTarget({ actor, targetUserId, res }) {
 export async function bookWorker({ workerId, taskId, res }) {
 
   const booked = await User.findOneAndUpdate(
-    { _id: workerId, availability: 'available', activeEmergencyTeam: null },
+    { _id: workerId, status: 'active', role: { $in: WORKER_ROLES }, availability: 'available', activeTask: null, activeEmergencyTeam: null },
     { $set: { availability: 'busy', activeTask: taskId, availabilityChangedAt: new Date() } },
     { new: true }
   );
@@ -88,14 +88,14 @@ export async function bookWorker({ workerId, taskId, res }) {
 
 export async function releaseWorker({ workerId, res }) {
   const otherActive = await DepartmentTask.exists({
-    $or: [{ assignedWorker: workerId }, { 'team.members': workerId }],
-    status: { $nin: ['completed', 'cancelled', 'rejected'] }
+    $or: [{ assignedWorker: workerId }, { workerIds: workerId }],
+    status: { $nin: ['completed', 'verified', 'cancelled', 'rejected'] }
   });
   if (otherActive) {
     return fail(res, CONFLICT, 'This worker still holds another active task and cannot be released.');
   }
   const released = await User.findOneAndUpdate(
-    { _id: workerId, availability: 'busy' },
+    { _id: workerId, availability: 'busy', activeEmergencyTeam: null },
     { $set: { availability: 'available', activeTask: null, availabilityChangedAt: new Date() } },
     { new: true }
   );
@@ -107,13 +107,13 @@ export async function workerWorkload({ departmentName, role = 'field_worker' }) 
     .select('name role availability activeTask availabilityChangedAt');
   const ids = workers.map((worker) => worker._id);
   const busyTasks = await DepartmentTask.find({
-    status: { $nin: ['completed', 'cancelled', 'rejected'] },
-    $or: [{ assignedWorker: { $in: ids } }, { 'team.members': { $in: ids } }]
-  }).select('taskNumber title status assignedWorker team');
+    status: { $nin: ['completed', 'verified', 'cancelled', 'rejected'] },
+    $or: [{ assignedWorker: { $in: ids } }, { workerIds: { $in: ids } }]
+  }).select('taskNumber title status assignedWorker workerIds team');
   return workers.map((worker) => {
     const task = busyTasks.find((candidate) =>
       candidate.assignedWorker?.equals?.(worker._id)
-      || candidate.team?.members?.some?.((member) => member.equals?.(worker._id))
+      || candidate.workerIds?.some?.((member) => member.equals?.(worker._id))
     );
     return {
       _id: worker._id,

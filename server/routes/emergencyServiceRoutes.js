@@ -129,7 +129,7 @@ router.get('/', async (req, res, next) => {
   try {
     const filter = {};
     if (facilityTypes.includes(req.query.type)) filter.type = req.query.type;
-    if (req.query.active !== 'false' && req.user.role !== 'admin') filter.active = true;
+    if (req.user.role !== 'admin') filter.active = true;
     const search = clean(req.query.search, 140).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     if (search) filter.$or = [{ name: new RegExp(search, 'i') }, { address: new RegExp(search, 'i') }];
     const limit = Math.min(Math.max(Number(req.query.limit) || 300, 1), 500);

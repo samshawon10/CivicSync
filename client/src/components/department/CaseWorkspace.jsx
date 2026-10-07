@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRightLeft, CheckCircle2, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, CheckCircle2, Link2, RefreshCw, ShieldAlert } from 'lucide-react';
 import { departmentApi } from '../../services/departmentService.js';
 import { apiMessage } from '../../services/api.js';
 import { showSuccess, showError } from '../../utils/sweetAlert.js';
@@ -25,6 +25,7 @@ import TaskOperationsPanel from './TaskOperationsPanel.jsx';
 import CaseConversation, { CaseTimeline } from './CaseConversation.jsx';
 import ResolveEscalationModal from './ResolveEscalationModal.jsx';
 import useDepartmentSync from './useDepartmentSync.js';
+import { stageLabel } from './workflowLabels.js';
 
 const reportStatuses = ['pending', 'verified', 'assigned', 'in_progress', 'under_review', 'completed', 'closed'];
 const priorities = ['low', 'medium', 'high', 'urgent'];
@@ -118,19 +119,35 @@ function HandoverModal({ report, staff, onClose, onDone }) {
   );
 }
 
-function ReviewCompletionModal({ report, onClose, onDone }) {
-  const [verificationStatus, setVerificationStatus] = useState('approved');
+function ReviewCompletionModal({ report, role, onClose, onDone }) {
+  const isHead = role === 'department_head';
+  const awaitingVerification = report.completionReport?.verificationStatus === 'submitted';
+  const fieldTaskVerified = !report.activeTask?.team
+    || !report.activeTask?.workerAssignments?.length
+    || report.activeTask.status === 'verified';
+  const options = [
+    ...(!isHead && awaitingVerification && fieldTaskVerified ? [['verified', 'Verify completed work']] : []),
+    ...(isHead && report.completionReport?.verificationStatus === 'verified' ? [['approved', 'Approve and resolve case']] : []),
+    ['rejected', 'Reject and send back for rework']
+  ];
+  const [verificationStatus, setVerificationStatus] = useState(options[0][0]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const completion = report.completionReport || {};
+
+  const successMessage = {
+    verified: ['Completion verified', 'The case is verified and now awaits the Department Head review.'],
+    approved: ['Case resolved', 'The case is resolved and the citizen has been notified.'],
+    rejected: ['Completion rejected', 'The case returned to in progress for rework.']
+  }[verificationStatus] || ['Review saved', ''];
 
   async function submit(event) {
     event.preventDefault();
     setBusy(true); setError('');
     try {
       await departmentApi.reviewCompletion(report._id, { verificationStatus, note: note.trim() });
-      showSuccess(verificationStatus === 'approved' ? 'Case closed' : 'Completion rejected', verificationStatus === 'approved' ? 'The case has been closed and the citizen notified.' : 'The case returned to in progress for rework.');
+      showSuccess(...successMessage);
       onDone();
     } catch (err) {
       const message = apiMessage(err);
@@ -142,8 +159,10 @@ function ReviewCompletionModal({ report, onClose, onDone }) {
     <Modal
       open
       onClose={onClose}
-      title="Review completion report"
-      subtitle="Approving closes the case. Rejecting returns it to in progress."
+      title={isHead ? 'Department Head final review' : 'Verify completed work'}
+      subtitle={isHead
+        ? 'Approving resolves the case and notifies the citizen. Rejecting returns it to the field team.'
+        : 'Verify the field work and its evidence. The Department Head resolves the case afterwards.'}
       icon="clipboard"
       footer={<><button type="button" onClick={onClose} className={secondaryButton}>Cancel</button><button type="submit" form="review-form" disabled={busy} className={primaryButton}>{busy ? 'Saving…' : 'Submit review'}</button></>}
     >
@@ -154,16 +173,15 @@ function ReviewCompletionModal({ report, onClose, onDone }) {
           <p className="mt-1">{completion.summary || 'No summary submitted.'}</p>
           {completion.materials && <p className="mt-1 text-xs">Materials: {completion.materials}</p>}
           {completion.notes && <p className="mt-1 text-xs">Notes: {completion.notes}</p>}
-          <p className="mt-1 text-xs text-slate-500">Submitted {formatOpsDate(completion.submittedAt)}</p>
+          <p className="mt-1 text-xs text-slate-500">Submitted {formatOpsDate(completion.submittedAt)} · Verification: {completion.verificationStatus || 'not submitted'}</p>
         </div>
         <TextField label="Decision">
           <select className={inputClass} value={verificationStatus} onChange={(event) => setVerificationStatus(event.target.value)}>
-            <option value="approved">Approve and close case</option>
-            <option value="rejected">Reject and re-open case</option>
+            {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
           </select>
         </TextField>
         <TextField label="Review note">
-          <textarea rows={3} className={inputClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Quality check remarks, rework instructions…" />
+          <textarea rows={3} className={inputClass} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Quality check remarks, evidence reviewed, rework instructions…" />
         </TextField>
       </form>
     </Modal>
@@ -186,6 +204,7 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
   const [error, setError] = useState('');
   const [dialog, setDialog] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [duplicateTarget, setDuplicateTarget] = useState('');
 
   const load = useCallback(async () => {
     if (!caseId) return;
@@ -200,6 +219,12 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
   useDepartmentSync(load, { enabled: Boolean(caseId) });
 
   const escalated = Boolean(report?.escalation?.isEscalated && !report?.escalation?.resolvedAt);
+  const fieldTaskVerified = !report?.activeTask?.team
+    || !report?.activeTask?.workerAssignments?.length
+    || report.activeTask.status === 'verified';
+  const selectedDuplicateTarget = report?.potentialDuplicates?.some((candidate) => candidate.id === duplicateTarget)
+    ? duplicateTarget
+    : report?.potentialDuplicates?.[0]?.id;
 
   async function changePriority(value) {
     setBusy(true);
@@ -221,6 +246,39 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
 
   function afterDialog() { setDialog(null); load(); onChanged?.(); }
 
+  async function startReview(event) {
+    event.preventDefault();
+    setBusy(true); setError('');
+    try {
+      const note = String(new FormData(event.currentTarget).get('reviewNote') || '').trim();
+      await departmentApi.startReview(report._id, note);
+      showSuccess('Review started', 'The case is now under department review.');
+      afterDialog();
+    } catch (err) {
+      const message = apiMessage(err);
+      setError(message); showError('Unable to start the review', message);
+    } finally { setBusy(false); }
+  }
+
+  async function reviewDuplicates(action) {
+    setBusy(true);
+    try {
+      await departmentApi.reviewDuplicates(report._id, {
+        action,
+        ...(action === 'link' ? { masterCaseId: selectedDuplicateTarget } : {})
+      });
+      showSuccess(
+        action === 'link' ? 'Reports linked' : 'Case kept separate',
+        action === 'link' ? 'Citizen reports now share one master civic case.' : 'This case may proceed as independent field work.'
+      );
+      if (action === 'link') onClose?.();
+      else await load();
+      onChanged?.();
+    } catch (err) {
+      showError('Unable to review related cases', apiMessage(err));
+    } finally { setBusy(false); }
+  }
+
   if (!caseId) return null;
 
   const footer = report ? (
@@ -241,9 +299,19 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
           <ArrowRightLeft size={14} className="mr-1 inline" /> Hand over
         </button>
       )}
-      {isHead && report.status === 'under_review' && (
+      {isHead && report.workflowStage === 'SUBMITTED' && (
+        <button type="button" onClick={() => setDialog('review-start')} className={secondaryButton}>
+          <CheckCircle2 size={14} className="mr-1 inline" /> Start review
+        </button>
+      )}
+      {canManage && report.completionReport?.verificationStatus === 'submitted' && !isHead && fieldTaskVerified && (
         <button type="button" onClick={() => setDialog('review')} className={primaryButton}>
-          <CheckCircle2 size={14} className="mr-1 inline" /> Review completion
+          <CheckCircle2 size={14} className="mr-1 inline" /> Verify completion
+        </button>
+      )}
+      {isHead && report.completionReport?.verificationStatus === 'verified' && (
+        <button type="button" onClick={() => setDialog('review')} className={primaryButton}>
+          <CheckCircle2 size={14} className="mr-1 inline" /> Final review
         </button>
       )}
     </>
@@ -255,7 +323,7 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
         open
         onClose={onClose}
         title={report?.title || 'Case workspace'}
-        subtitle={report ? `${String(report.category || '').replaceAll('_', ' ')} · ${report.location?.address || report.location?.area || 'Location not recorded'}` : 'Loading case…'}
+        subtitle={report ? `${report.reference ? `${report.reference} · ` : `#${String(report._id).slice(-6).toUpperCase()} · `}${String(report.category || '').replaceAll('_', ' ')} · ${report.location?.address || report.location?.area || 'Location not recorded'}` : 'Loading case…'}
         width="sm:max-w-2xl"
         footer={footer}
       >
@@ -266,7 +334,9 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
         ) : report ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
+              {report.reference && <Pill tone="info">{report.reference}</Pill>}
               <StatusPill value={report.status} />
+              {report.workflowStage && <Pill tone="progress">{stageLabel(report.workflowStage)}</Pill>}
               <PriorityPill value={report.priority} />
               <SlaPill sla={report.sla} />
               {escalated && <Pill tone="danger"><AlertTriangle size={11} aria-hidden="true" /> Escalated</Pill>}
@@ -319,6 +389,58 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
                   </dl>
                   {report.description && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">{report.description}</p>}
                 </Panel>
+
+                <Panel title={`Citizen reports (${report.masterReportCount || 1})`} subtitle="Original citizen submissions are retained and shown without reporter contact details.">
+                  {report.linkedReports?.length ? (
+                    <ul className="space-y-3">
+                      <li className="rounded-lg border border-civic-200 bg-civic-50/50 p-3 text-sm">
+                        <p className="font-bold text-ink">{report.title} <span className="ml-1 text-xs font-semibold text-civic-700">Master report</span></p>
+                        <p className="mt-1 text-xs text-slate-500">{formatOpsDate(report.createdAt)}</p>
+                      </li>
+                      {report.linkedReports.map((linkedReport) => (
+                        <li key={linkedReport._id} className="rounded-lg border border-slate-200 p-3 text-sm">
+                          <p className="font-bold text-ink">{linkedReport.title}</p>
+                          <p className="mt-1 text-slate-600">{linkedReport.description}</p>
+                          <p className="mt-1 text-xs text-slate-500">{formatOpsDate(linkedReport.createdAt)} · Linked citizen report</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="text-sm text-slate-500">No additional citizen reports are linked to this master case.</p>}
+                </Panel>
+
+                {canManage && report.duplicateReviewStatus !== 'separate' && report.potentialDuplicates?.length > 0 && (
+                  <Panel title="Potentially related cases" subtitle="Review these location and issue matches before dispatching another field task.">
+                    <ul className="space-y-3">
+                      {report.potentialDuplicates.map((candidate) => (
+                        <li key={candidate.id} className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
+                          <p className="font-bold text-ink">{candidate.title}</p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {candidate.category.replaceAll('_', ' ')} · {candidate.location.area || `${candidate.location.distanceMeters} m away`} · {stageLabel(candidate.status)}
+                          </p>
+                          <p className="mt-2 text-slate-600">{candidate.description}</p>
+                        </li>
+                      ))}
+                    </ul>
+                    <label className="mt-3 block text-sm font-semibold text-ink">
+                      Existing master case
+                      <select
+                        className={`${inputClass} mt-1`}
+                        value={selectedDuplicateTarget}
+                        onChange={(event) => setDuplicateTarget(event.target.value)}
+                      >
+                        {report.potentialDuplicates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
+                      </select>
+                    </label>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" disabled={busy} onClick={() => reviewDuplicates('link')} className={primaryButton}>
+                        <Link2 size={14} className="mr-1 inline" /> Link to existing case
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => reviewDuplicates('separate')} className={secondaryButton}>
+                        Keep separate
+                      </button>
+                    </div>
+                  </Panel>
+                )}
 
                 <Panel title="Ownership">
                   <dl className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
@@ -378,7 +500,7 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
                 <div className="border-t border-slate-200 pt-5">
                   <h3 className="mb-1 text-sm font-black text-ink">Field execution</h3>
                   <p className="mb-3 text-xs text-slate-500">
-                    Worker and team assignment is an Officer action on the task — it is not available from the case level.
+                    Worker and team assignment belongs to the Team Leader on the task — Department Officer and Team Leader are separate roles.
                   </p>
                   <TaskOperationsPanel
                     caseId={report._id}
@@ -401,8 +523,24 @@ export default function CaseWorkspace({ caseId, role, staff = [], onClose, onCha
       {dialog === 'escalate' && <EscalateModal report={report} onClose={() => setDialog(null)} onDone={afterDialog} />}
       {dialog === 'resolve' && <ResolveEscalationModal report={report} onClose={() => setDialog(null)} onResolved={afterDialog} />}
       {dialog === 'handover' && <HandoverModal report={report} staff={staff} onClose={() => setDialog(null)} onDone={afterDialog} />}
-      {dialog === 'review' && <ReviewCompletionModal report={report} onClose={() => setDialog(null)} onDone={afterDialog} />}
+      {dialog === 'review' && <ReviewCompletionModal report={report} role={role} onClose={() => setDialog(null)} onDone={afterDialog} />}
+      {dialog === 'review-start' && (
+        <Modal
+          open
+          onClose={() => setDialog(null)}
+          title="Start department review"
+          subtitle="Moves the case from Submitted to Under Review so it can be routed."
+          icon="clipboard"
+          footer={<><button type="button" onClick={() => setDialog(null)} className={secondaryButton}>Cancel</button><button type="submit" form="review-start-form" disabled={busy} className={primaryButton}>{busy ? 'Saving…' : 'Start review'}</button></>}
+        >
+          <form id="review-start-form" onSubmit={startReview} className="space-y-4">
+            <OpsError message={error} />
+            <TextField label="Review note (optional)">
+              <textarea rows={3} className={inputClass} name="reviewNote" placeholder="Initial assessment, routing intention…" />
+            </TextField>
+          </form>
+        </Modal>
+      )}
     </>
   );
 }
-

@@ -1,4 +1,6 @@
 import mongoose from 'mongoose';
+import Department from '../models/Department.js';
+import { emergencyDepartmentConflict } from './emergencyDepartmentAccess.js';
 import User from '../models/User.js';
 import Emergency from '../models/Emergency.js';
 import Notification from '../models/Notification.js';
@@ -127,7 +129,13 @@ export async function ensureSingletonHeadIndex() {
   const name = 'uniq_single_active_emergency_head';
   const collection = User.collection;
   const existing = (await collection.indexes().catch(() => [])).find((index) => index.name === name);
-  if (existing) return { created: false, name };
+  if (existing) {
+    if (!existing.unique || existing.key.role !== 1 || existing.key.status !== 1
+      || existing.partialFilterExpression?.role !== HEAD_ROLE || existing.partialFilterExpression?.status !== 'active') {
+      throw new OpsError(409, 'The Emergency Head index definition is invalid. Repair the index before starting the API.');
+    }
+    return { created: false, name };
+  }
   try {
     await collection.createIndex(
       { role: 1, status: 1 },
@@ -275,9 +283,10 @@ export async function applyTransition({ emergency, to, actor, note = '', extraSe
   }
   const now = new Date();
   const updated = await Emergency.findOneAndUpdate(
-    { _id: emergency._id, 'ops.workflowStatus': { $in: allowFrom || rule.from } },
+    { _id: emergency._id, 'ops.workflowStatus': from },
     {
       $set: { 'ops.workflowStatus': to, status: LEGACY_STATUS[to] || 'received', ...stampFor(to, now), ...extraSet },
+      $inc: { __v: 1 },
       $push: { activity: { action: `ops_${to.toLowerCase()}`, actorRole: actor.role || '', timestamp: now, note: String(note).slice(0, 500) } }
     },
     { new: true }
@@ -461,7 +470,7 @@ export async function assignableStaff(actor, { role = '' } = {}) {
   if (!wanted.length) {
     throw new OpsError(403, `A ${opsLabel(actor.role)} may only assign ${allowed.map(opsLabel).join(' or ')}.`);
   }
-  const users = await User.find({ role: { $in: wanted }, status: 'active', availability: 'available' })
+  const users = await User.find({ role: { $in: wanted }, status: 'active', availability: 'available', activeTask: null, activeEmergencyTeam: null, ...(['admin', HEAD_ROLE].includes(actor.role) ? {} : { department: actor.department }) })
     .select('name role status availability activeTask activeEmergencyTeam email phone departmentName updatedAt')
     .sort({ availability: 1, name: 1 });
   return annotateStaff(users);
@@ -703,6 +712,10 @@ export async function assignDepartmentOfficer({ emergencyId, edoId, actor }) {
 
   const edo = await User.findOne({ _id: edoId, role: 'emergency_department_officer', status: 'active', availability: 'available' });
   if (!edo) throw new OpsError(404, 'Active Emergency Department Officer not found.');
+  const conflict = emergencyDepartmentConflict(emergency, edo);
+  if (conflict) throw new OpsError(409, conflict);
+  const department = await Department.findOne({ _id: edo.department, status: 'active', scope: { $in: ['emergency', 'hybrid'] } });
+  if (!department) throw new OpsError(409, 'Choose an officer from an active emergency-enabled department.');
 
   const updated = await applyTransition({
     emergency,
@@ -711,6 +724,7 @@ export async function assignDepartmentOfficer({ emergencyId, edoId, actor }) {
     note: `Assigned to Department Officer ${edo.name}`,
     extraSet: {
       'ops.departmentOfficer': edo._id,
+      assignedDepartment: edo.department,
       'ops.assignedToEDOAt': new Date()
     },
     allowFrom: [WORKFLOW.SUBMITTED, WORKFLOW.HEAD_REVIEW, WORKFLOW.ASSIGNED_EDO, WORKFLOW.EDO_REVIEW]
@@ -777,6 +791,9 @@ export async function assignEmergencyOfficer({ emergencyId, eoId, actor }) {
 
   const eo = await User.findOne({ _id: eoId, role: 'emergency_officer', status: 'active', availability: 'available' });
   if (!eo) throw new OpsError(404, 'Active Emergency Officer not found.');
+  const departmentOfficer = await User.findById(emergency.ops?.departmentOfficer);
+  const conflict = emergencyDepartmentConflict(emergency, eo, departmentOfficer);
+  if (conflict || !departmentOfficer) throw new OpsError(409, conflict || 'Assign an Emergency Department Officer first.');
 
   const updated = await applyTransition({
     emergency,
@@ -828,6 +845,7 @@ export async function acceptEmergencyByOfficer({ emergencyId, actor }) {
 }
 
 export async function createTaskTeam({ emergencyId, title, kind = 'TASK', responseType = 'OTHER', fieldWorkerIds = [], notes = '', actor }) {
+  if (!Array.isArray(fieldWorkerIds) || new Set(fieldWorkerIds.map(String)).size !== fieldWorkerIds.length || fieldWorkerIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) throw new OpsError(400, 'Select valid, unique field worker IDs.');
   if (actor.role === 'emergency_department_head' || actor.role === 'emergency_department_officer') {
     throw new OpsError(403, 'Only Emergency Officers may form response teams.');
   }
@@ -874,9 +892,12 @@ export async function createTaskTeam({ emergencyId, title, kind = 'TASK', respon
     for (const wid of fieldWorkerIds) {
       const worker = await User.findOne({ _id: wid, role: 'emergency_field_worker', status: 'active' });
       if (!worker) throw new OpsError(404, `Worker ${wid} not found or inactive.`);
+      const supervisor = actor.role === 'admin' ? await User.findById(emergency.ops?.emergencyOfficer) : actor;
+      const conflict = emergencyDepartmentConflict(emergency, worker, supervisor);
+      if (conflict) throw new OpsError(409, conflict);
 
       const booked = await User.findOneAndUpdate(
-        { _id: wid, role: 'emergency_field_worker', status: 'active', availability: 'available', activeEmergencyTeam: null },
+        { _id: wid, role: 'emergency_field_worker', status: 'active', availability: 'available', activeTask: null, activeEmergencyTeam: null },
         { $set: { availability: 'busy', activeEmergencyTeam: team._id, availabilityChangedAt: new Date() } },
         { new: true }
       );
@@ -961,7 +982,7 @@ export async function createRosterTeam({ title, kind = 'ROSTER', responseType = 
   if (workerIds.length !== fieldWorkerIds.length || workerIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
     throw new OpsError(400, 'Select valid, unique field worker IDs for the roster.');
   }
-  const workers = await User.find({ _id: { $in: workerIds }, role: 'emergency_field_worker', status: 'active' }).select('name role');
+  const workers = await User.find({ _id: { $in: workerIds }, role: 'emergency_field_worker', status: 'active', ...(actor.role === 'admin' ? {} : { department: actor.department }) }).select('name role');
   if (workers.length !== workerIds.length) throw new OpsError(400, 'One or more roster field workers are unavailable.');
   team.members.push(...workers.map((worker) => ({
     user: worker._id,
@@ -1014,12 +1035,15 @@ export async function addWorkerToTeam({ emergencyId, teamId, workerId, actor }) 
 
   const worker = await User.findOne({ _id: workerId, role: 'emergency_field_worker', status: 'active' });
   if (!worker) throw new OpsError(404, 'Emergency field worker not found.');
+  const supervisor = actor.role === 'admin' ? await User.findById(emergency.ops?.emergencyOfficer) : actor;
+  const conflict = emergencyDepartmentConflict(emergency, worker, supervisor);
+  if (conflict) throw new OpsError(409, conflict);
 
   const existingMember = team.members.find((m) => String(m.user) === String(workerId) && m.status !== 'RELEASED');
   if (existingMember) throw new OpsError(409, 'Worker is already an active member of this response team.');
 
   const booked = await User.findOneAndUpdate(
-    { _id: workerId, role: 'emergency_field_worker', status: 'active', availability: 'available', activeEmergencyTeam: null },
+    { _id: workerId, role: 'emergency_field_worker', status: 'active', availability: 'available', activeTask: null, activeEmergencyTeam: null },
     { $set: { availability: 'busy', activeEmergencyTeam: team._id, availabilityChangedAt: new Date() } },
     { new: true }
   );
@@ -1196,6 +1220,8 @@ export async function startResponse({ emergencyId, step = 'active', notes = '', 
     throw new OpsError(400, 'Invalid response step.');
   }
 
+  const staffed = await EmergencyResponseTeam.exists({ emergency: emergency._id, kind: 'TASK', status: 'FORMED', members: { $elemMatch: { status: 'ACTIVE' } } });
+  if (!staffed) throw new OpsError(409, 'Form a staffed response team before starting field response.');
   const target = step === 'en_route'
     ? WORKFLOW.EN_ROUTE
     : step === 'on_scene'
@@ -1380,6 +1406,9 @@ export async function officerCompleteResponse({ emergencyId, notes = '', actor }
   if (!emergency) throw new OpsError(404, 'Emergency not found.');
   if (actor.role !== 'admin' && !isAssignedEmergencyOfficer(emergency, actor)) throw new OpsError(403, 'Only the assigned Emergency Officer may complete this response.');
   const teams = await EmergencyResponseTeam.find({ emergency: emergency._id, kind: 'TASK', status: 'FORMED' });
+  if (!teams.length || !teams.some((team) => team.members.some((member) => member.status === 'FIELD_WORK_COMPLETED' && member.fieldWorkStartedAt))) {
+    throw new OpsError(409, 'A response team must finish actual field work before the response can be completed.');
+  }
   const incomplete = teams.flatMap((team) => team.members.filter((member) => member.status === 'ACTIVE').map((member) => member.name));
   if (incomplete.length) throw new OpsError(409, 'Every assigned field worker must complete field work before the response can be completed.', { workers: incomplete });
 

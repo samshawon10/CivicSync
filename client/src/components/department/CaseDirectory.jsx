@@ -87,7 +87,7 @@ export default function CaseDirectory({ onOpenCase, title = 'Case workspace dire
               {reports.map((report) => (
                 <tr key={report._id} className="border-b border-slate-100 align-top hover:bg-slate-50">
                   <td className="max-w-xs px-3 py-3">
-                    <p className="text-[11px] font-black text-slate-400">#{report._id.slice(-6).toUpperCase()}</p>
+                    <p className="text-[11px] font-black text-slate-400">{report.reference || `#${report._id.slice(-6).toUpperCase()}`}</p>
                     <p className="font-bold text-ink">{report.title}</p>
                     <p className="text-xs text-slate-500">{String(report.category || '').replaceAll('_', ' ')}</p>
                   </td>
