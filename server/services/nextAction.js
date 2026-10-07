@@ -32,6 +32,10 @@ function decorate(action, deadline, priority) {
 }
 
 export function getReportNextAction(report) {
+  if (['RESOLVED', 'CANCELLED'].includes(report?.workflowStage)) return null;
+  if ((!report?.activeTask || !report.activeTask.status) && ['ASSIGNED_TO_OFFICER', 'TEAM_FORMED', 'ACCEPTED', 'IN_PROGRESS', 'ON_HOLD', 'BLOCKED'].includes(report?.workflowStage)) {
+    return decorate({ action: 'Create or review the operational field task', responsibleRole: 'officer', responsibleUser: asId(report.assignedOfficer), reason: 'The report has no valid operational task to perform field work.' }, report.dueAt, report.priority);
+  }
   if (report?.escalation?.isEscalated && !report.escalation.resolvedAt) {
     return decorate(
       { action: 'Review SLA / Critical Escalation', responsibleRole: 'department_head', reason: report.escalation.reason || 'Case has been escalated.' },
@@ -86,6 +90,7 @@ export function getReportNextAction(report) {
     }
   }
 
+  if (['assigned', 'in_progress'].includes(report?.status) && !report?.activeTask?.status) return decorate({ action: 'Create or review the operational field task', responsibleRole: 'officer', responsibleUser: asId(report.assignedOfficer), reason: 'A report assignment alone does not authorize field work.' }, report.dueAt, report.priority);
   const action = reportActions[report?.status];
   if (!action) return null;
   const responsibleUser = report.status === 'assigned' || report.status === 'in_progress'

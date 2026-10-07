@@ -34,7 +34,7 @@ async function validCategory(value) {
 
 function commandAccess(user) { return commandRoles.includes(user.role); }
 function denyLegacyOpsWrite(req, res, emergency) {
-  if (req.user.role !== 'admin' && req.user.role.startsWith('emergency_') && emergency?.ops?.workflowStatus) {
+  if (emergency?.ops?.workflowStatus) {
     res.status(403).json({ success: false, message: 'Use the Emergency Operations workflow endpoint for this action.' });
     return true;
   }
@@ -270,7 +270,9 @@ export async function uploadEvidence(req, res, next) {
     if (!files.length) return res.status(400).json({ success: false, message: 'Select at least one evidence file.' });
     emergency.evidence.push(...files.map((file) => ({ filename: file.filename, originalName: clean(file.originalname, 180), mediaType: file.mimetype.split('/')[0], url: `/api/emergencies/${emergency._id}/evidence/${file.filename}` })));
     emergency.activity.push({ action: 'Evidence uploaded', actorRole: req.user.role, note: `${files.length} file${files.length === 1 ? '' : 's'} added.` });
-    await emergency.save(); await audit(req.user, 'emergency_evidence_uploaded', emergency, `${files.length} evidence file(s).`);
+    await emergency.save();
+    req.uploadCommitted = true;
+    await audit(req.user, 'emergency_evidence_uploaded', emergency, `${files.length} evidence file(s).`);
     res.status(201).json({ success: true, emergency: emergencyForViewer(await populatedEmergency(emergency._id), req.user) });
   } catch (error) { next(error); }
 }
@@ -350,6 +352,7 @@ export async function assignEmergency(req, res, next) {
     if (req.user.role === 'emergency_department_head') return res.status(403).json({ success: false, message: 'The Emergency Head may assign only an Emergency Department Officer through the Emergency Operations workflow.' });
     if (!commandAccess(req.user)) return res.status(403).json({ success: false, message: 'Only emergency command can dispatch response teams.' });
     const emergency = await scopedEmergency(req, res); if (!emergency) return;
+    if (denyLegacyOpsWrite(req, res, emergency)) return;
     if (!activeEmergencyStatuses.includes(emergency.status)) return res.status(409).json({ success: false, message: 'Closed or terminal incidents cannot be dispatched.' });
     const { responseType, responseTeam = '', teamId = '', officerId = '', fieldWorkerIds = [], etaMinutes = null, notes = '' } = req.body;
     if (!clean(responseType, 80)) return res.status(400).json({ success: false, message: 'A response type is required.' });

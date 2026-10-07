@@ -109,9 +109,6 @@
   ::selection { background: rgba(37, 99, 235, .22); }
 }
 
-@keyframes civic-fade-up { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes civic-scale-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
-@keyframes civic-marker { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.55); opacity: .45; } }
 @keyframes civic-sos { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
 @keyframes civic-shimmer { 100% { transform: translateX(100%); } }
 @keyframes civic-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -162,12 +159,6 @@
 
 @layer components {
   .interactive { transition: transform var(--dur-normal) var(--ease-standard), box-shadow var(--dur-normal) var(--ease-standard), background-color var(--dur-normal) var(--ease-standard), color var(--dur-normal) var(--ease-standard), border-color var(--dur-normal) var(--ease-standard); }
-  .hero-kicker { animation: civic-fade-up .45s ease-out both; }
-  .hero-title { animation: civic-fade-up .62s .1s ease-out both; }
-  .hero-description { animation: civic-fade-up .56s .24s ease-out both; }
-  .hero-actions { animation: civic-fade-up .5s .36s ease-out both; }
-  .hero-visual { animation: civic-scale-in .68s .18s ease-out both; }
-  .hero-marker { animation: civic-marker 2.8s ease-in-out infinite; transform-origin: center; }
   .sos-pulse { animation: civic-sos 2.6s ease-in-out infinite; }
 
   .page-enter { animation: civic-page-in var(--dur-normal) var(--ease-standard) backwards; }
@@ -447,4 +438,3 @@
   .ai-step { animation: none; }
   .ai-launcher:hover { transform: none; }
 }
-

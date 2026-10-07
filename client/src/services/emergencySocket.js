@@ -1,12 +1,35 @@
 import { io } from 'socket.io-client';
-import { API_ORIGIN } from './api.js';
+import api, { API_ORIGIN, getAuthToken } from './api.js';
 
 let socket;
 export function emergencySocket() {
   if (!socket) {
-    socket = io(API_ORIGIN, { withCredentials: true, autoConnect: false });
+    socket = io(API_ORIGIN, {
+      withCredentials: true,
+      autoConnect: false,
+      auth: (cb) => {
+        cb({ token: getAuthToken() });
+      }
+    });
+    socket.on('SESSION_INVALIDATED', () => window.dispatchEvent(new Event('civicsync:session-invalidated')));
+    socket.on('disconnect', (reason) => { if (reason === 'io server disconnect' && getAuthToken()) socket?.connect(); });
+    let refreshing = false;
+    socket.on('connect_error', async () => {
+      if (refreshing || !getAuthToken()) return;
+      refreshing = true;
+      try { await api.get('/users/me', { skipGlobalErrorToast: true }); socket?.connect(); }
+      catch { /* The page keeps its connection/error state until access recovers. */ }
+      finally { refreshing = false; }
+    });
   }
   return socket;
+}
+
+export function disconnectSocket() {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
 }
 
 /** Department Operations lifecycle events (unified case → team → task workflow). */

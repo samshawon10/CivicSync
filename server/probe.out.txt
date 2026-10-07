@@ -1,0 +1,605 @@
+◇ injected env (9) from .env // tip: ⌘ override existing { override: true }
+
+== USERS ==
+[
+ {
+  "_id": "6a7f84168ff00ac58dab8eb0",
+  "name": "Sam Shawon",
+  "email": "shawonakando518@gmail.com",
+  "role": "admin",
+  "firebaseUid": "pd4pdXx7aCRNLaWmHpIiykYlGc43",
+  "status": "active",
+  "departmentName": "",
+  "availability": "available"
+ },
+ {
+  "_id": "6a7f96d30f95871064676f96",
+  "firebaseUid": "jJzENOm76zLOhxYZWmrJVB8nWPq1",
+  "name": "Sa Shawon",
+  "email": "sashawon518@gmail.com",
+  "role": "citizen",
+  "department": null,
+  "status": "active",
+  "departmentName": "",
+  "availability": "available"
+ },
+ {
+  "_id": "6a80a1c9184c4bdd2f4879fd",
+  "firebaseUid": "wV5sSpWFdfPrXHQiYvNacxVSwAN2",
+  "name": "Rahatul islam",
+  "email": "rahatulislam@gmail.com",
+  "role": "department_head",
+  "department": "6aa638b4532f28accdb78755",
+  "status": "active",
+  "departmentName": "Roads & Infrastructure",
+  "availability": "available"
+ },
+ {
+  "_id": "6aa5fac5ca295b55e4f749aa",
+  "firebaseUid": "FLMjynMPIEPuNaRYGPGbjozb0xy2",
+  "name": "Sam Shawon",
+  "email": "samshawon518@gmail.com",
+  "role": "department_head",
+  "department": "6aa639ba532f28accdb78821",
+  "status": "active",
+  "departmentName": "Water & Sewerage",
+  "availability": "available"
+ },
+ {
+  "_id": "6aa64398b1e2b90174ff4e93",
+  "firebaseUid": "dB2kyfFL7VfBOv0Yo1WKBJ8XReB2",
+  "name": "Alaminislam@gmail.com",
+  "email": "alaminislam@gmail.com",
+  "role": "officer",
+  "department": "6aa639ba532f28accdb78821",
+  "departmentName": "Water & Sewerage",
+  "status": "active",
+  "availability": "available"
+ },
+ {
+  "_id": "6aa6475eb1e2b90174ff4f90",
+  "firebaseUid": "gDA8skXMFuZApMj3lRs4CXBkt2m2",
+  "name": "Raju Ahmed",
+  "email": "rajuahmed@gmail.com",
+  "role": "field_worker",
+  "department": "6aa639ba532f28accdb78821",
+  "departmentName": "Water & Sewerage",
+  "status": "active",
+  "availability": "available"
+ },
+ {
+  "_id": "6aa64ae5a383c2be057edcc2",
+  "firebaseUid": "Uc66SiqgF1MnCBDWCK6k8HozzXs1",
+  "name": "Abdul Karim",
+  "email": "abdulkarim@gmail.com",
+  "role": "citizen",
+  "department": null,
+  "departmentName": "",
+  "status": "active",
+  "availability": "available"
+ },
+ {
+  "_id": "6ab6d59f8dcb0af8c8052e16",
+  "name": "Acc citizen",
+  "email": "acc.citizen.1790367135124@civicsync.test",
+  "role": "citizen",
+  "department": null,
+  "departmentName": "",
+  "status": "active"
+ },
+ {
+  "_id": "6ab6d59f8dcb0af8c8052e1d",
+  "name": "Acc department_officer",
+  "email": "acc.department_officer.1790367135552@civicsync.test",
+  "role": "department_officer",
+  "department": null,
+  "departmentName": "Roads & Public Works",
+  "status": "active"
+ },
+ {
+  "_id": "6ab6d59f8dcb0af8c8052e1f",
+  "name": "Acc emergency_officer",
+  "email": "acc.emergency_officer.1790367135610@civicsync.test",
+  "role": "emergency_officer",
+  "department": null,
+  "departmentName": "Emergency Response",
+  "status": "active"
+ },
+ {
+  "_id": "6ab6d5c8f8cd347da6c4fd49",
+  "name": "Dbg",
+  "email": "dbg.1790367176262@civicsync.test",
+  "role": "citizen",
+  "department": null,
+  "departmentName": "",
+  "status": "active"
+ },
+ {
+  "_id": "6ab775d5d5cf61ea3b3e2bd2",
+  "firebaseUid": "f23l5UTG0sWWG5pACNbHZA304Rv1",
+  "name": "MR John",
+  "email": "mrjohn@gmail.com",
+  "role": "emergency_department_head",
+  "department": "6ab89cff0007274b75ce44cc",
+  "departmentName": "Electricity",
+  "status": "active",
+  "availability": "available"
+ },
+ {
+  "_id": "6ab950df0fe423a8ed6b3196",
+  "firebaseUid": "iEINK4nbe5X6OErDGHzZtBPYxE02",
+  "name": "Mr Karim Mia",
+  "email": "emergencyofficer@gmail.com",
+  "role": "emergency_department_officer",
+  "department": "6ab89cff0007274b75ce44cc",
+  "departmentName": "Electricity",
+  "status": "active",
+  "availability": "available",
+  "activeTask": null,
+  "activeEmergencyTeam": null
+ },
+ {
+  "_id": "6ab9edbb953873aebc89ddd8",
+  "firebaseUid": "cPyZqKcJoOTyRVQ4XcpPoA8VDfr1",
+  "name": "roadofficer@gmail.com",
+  "email": "roadofficer@gmail.com",
+  "role": "department_officer",
+  "department": "6aa638b4532f28accdb78755",
+  "departmentName": "Roads & Infrastructure",
+  "status": "active",
+  "availability": "available",
+  "activeTask": null,
+  "activeEmergencyTeam": null
+ },
+ {
+  "_id": "6ab9ee97953873aebc89dfef",
+  "firebaseUid": "DJgXgCp0VMTSRNVnoUmrPnUdmgy2",
+  "name": "roadofficerstaff@gmail.com",
+  "email": "roadofficerstaff@gmail.com",
+  "role": "officer",
+  "department": "6aa638b4532f28accdb78755",
+  "departmentName": "Roads & Infrastructure",
+  "status": "active",
+  "availability": "available",
+  "activeTask": null,
+  "activeEmergencyTeam": null
+ },
+ {
+  "_id": "6ab9efdc953873aebc89e432",
+  "firebaseUid": "ysln6sHvx7NLa1fjRIIFDxPeDM53",
+  "name": "roadworkerbd@gmail.com",
+  "email": "roadworkerbd@gmail.com",
+  "role": "field_worker",
+  "department": "6aa638b4532f28accdb78755",
+  "departmentName": "Roads & Infrastructure",
+  "status": "active",
+  "availability": "available",
+  "activeTask": null,
+  "activeEmergencyTeam": null
+ }
+]
+
+== TEAMS ==
+[
+ {
+  "_id": "6ab9ef6e953873aebc89e32c",
+  "name": "RoadfixerBD",
+  "type": "normal",
+  "departmentName": "Roads & Infrastructure",
+  "leader": "6ab9ee97953873aebc89dfef",
+  "members": [
+   "6ab9edbb953873aebc89ddd8"
+  ],
+  "status": "available",
+  "active": true
+ }
+]
+
+== TASKS ==
+[]
+
+== EMERGENCY TEAMS ==
+[]
+
+== EMERGENCY SAMPLE ==
+[
+ {
+  "_id": "6ab8b8b68c057bd0be2e0fed",
+  "citizen": "6a7f96d30f95871064676f96",
+  "citizenName": "Sa Shawon",
+  "citizenPhone": "",
+  "citizenEmail": "sashawon518@gmail.com",
+  "emergencyId": "EM-01007",
+  "type": "not_sure",
+  "category": "not_sure",
+  "subcategory": "other",
+  "title": "dguhsdjw",
+  "description": "dgashdjoskdjgdjakdopadjapkdpadpoqw",
+  "location": {
+   "address": "",
+   "landmark": "",
+   "latitude": 23.79799369628024,
+   "longitude": 90.45006182881555,
+   "accuracy": 114,
+   "capturedAt": "2026-09-27T06:33:22.357Z",
+   "point": {
+    "type": "Point",
+    "coordinates": [
+     90.45006182881555,
+     23.79799369628024
+    ]
+   }
+  },
+  "status": "assessing",
+  "priority": "critical",
+  "severity": "critical",
+  "source": "report",
+  "discreet": false,
+  "visibility": "standard",
+  "personDetails": {
+   "lastKnownLocation": {
+    "address": "",
+    "latitude": null,
+    "longitude": null
+   },
+   "name": "",
+   "age": "",
+   "photoUrl": "",
+   "description": "",
+   "clothing": "",
+   "additionalInfo": "",
+   "lastSeenAt": null
+  },
+  "aiSuggestion": {
+   "category": "not_sure",
+   "subcategory": "other",
+   "severity": "high",
+   "responseTypes": [],
+   "summary": "dgashdjoskdjgdjakdopadjapkdpadpoqw",
+   "confidence": "low",
+   "source": "rule_engine",
+   "suggestedAt": "2026-09-27T06:33:26.253Z",
+   "appliedAt": null,
+   "overriddenBy": null
+  },
+  "dispatchedAt": "2026-09-27T15:04:22.892Z",
+  "acknowledgedAt": "2026-09-27T15:04:22.892Z",
+  "enRouteAt": null,
+  "communityVerification": {
+   "stillHappening": 0,
+   "resolvedVotes": 0,
+   "votes": [],
+   "notes": []
+  },
+  "assignedDepartment": null,
+  "assignedOfficer": null,
+  "assignedFieldWorker": null,
+  "emergencyHead": "6ab775d5d5cf61ea3b3e2bd2",
+  "responseAssignments": [
+   "6ab9307695f13e1f97cdcbce"
+  ],
+  "masterEmergency": null,
+  "relatedEmergencies": [],
+  "escalation": {
+   "escalatedAt": "2026-09-27T15:04:29.977Z",
+   "escalatedBy": "6ab775d5d5cf61ea3b3e2bd2",
+   "reason": "Escalated by response team."
+  },
+  "responseTimeMinutes": null,
+  "resolvedAt": null,
+  "closedAt": null,
+  "arrivalAt": null,
+  "resolutionNotes": "",
+  "citizenFeedback": {
+   "comment": ""
+  },
+  "notes": "",
+  "activity": [
+   {
+    "action": "Emergency reported",
+    "actorRole": "citizen",
+    "note": "dgashdjoskdjgdjakdopadjapkdpadpoqw",
+    "_id": "6ab8b8b68c057bd0be2e0fee",
+    "timestamp": "2026-09-27T06:33:26.303Z"
+   },
+   {
+    "action": "Response team dispatched: not_sure",
+    "actorRole": "emergency_department_head",
+    "note": "",
+    "_id": "6ab9307695f13e1f97cdcbd0",
+    "timestamp": "2026-09-27T15:04:22.892Z"
+   },
+   {
+    "action": "not_sure team status changed from Assigned to Accepted",
+    "actorRole": "emergency_department_head",
+    "note": "",
+    "_id": "6ab9307995f13e1f97cdcc5e",
+    "timestamp": "2026-09-27T15:04:25.865Z"
+   },
+   {
+    "action": "Emergency escalated",
+    "actorRole": "emergency_department_head",
+    "note": "Escalated by response team.",
+    "_id": "6ab9307d95f13e1f97cdccf2",
+    "timestamp": "2026-09-27T15:04:29.977Z"
+   },
+   {
+    "action": "ops_emergency_head_review",
+    "actorRole": "emergency_department_head",
+    "timestamp": "2026-09-27T17:17:34.121Z",
+    "note": "Reviewed by Emergency Department Head",
+    "_id": "6ab94fae0fe423a8ed6b30c3"
+   },
+   {
+    "action": "ops_assigned_to_emergency_department_officer",
+    "actorRole": "emergency_department_head",
+    "timestamp": "2026-09-27T17:25:49.960Z",
+    "note": "Assigned to Department Officer Mr Karim Mia",
+    "_id": "6ab9519d0fe423a8ed6b349e"
+   }
+  ],
+  "sosContacts": [],
+  "evidence": [],
+  "createdAt": "2026-09-27T06:33:26.306Z",
+  "updatedAt": "2026-09-27T17:25:49.961Z",
+  "__v": 3,
+  "ops": {
+   "activeEscalation": {
+    "level": "",
+    "previousStatus": "",
+    "reason": ""
+   },
+   "blockers": [],
+   "cancellationReason": "",
+   "closingNotes": "",
+   "completionPercent": 0,
+   "emergencyType": "OTHER",
+   "falseReportReason": "",
+   "instructions": [],
+   "priority": "MEDIUM",
+   "priorityHistory": [],
+   "progress": [],
+   "resolutionNotes": "",
+   "responseTypes": [],
+   "reviewNotes": "",
+   "reviewed": false,
+   "workflowStatus": "ASSIGNED_TO_EMERGENCY_DEPARTMENT_OFFICER",
+   "departmentOfficer": "6ab950df0fe423a8ed6b3196"
+  }
+ },
+ {
+  "_id": "6ab8b87b8c057bd0be2e0fa2",
+  "citizen": "6a7f96d30f95871064676f96",
+  "citizenName": "Sa Shawon",
+  "citizenPhone": "",
+  "citizenEmail": "sashawon518@gmail.com",
+  "emergencyId": "EM-01006",
+  "type": "not_sure",
+  "category": "not_sure",
+  "subcategory": "other",
+  "title": "SOS — immediate assistance requested",
+  "description": "Quick SOS activated from the citizen emergency dashboard.",
+  "location": {
+   "address": "",
+   "landmark": "",
+   "latitude": 23.79799369628024,
+   "longitude": 90.45006182881555,
+   "accuracy": 114,
+   "capturedAt": "2026-09-27T06:32:27.375Z",
+   "point": {
+    "type": "Point",
+    "coordinates": [
+     90.45006182881555,
+     23.79799369628024
+    ]
+   }
+  },
+  "status": "en_route",
+  "priority": "critical",
+  "severity": "critical",
+  "source": "sos",
+  "discreet": false,
+  "visibility": "standard",
+  "personDetails": {
+   "lastKnownLocation": {
+    "address": "",
+    "latitude": null,
+    "longitude": null
+   },
+   "name": "",
+   "age": "",
+   "photoUrl": "",
+   "description": "",
+   "clothing": "",
+   "additionalInfo": "",
+   "lastSeenAt": null
+  },
+  "aiSuggestion": {
+   "category": "not_sure",
+   "subcategory": "other",
+   "severity": "high",
+   "responseTypes": [],
+   "summary": "Quick SOS activated from the citizen emergency dashboard.",
+   "confidence": "low",
+   "source": "rule_engine",
+   "suggestedAt": "2026-09-27T06:32:27.613Z",
+   "appliedAt": null,
+   "overriddenBy": null
+  },
+  "dispatchedAt": "2026-09-27T08:54:23.530Z",
+  "acknowledgedAt": "2026-09-27T08:54:23.530Z",
+  "enRouteAt": "2026-09-27T08:54:47.719Z",
+  "communityVerification": {
+   "stillHappening": 0,
+   "resolvedVotes": 0,
+   "votes": [],
+   "notes": []
+  },
+  "assignedDepartment": null,
+  "assignedOfficer": null,
+  "assignedFieldWorker": null,
+  "emergencyHead": "6ab775d5d5cf61ea3b3e2bd2",
+  "responseAssignments": [
+   "6ab8d9bfe0cb92229a594705",
+   "6ab8d9d0e0cb92229a594833"
+  ],
+  "masterEmergency": null,
+  "relatedEmergencies": [],
+  "escalation": {
+   "reason": ""
+  },
+  "responseTimeMinutes": null,
+  "resolvedAt": null,
+  "closedAt": null,
+  "arrivalAt": null,
+  "resolutionNotes": "",
+  "citizenFeedback": {
+   "comment": ""
+  },
+  "notes": "",
+  "activity": [
+   {
+    "action": "SOS emergency created",
+    "actorRole": "citizen",
+    "note": "Quick SOS activated from the citizen emergency dashboard.",
+    "_id": "6ab8b87b8c057bd0be2e0fa3",
+    "timestamp": "2026-09-27T06:32:27.815Z"
+   },
+   {
+    "action": "Response team dispatched: not_sure",
+    "actorRole": "emergency_department_head",
+    "note": "",
+    "_id": "6ab8d9bfe0cb92229a594707",
+    "timestamp": "2026-09-27T08:54:23.532Z"
+   },
+   {
+    "action": "not_sure team status changed from Assigned to Accepted",
+    "actorRole": "emergency_department_head",
+    "note": "",
+    "_id": "6ab8d9c8e0cb92229a594781",
+    "timestamp": "2026-09-27T08:54:32.159Z"
+   },
+   {
+    "action": "Response team dispatched: not_sure",
+    "actorRole": "emergency_department_head",
+    "note": "",
+    "_id": "6ab8d9d0e0cb92229a594835",
+    "timestamp": "2026-09-27T08:54:40.464Z"
+   },
+   {
+    "action": "not_sure team status changed from Accepted to En Route",
+    "actorRole": "emergency_department_head",
+    "note": "",
+    "_id": "6ab8d9d7e0cb92229a5948bd",
+    "timestamp": "2026-09-27T08:54:47.819Z"
+   },
+   {
+    "action": "not_sure team status changed from Assigned to Accepted",
+    "actorRole": "emergency_department_head",
+    "note": "",
+    "_id": "6ab8d9dee0cb92229a594981",
+    "timestamp": "2026-09-27T08:54:54.799Z"
+   }
+  ],
+  "sosContacts": [],
+  "evidence": [],
+  "createdAt": "2026-09-27T06:32:27.839Z",
+  "updatedAt": "2026-09-27T08:54:54.802Z",
+  "__v": 5,
+  "ops": {
+   "activeEscalation": {
+    "level": "",
+    "previousStatus": "",
+    "reason": ""
+   },
+   "blockers": [],
+   "cancellationReason": "",
+   "closingNotes": "",
+   "completionPercent": 0,
+   "emergencyType": "OTHER",
+   "falseReportReason": "",
+   "instructions": [],
+   "priority": "MEDIUM",
+   "priorityHistory": [],
+   "progress": [],
+   "resolutionNotes": "",
+   "responseTypes": [],
+   "reviewNotes": "",
+   "reviewed": false,
+   "workflowStatus": "SUBMITTED"
+  }
+ }
+]
+
+== SYSTEM SETTINGS ==
+[
+ {
+  "_id": "6ab752c3c50955917dc2b640",
+  "key": "admin_portal",
+  "__v": 0,
+  "createdAt": "2026-09-26T05:06:08.810Z",
+  "updatedAt": "2026-09-26T05:06:15.400Z",
+  "updatedBy": "6a7f84168ff00ac58dab8eb0",
+  "value": {
+   "general": {
+    "portalName": "CivicSync",
+    "timezone": "Asia/Dhaka",
+    "language": "en",
+    "contactEmail": ""
+   },
+   "notifications": {
+    "emailDigest": true,
+    "criticalAlerts": true,
+    "inApp": true
+   },
+   "security": {
+    "sessionNotice": true,
+    "activityRetentionDays": 365
+   },
+   "emergency": {
+    "defaultSeverity": "high",
+    "escalationMinutes": 15,
+    "responseSlaMinutes": 30,
+    "criticalSlaMinutes": 10,
+    "highSlaMinutes": 20,
+    "mediumSlaMinutes": 60,
+    "lowSlaMinutes": 120,
+    "duplicateRadiusMeters": 300,
+    "autoClassifyAdvisory": true
+   },
+   "map": {
+    "defaultLatitude": 23.8103,
+    "defaultLongitude": 90.4125,
+    "defaultZoom": 11,
+    "clusterMarkers": false
+   },
+   "features": {
+    "emergency": true,
+    "womenSafety": true,
+    "safetyHeatmap": true,
+    "aiClassification": true,
+    "emergencyBroadcast": true,
+    "analytics": true
+   }
+  }
+ },
+ {
+  "_id": "6ab89d04c50955917dc48cf6",
+  "key": "reportCatalogueSeed",
+  "__v": 0,
+  "createdAt": "2026-09-27T04:35:12.050Z",
+  "updatedAt": "2026-09-27T04:35:12.050Z",
+  "updatedBy": null,
+  "value": {
+   "version": 1,
+   "at": "2026-09-27T04:35:12.047Z"
+  }
+ }
+]
+
+== COUNTS ==
+{
+ "notifications": 42,
+ "activitylogs": 125,
+ "departmenttasks": 0
+}

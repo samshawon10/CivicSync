@@ -25,6 +25,7 @@ const userSchema = new mongoose.Schema(
     activeEmergencyTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'EmergencyResponseTeam', default: null },
     availabilityChangedAt: { type: Date, default: null },
     emailVerified: { type: Boolean, default: false },
+    sessionVersion: { type: Number, default: 0, min: 0 },
     preferences: { emailNotifications: { type: Boolean, default: true } }
   },
   { timestamps: true }

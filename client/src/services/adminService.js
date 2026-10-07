@@ -1,4 +1,4 @@
-import api from './api.js';
+import api, { getAuthToken } from './api.js';
 
 export const adminApi = {
   // Overview, governance and intelligence
@@ -62,7 +62,7 @@ export const adminApi = {
   logs: (params) => api.get('/admin/activity-logs', { params }),
   settings: () => api.get('/admin/settings'),
   updateSettings: (payload) => api.patch('/admin/settings', payload),
-  exportUrl: (type) => `${api.defaults.baseURL}/admin/reports/export?type=${type}`
+  exportUrl: (type) => `${api.defaults.baseURL}/admin/reports/export?type=${type}${getAuthToken() ? `&token=${encodeURIComponent(getAuthToken())}` : ''}`
 };
 
 export default adminApi;

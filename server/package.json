@@ -7,10 +7,15 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "nodemon server.js",
-    "start": "node server.js",
-    "test": "node --test",
-    "geo:backfill": "node scripts/backfillGeoLocations.js"
+    "dev": "node init && node --watch server.js",
+    "start": "node init && node server.js",
+    "test": "node --test config/*.test.js middleware/*.test.js routes/*.test.js services/*.test.js",
+    "test:integration": "node scripts/runSystemQA.js",
+    "test:supertest": "node scripts/runSupertestQA.js",
+    "test:acceptance": "node acceptance.ai.test.js",
+    "qa:database": "node scripts/auditDatabase.js",
+    "geo:backfill": "node scripts/backfillGeoLocations.js",
+    "seed:demo": "node scripts/seedDemoData.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -22,15 +27,18 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.1",
-    "multer": "^2.2.0",
+    "multer": "^2.4.0",
     "socket.io": "^4.8.3"
   },
   "overrides": {
+    "gaxios": {
+      "uuid": "^11.1.1"
+    },
     "jwks-rsa": {
       "jose": "4.15.9"
     }
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "supertest": "^7.3.1"
   }
 }

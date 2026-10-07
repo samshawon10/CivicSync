@@ -252,7 +252,7 @@ export const departmentTools = [
       const filter = { departmentName };
       // Field workers only ever see their own assignments (services/departmentTaskAccess.js).
       if (user.role === 'field_worker') filter.assignedWorker = user._id;
-      if (!input.includeCompleted) filter.status = { $nin: ['completed', 'cancelled', 'rejected'] };
+      if (!input.includeCompleted) filter.status = { $nin: ['completed', 'verified', 'cancelled', 'rejected'] };
       const tasks = await DepartmentTask.find(filter)
         .select('title description status priority targetDueAt report team teamLeader assignedWorker location blockedInfo completion timeline')
         .populate('report', 'title category status priority departmentName')

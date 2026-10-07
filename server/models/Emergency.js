@@ -178,7 +178,7 @@ const emergencySchema = new mongoose.Schema(
       note: { type: String, maxlength: 500, default: '' }
     }]
   },
-  { timestamps: true }
+  { timestamps: true, optimisticConcurrency: true }
 );
 
 emergencySchema.index({ citizen: 1, createdAt: -1 });

@@ -20,7 +20,7 @@ const communityGroupSchema = new mongoose.Schema({
   }],
   memberCount: { type: Number, default: 1 },
   status: { type: String, enum: ['active', 'archived'], default: 'active', index: true }
-}, { timestamps: true });
+}, { timestamps: true, optimisticConcurrency: true });
 
 communityGroupSchema.index({ category: 1, status: 1 });
 communityGroupSchema.index({ 'members.user': 1 });

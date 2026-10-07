@@ -30,11 +30,15 @@ import aiRoutes from './routes/aiRoutes.js';
 import { initializeRealtime } from './realtime/emergencyRealtime.js';
 import { seedReportCatalogue } from './services/reportCatalogue.js';
 import { ensureSingletonHeadIndex } from './services/emergencyOps.js';
+import { ensureDepartmentHeadIndexes } from './services/departmentIndexes.js';
 import { logFirebaseAdminStatus } from './config/firebaseAdmin.js';
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(serverDir, '.env') });
 logFirebaseAdminStatus();
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be configured before starting CivicSync.');
+}
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -43,6 +47,7 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
+app.use((req, res, next) => { req.body ??= {}; next(); });
 app.get(['/', '/api/health'], (req, res) => res.json({ success: true, message: 'CivicSync API is running' }));
 app.use((req, res, next) => {
   ensureDatabaseReady()
@@ -83,6 +88,7 @@ function ensureDatabaseReady() {
   if (!initializationPromise) {
     initializationPromise = (async () => {
       await connectDatabase();
+      await ensureDepartmentHeadIndexes();
       await ensureSingletonHeadIndex();
       try {
         const seeded = await seedReportCatalogue();

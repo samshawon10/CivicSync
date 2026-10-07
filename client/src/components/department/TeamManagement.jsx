@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { Plus, Users, Wrench, Phone, MapPin, Pencil, RefreshCw } from 'lucide-react';
 import { departmentApi } from '../../services/departmentService.js';
 import { apiMessage } from '../../services/api.js';
@@ -36,16 +37,22 @@ function toDraft(team) {
 }
 
 function TeamForm({ team, staff, onClose, onSaved }) {
-  const [draft, setDraft] = useState(() => (team ? toDraft(team) : emptyDraft));
+  const { user } = useAuth();
+  const currentId = String(user?.id || user?._id || '');
+  const [draft, setDraft] = useState(() => (team ? toDraft(team) : { ...emptyDraft, leaderId: user?.role === 'officer' ? currentId : '' }));
+  const submitting = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const workers = staff.filter((person) => ['field_worker', 'officer', 'department_officer'].includes(person.role));
+  const leaders = staff.filter((person) => person.role === 'officer' && (user?.role !== 'officer' || String(person.id || person._id) === currentId));
+  const workers = staff.filter((person) => person.role === 'field_worker');
 
   function set(key, value) { setDraft((current) => ({ ...current, [key]: value })); }
 
   async function submit(event) {
     event.preventDefault();
+    if (submitting.current) return;
     if (!draft.name.trim()) { setError('Team name is required.'); return; }
+    submitting.current = true;
     setBusy(true); setError('');
     try {
       const payload = {
@@ -69,7 +76,7 @@ function TeamForm({ team, staff, onClose, onSaved }) {
     } catch (err) {
       const message = apiMessage(err);
       setError(message); showError('Unable to save team', message);
-    } finally { setBusy(false); }
+    } finally { submitting.current = false; setBusy(false); }
   }
 
   return (
@@ -92,15 +99,15 @@ function TeamForm({ team, staff, onClose, onSaved }) {
             <input className={inputClass} value={draft.serviceArea} onChange={(e) => set('serviceArea', e.target.value)} placeholder="e.g. Ward 12 – North" />
           </TextField>
           <TextField label="Team leader">
-            <select className={inputClass} value={draft.leaderId} onChange={(e) => set('leaderId', e.target.value)}>
-              <option value="">No leader assigned</option>
-              {workers.map((person) => <option key={person.id} value={person.id}>{person.name} · {person.role.replaceAll('_', ' ')}</option>)}
+            <select className={inputClass} value={draft.leaderId} disabled={user?.role === 'officer'} onChange={(e) => set('leaderId', e.target.value)}>
+              {user?.role !== 'officer' && <option value="">No leader assigned</option>}
+              {leaders.map((person) => <option key={person.id || person._id} value={person.id || person._id}>{person.name} · Team Leader</option>)}
             </select>
           </TextField>
           <TextField label="Contact number">
             <input className={inputClass} value={draft.phone} onChange={(e) => set('phone', e.target.value)} placeholder="Team radio / phone" />
           </TextField>
-          <TextField label="Capacity" hint="Maximum concurrent active tasks before this team is flagged overloaded.">
+          <TextField label="Capacity" hint="Maximum number of field workers in this team (1–50).">
             <input type="number" min="1" max="50" className={inputClass} value={draft.capacity} onChange={(e) => set('capacity', e.target.value)} />
           </TextField>
           {team && (
@@ -194,7 +201,9 @@ function TeamCard({ team, canManage, onEdit }) {
   );
 }
 
-export default function TeamManagement({ canManage = false }) {
+export default function TeamManagement({ canManage: requestedCanManage = false }) {
+  const { user } = useAuth();
+  const canManage = requestedCanManage || user?.role === 'officer';
   const [teams, setTeams] = useState([]);
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -207,7 +216,7 @@ export default function TeamManagement({ canManage = false }) {
     try {
       const [{ data }, staffResult] = await Promise.all([
         departmentApi.teams(),
-        canManage ? departmentApi.staff().catch(() => ({ data: { staff: [] } })) : Promise.resolve({ data: { staff: [] } })
+        canManage ? departmentApi.staff() : Promise.resolve({ data: { staff: [] } })
       ]);
       setTeams(data.teams || []);
       setStaff(staffResult.data.staff || []);
@@ -255,7 +264,7 @@ export default function TeamManagement({ canManage = false }) {
           </div>
         ) : teams.length ? (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {teams.map((team) => <TeamCard key={team._id} team={team} canManage={canManage} onEdit={() => { setEditing(team); setFormOpen(true); }} />)}
+            {teams.map((team) => <TeamCard key={team._id} team={team} canManage={canManage && (user?.role !== 'officer' || String(team.leader?._id || team.leader?.id || '') === String(user?.id || user?._id))} onEdit={() => { setEditing(team); setFormOpen(true); }} />)}
           </div>
         ) : (
           <div className="mt-4">
@@ -279,4 +288,3 @@ export default function TeamManagement({ canManage = false }) {
     </div>
   );
 }
-

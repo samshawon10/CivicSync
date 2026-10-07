@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { UserPlus, Users, PlayCircle, CheckCircle2, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { Users, PlayCircle, RefreshCw, X } from 'lucide-react';
 import { departmentApi } from '../../services/departmentService.js';
 import { apiMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { showSuccess, showError } from '../../utils/sweetAlert.js';
 import { OpsError, Pill, TextField, inputClass, primaryButton, secondaryButton, StatusPill } from './DepartmentOpsUI.jsx';
 import {
-  AVAILABILITY_LABELS, PROGRESS_KIND_LABELS, TASK_STATE_LABELS, canStaffTasks
+  PROGRESS_KIND_LABELS, canStaffTasks
 } from './workflowLabels.js';
 
 export default function TaskOperationsPanel({ caseId, task, onChanged }) {
@@ -15,23 +15,24 @@ export default function TaskOperationsPanel({ caseId, task, onChanged }) {
   const mayStaff = canStaffTasks(role);
 
   const taskId = task?._id || '';
-  const [workers, setWorkers] = useState([]);
+  const taskTeamId = task?.team?._id || task?.team || '';
   const [teams, setTeams] = useState([]);
   const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [workerId, setWorkerId] = useState('');
   const [teamId, setTeamId] = useState('');
+  const [draft, setDraft] = useState({ title: '', description: '', priority: 'medium', targetDueAt: '' });
+  const availableTeams = teams.filter((team) =>
+    String(team.leader?._id || team.leader) === String(user?._id || user?.id)
+    && (!taskTeamId || String(team._id) === String(taskTeamId))
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      const [workerRes, teamRes] = await Promise.all([
-        departmentApi.availableWorkers(),
-        departmentApi.teams()
-      ]);
-      setWorkers(workerRes.data.workers || []);
+      const teamRes = await departmentApi.teams();
       setTeams(teamRes.data.teams || []);
       if (taskId) {
         const { data } = await departmentApi.taskUpdates(taskId);
@@ -46,32 +47,68 @@ export default function TaskOperationsPanel({ caseId, task, onChanged }) {
 
   useEffect(() => { load(); }, [load]);
 
+  async function run(action, successMessage) {
+    setBusy(true);
+    setError('');
+    try {
+      const { data } = await action();
+      showSuccess('Field task updated', data.message || successMessage);
+      setTeamId('');
+      await load();
+      onChanged?.();
+    } catch (err) {
+      const message = apiMessage(err);
+      setError(message);
+      showError('Unable to update field task', message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function createTask() {
-    await run(() => departmentApi.createTask({ reportId: caseId }), 'Operational task created. Staff it with available workers.');
+    await run(() => departmentApi.createTask({
+      reportId: caseId,
+      title: draft.title.trim() || undefined,
+      description: draft.description.trim() || undefined,
+      priority: draft.priority,
+      targetDueAt: draft.targetDueAt || undefined
+    }), 'Operational task created.');
   }
 
   if (!taskId) {
     return (
       <div className="space-y-3">
         <OpsError message={error} />
+        {(mayStaff || role === 'department_officer' || role === 'department_head') && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField label="Task title">
+              <input className={inputClass} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Defaults to the case title" maxLength={180} />
+            </TextField>
+            <TextField label="Priority">
+              <select className={inputClass} value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value })}>
+                {['low', 'medium', 'high', 'urgent'].map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </TextField>
+            <TextField label="Task description">
+              <textarea className={inputClass} rows={2} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Defaults to the case description" maxLength={2000} />
+            </TextField>
+            <TextField label="SLA / due date">
+              <input type="datetime-local" className={inputClass} value={draft.targetDueAt} onChange={(event) => setDraft({ ...draft, targetDueAt: event.target.value })} />
+            </TextField>
+          </div>
+        )}
         <p className="text-sm text-slate-600">
-          No operational task yet. {mayStaff || role === 'department_officer' || role === 'department_head'
-            ? 'Create one to start field work on this case.'
-            : 'The Officer assigned to this case will create it.'}
+          No operational task yet. {mayStaff ? 'Create one to start field work on this case.' : 'The assigned Team Leader creates the operational task when the case reaches this stage.'}
         </p>
-        {(mayStaff || role === 'department_officer') && (
+        {mayStaff && ['pending', 'assigned', 'team_formed'].includes(task.status) && (
           <button type="button" disabled={busy} onClick={createTask} className={primaryButton}>
             <PlayCircle size={15} className="mr-1 inline" /> Create field task
           </button>
         )}
+
       </div>
     );
   }
-
-  const bookedIds = new Set(
-    [task?.assignedWorker?._id, ...(task?.workerIds || []).map((worker) => worker?._id || worker)]
-      .filter(Boolean).map(String)
-  );
 
   return (
     <div className="space-y-4">
@@ -92,49 +129,30 @@ export default function TaskOperationsPanel({ caseId, task, onChanged }) {
       {mayStaff && (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <p className="text-xs font-bold text-slate-600">
-            Staffing — you own this task, so worker and team assignment is yours.
+            Assign a response team to dispatch this task. Each team must have at least two active Field Workers.
           </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <TextField label="Assign an available worker">
-              <select className={inputClass} value={workerId} onChange={(event) => setWorkerId(event.target.value)}>
-                <option value="">Select a worker…</option>
-                {workers.map((worker) => (
-                  <option key={worker._id} value={worker._id} disabled={worker.availability !== 'available' || bookedIds.has(String(worker._id))}>
-                    {worker.name} · {AVAILABILITY_LABELS[worker.availability]}
-                    {bookedIds.has(String(worker._id)) ? ' · already on task' : ''}
-                  </option>
-                ))}
-              </select>
-            </TextField>
-            <TextField label="Or attach a team" hint="Normal teams are built for this task; roster teams are standing.">
-              <select className={inputClass} value={teamId} onChange={(event) => setTeamId(event.target.value)}>
-                <option value="">Select a team…</option>
-                {teams.map((team) => (
-                  <option key={team._id} value={team._id}>
-                    {team.name} · {team.type || 'normal'} · {(team.members || []).length} members
-                  </option>
-                ))}
-              </select>
-            </TextField>
-          </div>
+          {!task?.team && ['pending', 'assigned', 'team_formed'].includes(task?.status) && <TextField label="Response team" hint="The Team Leader's team is assigned as one operational unit.">
+            <select className={inputClass} value={teamId} onChange={(event) => setTeamId(event.target.value)} disabled={loading}>
+              <option value="">Select your team…</option>
+              {availableTeams.map((team) => (
+                <option key={team._id} value={team._id}>
+                  {team.name} · {(team.members || []).length} members
+                </option>
+              ))}
+            </select>
+            {!availableTeams.length && <p className="mt-1 text-xs text-amber-700">{loading ? 'Loading your teams…' : 'No team led by you is available. Create or update a response team with at least two active Field Workers.'}</p>}
+          </TextField>}
+          {task?.team && <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm"><p className="font-bold text-ink">{task.team.name} · {task.team.members?.length || task.workerAssignments?.length || 0} members</p><p className="mt-1 text-xs text-slate-600">Assigned as a team; workers accept and update their own assignments.</p></div>}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={busy || !workerId}
-              onClick={() => run(() => departmentApi.assignWorker(taskId, workerId), 'Worker assigned and marked busy.')}
+              disabled={busy || loading || !teamId || Boolean(task?.team)}
+              onClick={() => run(() => departmentApi.attachTeam(taskId, teamId), 'Team attached and its members booked.')}
               className={primaryButton}
             >
-              <UserPlus size={15} className="mr-1 inline" /> Assign worker
+              <Users size={15} className="mr-1 inline" /> Assign response team
             </button>
-            <button
-              type="button"
-              disabled={busy || !teamId}
-              onClick={() => run(() => departmentApi.attachTeam(taskId, teamId), 'Team attached and its members booked.')}
-              className={secondaryButton}
-            >
-              <Users size={15} className="mr-1 inline" /> Attach team
-            </button>
-            {task?.team && (
+            {task?.team && ['pending', 'assigned', 'team_formed'].includes(task.status) && (
               <button
                 type="button"
                 disabled={busy}
@@ -144,34 +162,26 @@ export default function TaskOperationsPanel({ caseId, task, onChanged }) {
                 <X size={15} className="mr-1 inline" /> Detach team
               </button>
             )}
+
           </div>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {['accepted', 'in_progress', 'completed'].map((status) => (
-          <button
-            key={status}
-            type="button"
-            disabled={busy}
-            onClick={() => run(() => departmentApi.transitionTask(taskId, { status }), `Task moved to ${TASK_STATE_LABELS[status] || status}.`)}
-            className={secondaryButton}
-          >
-            {status === 'completed'
-              ? <CheckCircle2 size={14} className="mr-1 inline" />
-              : <PlayCircle size={14} className="mr-1 inline" />}
-            {TASK_STATE_LABELS[status]}
-          </button>
-        ))}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => run(() => departmentApi.transitionTask(taskId, { status: 'blocked', reason: 'Reported from the field' }), 'Task marked blocked.')}
-          className={secondaryButton}
-        >
-          <AlertTriangle size={14} className="mr-1 inline" /> Blocked
-        </button>
-      </div>
+      {(task?.team || task?.workerAssignments?.length > 0) && (
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-sm font-black text-ink">
+            {task.team?.name || 'Individual assignments'} · {task.teamLeader?.name || 'Team Leader'}
+          </p>
+          <ul className="mt-2 space-y-2">
+            {(task.workerAssignments || []).map((assignment) => (
+              <li key={assignment.worker?._id || assignment.worker} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="font-semibold">{assignment.worker?.name || 'Worker'}</span>
+                <span className="text-xs text-slate-600">{assignment.status.replaceAll('_', ' ')} · {assignment.progressPercent}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div>
         <h4 className="text-sm font-black text-ink">Field progress</h4>

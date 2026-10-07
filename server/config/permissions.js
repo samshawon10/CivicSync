@@ -15,12 +15,12 @@ export const roleOrder = [
 export const roleMeta = {
   admin: { label: 'Super Admin', group: 'Governance', description: 'Governs the whole CivicSync ecosystem: users, roles, departments, configuration, audit and analytics.' },
   emergency_department_head: { label: 'Emergency Head', group: 'Emergency', description: 'Runs emergency command: classify, verify, dispatch, escalate, close incidents and manage alerts.' },
-  emergency_department_officer: { label: 'Emergency Department Officer', group: 'Emergency', description: 'Legacy responder role retained for older records; participates in assignments without command authority.' },
+  emergency_department_officer: { label: 'Emergency Department Officer', group: 'Emergency', description: 'Reviews assigned incidents, dispatches Emergency Officers and reviews field completion.' },
   emergency_officer: { label: 'Emergency Officer', group: 'Emergency', description: 'Accepts assignments, moves through the assignment lifecycle and manages field workers.' },
   emergency_field_worker: { label: 'Emergency Field Worker', group: 'Emergency', description: 'Executes field work on an assignment and reports location and completion.' },
   department_head: { label: 'Department Head', group: 'Civic', description: 'Owns a civic department queue: priority, assignment, escalation and completion review.' },
   department_officer: { label: 'Department Officer', group: 'Civic', description: 'Works the department queue and updates assigned complaints.' },
-  officer: { label: 'Officer', group: 'Civic', description: 'Handles complaints assigned directly to them.' },
+  officer: { label: 'Team Leader', group: 'Civic', description: 'Manages assigned operational tasks, worker teams and field progress.' },
   field_worker: { label: 'Field Worker', group: 'Civic', description: 'Completes assigned field work and submits completion evidence.' },
   citizen: { label: 'Citizen', group: 'Public', description: 'Reports civic issues, raises emergencies, tracks progress and manages safety services.' }
 };

@@ -77,11 +77,11 @@ const departmentSchema = new mongoose.Schema(
     emergencyHead: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
   },
-  { timestamps: true }
+  { timestamps: true, optimisticConcurrency: true }
 );
 
-departmentSchema.index({ head: 1 }, { unique: true, sparse: true });
-departmentSchema.index({ emergencyHead: 1 }, { unique: true, sparse: true });
+departmentSchema.index({ head: 1 }, { unique: true, name: 'uniq_department_head', partialFilterExpression: { head: { $type: 'objectId' } } });
+departmentSchema.index({ emergencyHead: 1 }, { unique: true, name: 'uniq_department_emergency_head', partialFilterExpression: { emergencyHead: { $type: 'objectId' } } });
 departmentSchema.index({ emergencyTypes: 1, status: 1 });
 // Note: code index is declared inline on the field (unique: true, sparse: true) — no need to repeat here.
 
@@ -91,7 +91,7 @@ departmentSchema.pre('save', function preSave(next) {
       .toUpperCase()
       .replace(/[^A-Z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '')
-      .slice(0, 40) || null;
+      .slice(0, 40) || `DEPT_${this._id}`;
   }
   next();
 });

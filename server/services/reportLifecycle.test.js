@@ -19,10 +19,11 @@ test('citizen resolution verification is limited to resolved-like states', () =>
   assert.equal(canCitizenReopenReport('completed'), true);
   assert.equal(canCitizenReopenReport('closed'), false);
   assert.equal(canCitizenReopenReport('in_progress'), false);
-  assert.equal(canReviewReportCompletion('completed', 'submitted', 'approved'), true);
+  assert.equal(canReviewReportCompletion('completed', 'submitted', 'approved'), false);
+  assert.equal(canReviewReportCompletion('under_review', 'submitted', 'verified'), true);
   assert.equal(canReviewReportCompletion('completed', 'approved', 'approved'), false);
   assert.equal(canReviewReportCompletion('in_progress', 'submitted', 'approved'), false);
-  assert.equal(canReviewReportCompletion('completed', 'submitted', 'approved'), true);
+  assert.equal(canReviewReportCompletion('completed', 'verified', 'approved'), true);
   assert.equal(canReviewReportCompletion('completed', 'submitted', 'rejected'), true);
   assert.equal(canReviewReportCompletion('completed', 'submitted', 'invalid'), false);
   assert.equal(isTerminalReportStatus('closed'), true);

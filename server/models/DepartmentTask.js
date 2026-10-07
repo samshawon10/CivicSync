@@ -15,6 +15,17 @@ const departmentTaskSchema = new mongoose.Schema(
 
     assignedWorker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
     workerIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }],
+    workerAssignments: [{
+      worker: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      status: {
+        type: String,
+        enum: ['assigned', 'accepted', 'in_progress', 'completed'],
+        default: 'assigned'
+      },
+      progressPercent: { type: Number, min: 0, max: 100, default: 0 },
+      completionSummary: { type: String, trim: true, maxlength: 1200, default: '' },
+      updatedAt: { type: Date, default: Date.now }
+    }],
     assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     status: { type: String, enum: TASK_STATES, default: 'pending', index: true },
     /** Denormalised from the linked case so lists can filter without a join. */
@@ -61,7 +72,7 @@ const departmentTaskSchema = new mongoose.Schema(
       longitude: { type: Number, default: null }
     }
   },
-  { timestamps: true }
+  { timestamps: true, optimisticConcurrency: true }
 );
 
 departmentTaskSchema.index({ assignedWorker: 1, status: 1 });

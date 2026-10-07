@@ -85,7 +85,7 @@ export default function CaseAssignmentPanel({ report, staff, onChanged }) {
         </div>
       ) : (
         <div className="space-y-2">
-          <TextField label="Assign to Officer" hint="The Officer staffs the task and picks the workers. You do not assign workers directly.">
+          <TextField label="Assign to Team Leader" hint="The Team Leader creates the task and assigns their team. You do not assign workers directly.">
             <select className={inputClass} value={officerId} onChange={(event) => setOfficerId(event.target.value)}>
               <option value="">Unassigned</option>
               {officers.map((person) => (
@@ -120,10 +120,10 @@ export default function CaseAssignmentPanel({ report, staff, onChanged }) {
           <span className="font-semibold">{report.assignedOfficer?.name || '— awaiting hand-off —'}</span>
         </li>
         <li className="flex flex-wrap items-center gap-2">
-          <span>3. Officer</span>
+          <span>3. Team Leader</span>
           <ArrowRight size={12} aria-hidden="true" />
           <Wrench size={12} aria-hidden="true" />
-          <span className="font-semibold">assigns workers on the task</span>
+          <span className="font-semibold">creates the task and assigns workers</span>
         </li>
       </ol>
     </div>

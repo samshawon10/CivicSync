@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { getMyProfile, getMyProfilePhoto, getUser, listUsers, updateMyPreferences, updateMyProfile, updateUserRole, updateUserStatus, uploadMyProfilePhoto } from '../controllers/userController.js';
+import { getMyProfile, getMyProfilePhoto, getUser, listUsers, updateMyPreferences, updateMyProfile, uploadMyProfilePhoto } from '../controllers/userController.js';
 import { uploadProfileImage } from '../middleware/uploadMiddleware.js';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
+import { updateUserRole as manageUserRole, updateUserStatus as manageUserStatus } from '../controllers/adminController.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -13,7 +14,7 @@ router.patch('/me/preferences', updateMyPreferences);
 router.use(requireRole('admin'));
 router.get('/', listUsers);
 router.get('/:id', getUser);
-router.patch('/:id/role', updateUserRole);
-router.patch('/:id/status', updateUserStatus);
+router.patch('/:id/role', manageUserRole);
+router.patch('/:id/status', manageUserStatus);
 export default router;
 

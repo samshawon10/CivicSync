@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import ResponseTeam from '../models/ResponseTeam.js';
 import User from '../models/User.js';
 import { requireAuth, requireRole } from '../middleware/authMiddleware.js';
+import { assertUnreferencedRecord } from '../services/referenceSafety.js';
 
 const teamTypes = ['medical', 'fire', 'security', 'traffic', 'disaster', 'rescue', 'infrastructure', 'other'];
 const managerRoles = ['admin', 'emergency_department_head'];
@@ -78,6 +79,8 @@ router.patch('/:id', requireRole(...managerRoles), async (req, res, next) => {
 router.delete('/:id', requireRole('admin'), async (req, res, next) => {
   try {
     if (!isId(req.params.id)) return res.status(404).json({ success: false, message: 'Response team not found.' });
+    if (!await ResponseTeam.exists({ _id: req.params.id })) return res.status(404).json({ success: false, message: 'Response team not found.' });
+    await assertUnreferencedRecord('ResponseTeam', req.params.id);
     await ResponseTeam.deleteOne({ _id: req.params.id });
     res.status(204).end();
   } catch (error) { next(error); }

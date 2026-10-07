@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "node init && vite",
+    "build": "node init && vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "audit:lighthouse": "node scripts/runLighthouse.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.6.0",
-    "axios": "^1.10.0",
+    "axios": "^1.20.0",
     "firebase": "^12.17.1",
     "framer-motion": "^13.1.0",
     "leaflet": "^1.9.4",
@@ -25,8 +27,13 @@
     "sweetalert2": "^11.26.25",
     "vite": "^6.3.5"
   },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
+  },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.1.11",
+    "lighthouse": "^13.5.0",
     "tailwindcss": "^4.1.11"
   }
 }
