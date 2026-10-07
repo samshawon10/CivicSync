@@ -6,6 +6,11 @@ export function notFound(req, res) {
 
 export function errorHandler(error, req, res, next) { // eslint-disable-line no-unused-vars
   console.error(error);
+  if (res.headersSent) return next(error);
+  if (error.type === 'entity.parse.failed') return res.status(400).json({ success: false, message: 'Request body must contain valid JSON.' });
+  if (error.type === 'entity.too.large') return res.status(413).json({ success: false, message: 'Request body is too large.' });
+  if (error.name === 'CastError') return res.status(400).json({ success: false, message: 'An identifier or field value is invalid.' });
+  if (error.name === 'VersionError') return res.status(409).json({ success: false, message: 'This record changed. Refresh and try again.' });
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ success: false, message: req.originalUrl.startsWith('/api/users/me/photo') ? 'Profile images must be 5 MB or smaller.' : 'Each media file must be 25 MB or smaller.' });
     if (error.code === 'LIMIT_FILE_COUNT') return res.status(400).json({ success: false, message: req.originalUrl.startsWith('/api/users/me/photo') ? 'Upload one profile image at a time.' : 'You can upload up to 5 media files per report.' });

@@ -592,6 +592,20 @@ CLOUDINARY_API_SECRET=
 GOOGLE_MAPS_API_KEY=
 
 OPENAI_API_KEY= (Optional)
+
+# Optional: maximum distance used when finding potentially duplicate civic reports
+DUPLICATE_REPORT_RADIUS_METERS=100
+```
+
+Ordinary civic report suggestions require matching department/category, a usable
+location within the configured radius, and similar report text. Citizens choose
+whether to link a submission; emergency reports remain in their separate review
+workflow. The demo seed creates three preserved citizen reports linked to one
+master case and, when two demo workers are available, one team task:
+
+```bash
+cd server
+npm run seed:demo
 ```
 
 ---

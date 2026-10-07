@@ -6,28 +6,6 @@ const maxFiles = 5;
 const maxFileSize = 25 * 1024 * 1024;
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime']);
 
-const FALLBACK_DEPARTMENTS = [
-  'Roads & Infrastructure', 'Waste Management', 'Water & Sewerage', 'Electricity',
-  'Traffic Management', 'Public Health', 'Environment', 'Parks & Recreation',
-  'Public Safety', 'Urban Planning', 'Other'
-];
-
-const CATEGORIES = [
-  ['road_infrastructure', 'Road & Infrastructure'], ['street_light', 'Street Light'],
-  ['garbage_waste', 'Garbage & Waste'], ['drainage', 'Drainage'],
-  ['water_supply', 'Water Supply'], ['sewerage', 'Sewerage'],
-  ['traffic', 'Traffic'], ['public_transport', 'Public Transport'],
-  ['footpath', 'Footpath'], ['illegal_parking', 'Illegal Parking'],
-  ['public_health', 'Public Health'], ['electricity', 'Electricity'],
-  ['public_safety', 'Public Safety'], ['noise_pollution', 'Noise Pollution'],
-  ['air_pollution', 'Air Pollution'], ['water_pollution', 'Water Pollution'],
-  ['public_property_damage', 'Public Property Damage'], ['parks_recreation', 'Parks & Recreation'],
-  ['mosquito_pest_control', 'Mosquito / Pest Control'], ['tree_environment', 'Tree / Environment'],
-  ['illegal_construction', 'Illegal Construction'], ['other', 'Other']
-];
-
-const FALLBACK_CATEGORIES = CATEGORIES.map(([key, label]) => ({ key, label, defaultDepartment: '', description: '', departmentAvailable: false }));
-
 const BLANK = {
   title: '',
   category: 'road_infrastructure',
@@ -58,7 +36,8 @@ export default function ReportForm({ report, onSave, onCancel, busy, prefilledDe
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
   const [departments, setDepartments] = useState([]);
-  const [categories, setCategories] = useState(FALLBACK_CATEGORIES);
+  const [categories, setCategories] = useState([]);
+  const [categoryError, setCategoryError] = useState('');
   const [catalogueUpdated, setCatalogueUpdated] = useState(false);
   const [deptLoading, setDeptLoading] = useState(true);
   const [deptError, setDeptError] = useState('');
@@ -90,10 +69,8 @@ export default function ReportForm({ report, onSave, onCancel, busy, prefilledDe
       });
     } catch {
       if (!mounted.current) return;
-      // Graceful fallback: use static list
-      const fallback = FALLBACK_DEPARTMENTS.map((name) => ({ name, icon: 'building2', color: '#2563eb', description: '' }));
-      setDepartments(fallback);
-      setDeptError('Could not load departments from server. Showing a default list.');
+      setDepartments([]);
+      setDeptError('Could not load departments. Retry before submitting your report.');
     } finally {
       if (mounted.current) setDeptLoading(false);
     }
@@ -102,10 +79,13 @@ export default function ReportForm({ report, onSave, onCancel, busy, prefilledDe
   // Live category catalogue. Falls back to the compiled list if the request
   // fails, so the form is never empty.
   const loadCategories = useCallback(async () => {
+    setCategoryError('');
     try {
       const { data } = await reportsApi.categories();
       if (!mounted.current) return;
       const list = data.categories || [];
+      setCategories(list);
+      if (!list.length) setCategoryError('No active report categories are available.');
       if (list.length) {
         setCategories(list);
         // Keep the current selection valid if the admin retired it.
@@ -116,7 +96,7 @@ export default function ReportForm({ report, onSave, onCancel, busy, prefilledDe
         ));
       }
     } catch {
-      if (mounted.current) setCategories(FALLBACK_CATEGORIES);
+      if (mounted.current) { setCategories([]); setCategoryError('Could not load report categories. Retry before submitting.'); }
     }
   }, []);
 
@@ -201,6 +181,8 @@ export default function ReportForm({ report, onSave, onCancel, busy, prefilledDe
 
   function submit(e) {
     e.preventDefault();
+    if (busy) return;
+    if (!departments.some((department) => department.name === values.departmentName) || !categories.some((category) => category.key === values.category)) return setError('Choose an available category and department from the live catalogue.');
     if (values.title.trim().length < 3 || values.description.trim().length < 10) {
       return setError('Use a title of at least 3 characters and a description of at least 10 characters.');
     }
@@ -338,6 +320,7 @@ export default function ReportForm({ report, onSave, onCancel, busy, prefilledDe
             <button type="button" onClick={loadDepartments} className="ml-2 underline">Retry</button>
           </p>
         )}
+        {categoryError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{categoryError} <button type="button" onClick={loadCategories} className="underline">Retry categories</button></p>}
 
         {/* ── Evidence & description ── */}
         <p className="pt-2 text-sm font-bold text-ink dark:text-slate-100">Evidence and description</p>
@@ -417,7 +400,7 @@ export default function ReportForm({ report, onSave, onCancel, busy, prefilledDe
           </p>
         )}
 
-        <button disabled={busy} className="civic-primary w-full sm:w-auto">
+        <button disabled={busy || deptLoading || !departments.length || !categories.length} className="civic-primary w-full sm:w-auto">
           {busy ? 'Saving…' : report ? 'Save changes' : 'Submit report'}
         </button>
       </div>

@@ -14,15 +14,22 @@ const expectedRoutes = [
   // Overview
   'GET /dashboard', 'GET /analytics', 'GET /activity', 'GET /staff',
   // Case operations
-  'GET /reports', 'GET /reports/:id', 'POST /reports/:id/notes', 'POST /reports/:id/messages',
+  'GET /reports', 'GET /reports/:id', 'PATCH /reports/:id/duplicate-review', 'POST /reports/:id/notes', 'POST /reports/:id/messages',
   'PATCH /reports/:id/priority', 'PATCH /reports/:id/assign', 'PATCH /reports/:id/status',
   'POST /reports/:id/completion-report', 'PATCH /reports/:id/completion-review',
+  'POST /reports/:id/review',
   'GET /reports/:id/team-recommendations', 'POST /reports/:id/escalate',
   'POST /reports/:id/resolve-escalation', 'POST /reports/:id/handover',
   // Teams
   'GET /teams', 'POST /teams', 'PATCH /teams/:id',
   // Field tasks
-  'GET /tasks', 'GET /tasks/:id', 'PATCH /tasks/:id/status', 'POST /tasks/:id/complete',
+  'GET /tasks', 'POST /tasks', 'GET /tasks/:id', 'PATCH /tasks/:id/status', 'POST /tasks/:id/complete',
+  'PATCH /tasks/:id/assign-worker', 'DELETE /tasks/:id/workers/:workerId', 'POST /tasks/:id/team',
+  'POST /tasks/:id/team/detach', 'PATCH /tasks/:id/transition', 'POST /tasks/:id/progress',
+  'GET /tasks/:id/updates',
+  // Workers, officers and workload
+  'GET /workers/available', 'GET /officers/available', 'GET /department/workload',
+  'GET /workers/:id/assignments', 'PATCH /workers/:id/availability',
   // Resources
   'GET /resources', 'POST /resources', 'POST /resources/:id/request', 'PATCH /resources/:id/review'
 ];

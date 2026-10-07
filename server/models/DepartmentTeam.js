@@ -29,7 +29,7 @@ const departmentTeamSchema = new mongoose.Schema(
     notes: { type: String, trim: true, default: '' },
     active: { type: Boolean, default: true, index: true }
   },
-  { timestamps: true }
+  { timestamps: true, optimisticConcurrency: true }
 );
 
 departmentTeamSchema.index({ department: 1, status: 1 });

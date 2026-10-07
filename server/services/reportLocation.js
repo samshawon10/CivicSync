@@ -9,6 +9,7 @@ export function normalizeReportLocation(raw) {
   const longitudeInput = source.longitude;
   const hasLatitude = latitudeInput !== undefined && latitudeInput !== null && latitudeInput !== '';
   const hasLongitude = longitudeInput !== undefined && longitudeInput !== null && longitudeInput !== '';
+  if ((hasLatitude && !['number', 'string'].includes(typeof latitudeInput)) || (hasLongitude && !['number', 'string'].includes(typeof longitudeInput))) return { error: 'Location coordinates must be numeric values.' };
   if (hasLatitude !== hasLongitude) return { error: 'Provide both latitude and longitude, or omit both.' };
   const latitude = Number(latitudeInput);
   const longitude = Number(longitudeInput);

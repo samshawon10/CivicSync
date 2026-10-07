@@ -15,14 +15,14 @@ const volunteerOpportunitySchema = new mongoose.Schema({
     longitude: { type: Number, min: -180, max: 180, default: null }
   },
   date: { type: Date, default: null },
-  maxParticipants: { type: Number, default: 20 },
+  maxParticipants: { type: Number, default: 20, min: 1, max: 10000, validate: Number.isInteger },
   participants: [{
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     joinedAt: { type: Date, default: Date.now }
   }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   status: { type: String, enum: ['open', 'completed', 'cancelled'], default: 'open', index: true }
-}, { timestamps: true });
+}, { timestamps: true, optimisticConcurrency: true });
 
 volunteerOpportunitySchema.index({ type: 1, status: 1 });
 volunteerOpportunitySchema.index({ 'participants.user': 1 });

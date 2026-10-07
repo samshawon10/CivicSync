@@ -12,7 +12,9 @@ export const departmentApi = {
   // Case Actions
   priority: (id, priority, note = '') => api.patch(`/departments/reports/${id}/priority`, { priority, note }),
   assign: (id, payload) => api.patch(`/departments/reports/${id}/assign`, payload),
+  reviewDuplicates: (id, payload) => api.patch(`/departments/reports/${id}/duplicate-review`, payload),
   status: (id, status, note = '') => api.patch(`/departments/reports/${id}/status`, { status, note }),
+  startReview: (id, note = '') => api.post(`/departments/reports/${id}/review`, { note }),
   note: (id, note) => api.post(`/departments/reports/${id}/notes`, { note }),
   message: (id, text, isInternal = true) => api.post(`/departments/reports/${id}/messages`, { text, isInternal }),
   complete: (id, payload) => api.post(`/departments/reports/${id}/completion-report`, payload),
@@ -36,7 +38,7 @@ export const departmentApi = {
 
   // Operational assignment — Officer only. The server rejects these for every
   // other role, so the UI simply does not offer them above the Officer.
-  assignWorker: (taskId, workerId) => api.patch(`/departments/tasks/${taskId}/assign-worker`, { workerId }),
+  assignWorker: (taskId, workerId, teamId) => api.patch(`/departments/tasks/${taskId}/assign-worker`, { workerId, teamId }),
   removeWorker: (taskId, workerId) => api.delete(`/departments/tasks/${taskId}/workers/${workerId}`),
   attachTeam: (taskId, teamId) => api.post(`/departments/tasks/${taskId}/team`, { teamId }),
   detachTeam: (taskId) => api.post(`/departments/tasks/${taskId}/team/detach`),
@@ -57,4 +59,3 @@ export const departmentApi = {
   requestResource: (id, payload) => api.post(`/departments/resources/${id}/request`, payload),
   reviewResource: (id, payload) => api.patch(`/departments/resources/${id}/review`, payload)
 };
-

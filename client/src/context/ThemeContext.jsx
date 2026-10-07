@@ -38,7 +38,7 @@ export function ThemeProvider({ children }) {
   }, [mode, resolved]);
 
   const cycle = useCallback(() => setMode((current) => (current === 'light' ? 'dark' : current === 'dark' ? 'system' : 'light')), []);
-  const toggle = useCallback(() => setMode((current) => (current === 'dark' ? 'light' : 'dark')), []);
+  const toggle = useCallback(() => setMode(resolved === 'dark' ? 'light' : 'dark'), [resolved]);
   const value = useMemo(() => ({ mode, resolved, setMode, toggle, cycle }), [mode, resolved, toggle, cycle]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

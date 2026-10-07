@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Activity, Boxes, BriefcaseBusiness, ChartNoAxesCombined, ClipboardList, Command, HardHat, History, LogOut, Menu, NotebookPen, ShieldAlert, UserRound, Users, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { dashboardPaths, roleLabels } from '../../utils/roles.js';
 import api, { apiMessage } from '../../services/api.js';
 import { departmentApi } from '../../services/departmentService.js';
 import { mediaUrl } from '../../services/reportService.js';
@@ -11,6 +12,7 @@ import CaseWorkspace from '../../components/department/CaseWorkspace.jsx';
 import EscalationCenter from '../../components/department/EscalationCenter.jsx';
 import ResourceCenter from '../../components/department/ResourceCenter.jsx';
 import TaskExecution from '../../components/department/TaskExecution.jsx';
+import FieldWorkerDashboard from '../../components/department/FieldWorkerDashboard.jsx';
 import TeamManagement from '../../components/department/TeamManagement.jsx';
 import ProfileSection from '../../pages/admin/sections/ProfileSection.jsx';
 import useDepartmentSync from '../../components/department/useDepartmentSync.js';
@@ -72,13 +74,13 @@ function DepartmentShell({ children, active, setActive, live }) {
   const isHead = user.role === 'department_head';
   const isWorker = user.role === 'field_worker';
   const canManageStaff = ['department_head', 'department_officer'].includes(user.role);
-  const roleName = user.role === 'department_head' ? 'Department Head' : user.role === 'department_officer' ? 'Department Officer' : user.role === 'officer' ? 'Officer' : 'Field Worker';
-  const homePath = user.role === 'department_head' ? '/dashboard/department-head' : user.role === 'department_officer' ? '/dashboard/department-officer' : user.role === 'officer' ? '/dashboard/officer' : '/dashboard/field-worker';
+  const roleName = roleLabels[user.role] || 'Department';
+  const homePath = dashboardPaths[user.role] || '/dashboard';
   const items = isHead
     ? [['overview', 'Command Center', Command], ['workspace', 'Case Workspace', BriefcaseBusiness], ['complaints', 'Cases', ClipboardList], ['tasks', 'Field Task Board', HardHat], ['escalations', 'Escalations & SLA', ShieldAlert], ['teams', 'Team Management', Users], ['resources', 'Resource Management', Boxes], ['field', 'People & Workload', Users], ['analytics', 'Department Analytics', ChartNoAxesCombined], ['activity', 'Department Activity', History], ['notifications', 'Notifications', Activity], ['profile', 'My Profile', UserRound]]
     : isWorker
-      ? [['overview', 'Home', HardHat], ['tasks', 'My Tasks', ClipboardList], ['workspace', 'Case Workspace', BriefcaseBusiness], ['resources', 'Resources', Boxes], ['notes', 'Case Notes', NotebookPen], ['notifications', 'Notifications', Activity], ['profile', 'My Profile', UserRound]]
-      : [['overview', 'Operations Desk', BriefcaseBusiness], ['workspace', 'Case Workspace', BriefcaseBusiness], ['complaints', 'Department Cases', ClipboardList], ['tasks', 'Field Task Board', HardHat], ['escalations', 'Escalations & SLA', ShieldAlert], ['teams', 'Team Management', Users], ['resources', 'Resources', Boxes], ...(canManageStaff ? [['field', 'Field Workers', Users]] : []), ['notes', 'Case Notes', NotebookPen], ['analytics', 'Workload Analytics', ChartNoAxesCombined], ['notifications', 'Notifications', Activity], ['profile', 'My Profile', UserRound]];
+      ? [['overview', 'Home', HardHat], ['tasks', 'My Tasks', ClipboardList], ['team', 'My Team', Users], ['notifications', 'Notifications', Activity], ['profile', 'My Profile', UserRound]]
+      : [['overview', 'Operations Desk', BriefcaseBusiness], ['workspace', 'Case Workspace', BriefcaseBusiness], ['complaints', 'Department Cases', ClipboardList], ['tasks', 'Field Task Board', HardHat], ['escalations', 'Escalations & SLA', ShieldAlert], ['teams', 'Team Management', Users], ['resources', 'Resources', Boxes], ...(canManageStaff ? [['field', 'Team & Worker Load', Users]] : []), ['notes', 'Case Notes', NotebookPen], ['analytics', 'Workload Analytics', ChartNoAxesCombined], ['notifications', 'Notifications', Activity], ['profile', 'My Profile', UserRound]];
   async function signOut() { await logout(); navigate('/login'); }
   function go(key) { setActive(key); setOpen(false); }
   const sidebar = <aside className="flex h-full flex-col bg-ink p-5 text-white"><div><Link to={homePath} className="text-xl font-extrabold">Civic<span className="text-civic-300">Sync</span></Link><p className="mt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{user.departmentName || 'Department workspace'}</p><div className="mt-6 rounded-lg border border-white/10 bg-white/5 p-3"><p className="text-sm font-bold">{user.name}</p><p className="mt-1 text-xs text-slate-300">{roleName}</p></div></div><nav aria-label={`${roleName} navigation`} className="mt-6 space-y-1">{items.map(([key, label, Icon]) => <button key={key} onClick={() => go(key)} aria-current={active === key ? 'page' : undefined} className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold transition ${active === key ? 'bg-white text-ink shadow-sm' : 'text-slate-200 hover:bg-white/10'}`}><Icon size={17} aria-hidden="true" />{label}</button>)}</nav><button onClick={signOut} className="mt-auto flex min-h-11 items-center gap-3 rounded-lg border border-white/15 px-3 text-sm font-bold text-white hover:bg-white/10"><LogOut size={17} />Sign out</button></aside>;
@@ -242,15 +244,31 @@ function Analytics() {
   return <div className="grid gap-4 lg:grid-cols-2">{groups.map(([heading, rows]) => <section key={heading} className="rounded-lg border border-line bg-surface p-5"><h2 className="font-black text-fg">{heading}</h2>{loading ? <div className="mt-5"><SkeletonTable rows={4} columns={2} /></div> : rows?.length ? <div className="mt-5 space-y-3">{rows.map((row) => <div key={row._id}><div className="flex justify-between text-sm"><span className="font-bold text-fg">{title(row._id)}</span><span className="text-fg-muted">{row.count}</span></div><div className="mt-1 h-2 rounded-full bg-surface-2"><div className="h-2 rounded-full bg-civic-600" style={{ width: `${(row.count / max) * 100}%` }} /></div></div>)}</div> : <p className="mt-5 rounded-lg bg-surface-2 p-5 text-sm text-fg-muted">No recorded data for this period.</p>}</section>)}</div>;
 }
 
-function Notifications() {
+function Notifications({ refreshVersion }) {
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState('');
-  async function load() {
-    try { const { data } = await api.get('/notifications'); setNotifications(data.notifications); } catch (err) { setError(apiMessage(err)); }
+  const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState('');
+  const load = useCallback(async () => {
+    setError('');
+    setLoading(true);
+    try { const { data } = await api.get('/notifications'); setNotifications(data.notifications || []); }
+    catch (err) { setError(apiMessage(err)); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (refreshVersion > 0) load(); }, [refreshVersion, load]);
+  async function mark(id) {
+    if (marking) return;
+    setMarking(id); setError('');
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      setNotifications((current) => current.map((item) => item._id === id ? { ...item, readAt: new Date().toISOString() } : item));
+    } catch (err) { setError(apiMessage(err)); }
+    finally { setMarking(''); }
   }
-  useEffect(() => { load(); }, []);
-  async function mark(id) { await api.patch(`/notifications/${id}/read`); load(); }
-  return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-lg font-black text-ink">Notification Center</h2>{error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="mt-5 space-y-3">{notifications.map((item) => <button key={item._id} onClick={() => mark(item._id)} className={`w-full rounded-xl border p-4 text-left transition hover:border-civic-300 ${item.readAt ? 'border-slate-200 bg-white' : 'border-civic-200 bg-civic-50'}`}><p className="font-bold text-ink">{item.message}</p><p className="mt-1 text-xs text-slate-500">{formatDate(item.createdAt)}</p></button>)}</div>{!notifications.length && <div className="mt-4"><EmptyState title="No notifications" message="Assignments, status changes, and approvals will show here." /></div>}</section>;
+  const unreadCount = notifications.filter((item) => !item.readAt).length;
+  return <section className="rounded-xl border border-line bg-surface p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><h2 className="text-lg font-black text-fg">Notification Center</h2><span className="rounded-full bg-civic-50 px-3 py-1 text-xs font-bold text-civic-800 dark:bg-civic-950/40 dark:text-civic-200">{unreadCount} unread</span></div>{error && <div role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"><p>{error}</p><button type="button" onClick={load} className="mt-2 font-bold underline">Try again</button></div>}{loading ? <div className="mt-5 space-y-3" aria-label="Loading notifications">{[0, 1, 2].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl bg-surface-2" />)}</div> : notifications.length ? <div className="mt-5 space-y-3">{notifications.map((item) => <button key={item._id} type="button" disabled={Boolean(marking)} onClick={() => !item.readAt && mark(item._id)} className={`w-full rounded-xl border p-4 text-left transition hover:border-civic-300 disabled:cursor-wait ${item.readAt ? 'border-line bg-surface' : 'border-civic-200 bg-civic-50 dark:border-civic-900 dark:bg-civic-950/30'}`}><p className="font-bold text-fg">{item.message}</p><p className="mt-1 text-xs text-fg-muted">{formatDate(item.createdAt)}{marking === item._id ? ' · Marking read…' : item.readAt ? ' · Read' : ' · Unread'}</p></button>)}</div> : <div className="mt-4"><EmptyState title="No notifications" message="Assignments, status changes, and approvals will show here." /></div>}</section>;
 }
 
 export default function DepartmentDashboard({ role }) {
@@ -268,8 +286,12 @@ export default function DepartmentDashboard({ role }) {
     setLoading(true); setError('');
     try { const { data } = await departmentApi.dashboard(); setDashboardData(data); } catch (err) { setError(apiMessage(err)); } finally { setLoading(false); }
   }
-  const live = useDepartmentSync(loadDashboard);
-  useEffect(() => { loadDashboard(); }, []);
+  const [syncVersion, setSyncVersion] = useState(0);
+  const live = useDepartmentSync(() => {
+    setSyncVersion((version) => version + 1);
+    if (role !== 'field_worker') loadDashboard();
+  });
+  useEffect(() => { if (role !== 'field_worker') loadDashboard(); }, [role]);
   useEffect(() => {
     if (!canManage) { setStaffDirectory([]); return undefined; }
     let alive = true;
@@ -279,6 +301,6 @@ export default function DepartmentDashboard({ role }) {
     return () => { alive = false; };
   }, [canManage]);
   function openCase(caseId) { setWorkspaceCaseId(caseId); }
-  const activeLabel = { overview: isHead ? 'Department command center' : role === 'field_worker' ? 'My active work' : 'Operations queue', workspace: 'Unified case workspace', tasks: role === 'field_worker' ? 'My field tasks' : 'Field task execution board', teams: 'Response teams & workload', resources: 'Resource pool & approvals', complaints: role === 'field_worker' ? 'Assigned tasks' : 'Department cases', escalations: 'Escalations, SLA breaches and overdue cases', field: isHead ? 'People and workload' : 'Field worker workload', analytics: isHead ? 'Department analytics' : 'Workload analytics', activity: 'Department activity', notes: 'Case notes', notifications: 'Notifications', profile: 'My Profile' }[active];
-  return <DepartmentShell active={active} setActive={setActive} live={live}><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-bold text-civic-700">{isHead ? 'Department-wide command center' : role === 'field_worker' ? 'Assigned field work' : 'Assigned operations workspace'}</p><h2 className="text-2xl font-black text-fg">{activeLabel}</h2></div><div className="flex items-center gap-2"><span className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-bold text-fg-muted">{new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</span></div></div>{active === 'overview' && <Overview data={data} loading={loading} error={error} reload={loadDashboard} setActive={setActive} isHead={isHead} />}{active === 'workspace' && <CaseDirectory onOpenCase={openCase} />}{active === 'tasks' && <TaskExecution role={role} onOpenCase={openCase} />}{active === 'complaints' && <Complaints isHead={isHead} canManage={canManage} />}{active === 'escalations' && <EscalationCenter role={role} onOpenCase={openCase} />}{active === 'teams' && <TeamManagement canManage={isHead} />}{active === 'resources' && <ResourceCenter role={role} />}{active === 'field' && <FieldOperations />}{active === 'analytics' && <Analytics />}{active === 'activity' && <DepartmentActivity />}{active === 'notes' && <CaseNotes />}{active === 'notifications' && <Notifications />}{active === 'profile' && <ProfileSection scope="department" />}{workspaceCaseId && <CaseWorkspace caseId={workspaceCaseId} role={role} staff={staffDirectory} onClose={() => setWorkspaceCaseId('')} onChanged={loadDashboard} />}</DepartmentShell>;
+  const activeLabel = { overview: isHead ? 'Department command center' : role === 'field_worker' ? 'My active work' : 'Operations queue', workspace: 'Unified case workspace', tasks: role === 'field_worker' ? 'My field tasks' : 'Field task execution board', team: 'My Team', teams: 'Response teams & workload', resources: 'Resource pool & approvals', complaints: role === 'field_worker' ? 'Assigned tasks' : 'Department cases', escalations: 'Escalations, SLA breaches and overdue cases', field: isHead ? 'People and workload' : 'Field worker workload', analytics: isHead ? 'Department analytics' : 'Workload analytics', activity: 'Department activity', notes: 'Case notes', notifications: 'Notifications', profile: 'My Profile' }[active];
+  return <DepartmentShell active={active} setActive={setActive} live={live}><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-bold text-civic-700">{isHead ? 'Department-wide command center' : role === 'field_worker' ? 'Assigned field work' : 'Assigned operations workspace'}</p><h2 className="text-2xl font-black text-fg">{activeLabel}</h2></div><div className="flex items-center gap-2"><span className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-bold text-fg-muted">{new Date().toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</span></div></div>{role === 'field_worker' && ['overview', 'tasks', 'team'].includes(active) && <FieldWorkerDashboard view={active} setView={setActive} live={live} refreshVersion={syncVersion} />}{role !== 'field_worker' && active === 'overview' && <Overview data={data} loading={loading} error={error} reload={loadDashboard} setActive={setActive} isHead={isHead} />}{active === 'workspace' && role !== 'field_worker' && <CaseDirectory onOpenCase={openCase} />}{active === 'tasks' && role !== 'field_worker' && <TaskExecution role={role} userId={user.id} onOpenCase={openCase} />}{active === 'complaints' && role !== 'field_worker' && <Complaints isHead={isHead} canManage={canManage} />}{active === 'escalations' && role !== 'field_worker' && <EscalationCenter role={role} onOpenCase={openCase} />}{active === 'teams' && role !== 'field_worker' && <TeamManagement canManage={isHead} />}{active === 'resources' && role !== 'field_worker' && <ResourceCenter role={role} />}{active === 'field' && role !== 'field_worker' && <FieldOperations />}{active === 'analytics' && role !== 'field_worker' && <Analytics />}{active === 'activity' && role !== 'field_worker' && <DepartmentActivity />}{active === 'notes' && role !== 'field_worker' && <CaseNotes />}{active === 'notifications' && <Notifications refreshVersion={syncVersion} />}{active === 'profile' && <ProfileSection scope="department" />}{workspaceCaseId && role !== 'field_worker' && <CaseWorkspace caseId={workspaceCaseId} role={role} staff={staffDirectory} onClose={() => setWorkspaceCaseId('')} onChanged={loadDashboard} />}</DepartmentShell>;
 }

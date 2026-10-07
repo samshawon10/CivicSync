@@ -174,6 +174,7 @@ export default function DataTable({
         <div className="divide-y sm:hidden" style={{ borderColor: 'var(--line)' }}>
           {sorted.map((row) => (
             <div key={rowKey(row)} className="space-y-2 p-4">
+              {selectable && <Checkbox label="Select row" checked={selected.includes(rowKey(row))} onChange={() => onSelectedChange?.(selected.includes(rowKey(row)) ? selected.filter((value) => value !== rowKey(row)) : [...selected, rowKey(row)])} />}
               <button type="button" className="flex w-full items-start justify-between gap-3 text-left" onClick={() => onRowClick?.(row)}>
                 <span className="min-w-0 text-sm font-semibold text-fg">{mobilePrimary(row)}</span>
                 <Icon name="chevronRight" size={16} className="mt-0.5 text-fg-subtle" />
@@ -182,7 +183,7 @@ export default function DataTable({
                 {visibleColumns.map((column) => (
                   <div key={column.key} className="min-w-0">
                     <dt className="text-[11px] font-semibold uppercase tracking-wide text-fg-subtle">{column.label}</dt>
-                    <dd className="truncate text-[13px] text-fg">{column.render ? column.render(row) : (row[column.key] ?? '—')}</dd>
+                    <dd className="break-words text-[13px] text-fg">{column.render ? column.render(row) : (row[column.key] ?? '—')}</dd>
                   </div>
                 ))}
               </dl>

@@ -1,5 +1,6 @@
 
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import AiConfirmation from '../../models/AiConfirmation.js';
 import Report from '../../models/Report.js';
 import Notification from '../../models/Notification.js';
@@ -8,7 +9,7 @@ import { getAction, validateAction, ACTION_NAMES } from './actionRegistry.js';
 import { readAiConfig } from '../config/aiConfig.js';
 import { auditAi, AI_AUDIT_ACTIONS } from '../security/audit.js';
 import { AiError } from '../errors.js';
-import { reportCategories, reportDepartments, reportPriorities } from '../../config/reportOptions.js';
+import { reportPriorities } from '../../config/reportOptions.js';
 import { defaultDepartmentFor, isReportCategory, isReportDepartment } from '../../services/reportCatalogue.js';
 
 export async function createActionConfirmation({ user, actionName, payload = {}, explanation = '' }) {
@@ -106,8 +107,16 @@ export async function confirmAction({ token, user }) {
   }
 
   let executionResult = null;
+  const session = await mongoose.startSession();
 
   try {
+    await session.withTransaction(async () => {
+    const claimed = await AiConfirmation.findOneAndUpdate(
+      { _id: record._id, user: user._id, status: 'pending', expiresAt: { $gt: new Date() } },
+      { $set: { status: 'confirmed' } },
+      { new: true, session }
+    );
+    if (!claimed) throw new AiError('INVALID_STATE', { message: 'This confirmation was already processed or expired.' });
     switch (record.actionName) {
       case ACTION_NAMES.createReport: {
         const { title, description, category, departmentName, priority = 'medium' } = record.payload;
@@ -118,26 +127,30 @@ export async function confirmAction({ token, user }) {
         const [categoryOk, departmentOk, categoryDefault] = await Promise.all([
           isReportCategory(category),
           isReportDepartment(departmentName),
-          defaultDepartmentFor(reportCategories.includes(category) ? category : 'other')
+          defaultDepartmentFor(category)
         ]);
-        const resolvedCategory = categoryOk ? category : 'other';
-        const resolvedDept = departmentOk ? departmentName : categoryDefault || 'Other';
+        if (!categoryOk || (departmentName && !departmentOk)) throw new AiError('INVALID_TOOL_INPUT', { message: 'Choose an active report category and civic department.' });
+        const resolvedCategory = category;
+        const resolvedDept = departmentOk ? departmentName : categoryDefault;
+        if (!resolvedDept || !(await isReportDepartment(resolvedDept))) throw new AiError('INVALID_TOOL_INPUT', { message: 'This category has no active department. Choose a responsible department.' });
         const resolvedPriority = reportPriorities.includes(priority) ? priority : 'medium';
 
-        const report = await Report.create({
+        const [report] = await Report.create([{
           title: String(title).trim(),
           description: String(description).trim(),
           category: resolvedCategory,
           departmentName: resolvedDept,
           priority: resolvedPriority,
           createdBy: user._id,
+          workflowStage: 'SUBMITTED',
+          workflowHistory: [{ stage: 'SUBMITTED', actor: user._id, actorRole: user.role, note: 'Citizen confirmed report submission.' }],
           source: 'ai_copilot',
           activity: [{
             action: 'Report created via AI Copilot confirmed action',
             actorRole: user.role,
             note: record.explanation || ''
           }]
-        });
+        }], { session });
 
         executionResult = {
           reportId: report._id,
@@ -153,7 +166,8 @@ export async function confirmAction({ token, user }) {
       case ACTION_NAMES.markAllNotificationsRead: {
         const updateResult = await Notification.updateMany(
           { recipient: user._id, readAt: null },
-          { readAt: new Date() }
+          { readAt: new Date() },
+          { session }
         );
         executionResult = {
           modifiedCount: updateResult.modifiedCount || 0
@@ -170,7 +184,7 @@ export async function confirmAction({ token, user }) {
             category: category || 'general',
             location: { area: String(area || '').trim(), label: '' }
           },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
+          { upsert: true, new: true, setDefaultsOnInsert: true, session }
         );
         executionResult = {
           draftId: draft._id,
@@ -185,7 +199,8 @@ export async function confirmAction({ token, user }) {
     }
 
     record.status = 'confirmed';
-    await record.save();
+    await record.save({ session });
+    });
 
     await auditAi({
       user,
@@ -217,7 +232,7 @@ export async function confirmAction({ token, user }) {
       result: 'failure'
     });
     throw error;
-  }
+  } finally { await session.endSession(); }
 }
 
 export async function rejectAction({ token, user, reason = '' }) {
@@ -234,8 +249,8 @@ export async function rejectAction({ token, user, reason = '' }) {
     throw new AiError('ROLE_NOT_PERMITTED', { message: 'You do not own this action confirmation token.' });
   }
 
-  record.status = 'rejected';
-  await record.save();
+  const rejected = await AiConfirmation.findOneAndUpdate({ _id: record._id, user: user._id, status: 'pending', expiresAt: { $gt: new Date() } }, { $set: { status: 'rejected' } }, { new: true });
+  if (!rejected) throw new AiError('INVALID_STATE', { message: 'This confirmation was already processed or expired.' });
 
   await auditAi({
     user,

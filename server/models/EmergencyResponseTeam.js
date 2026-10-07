@@ -35,7 +35,7 @@ const responseTeamSchema = new mongoose.Schema(
     disbandedAt: { type: Date, default: null },
     disbandReason: { type: String, trim: true, maxlength: 300, default: '' }
   },
-  { timestamps: true }
+  { timestamps: true, optimisticConcurrency: true }
 );
 
 responseTeamSchema.index({ emergency: 1, status: 1 });

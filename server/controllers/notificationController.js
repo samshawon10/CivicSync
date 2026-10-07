@@ -4,7 +4,8 @@ import Notification from '../models/Notification.js';
 export async function listNotifications(req, res, next) {
   try {
     const notifications = await Notification.find({ recipient: req.user._id }).sort({ createdAt: -1 }).limit(100).lean();
-    res.json({ success: true, notifications, unreadCount: notifications.filter((item) => !item.readAt).length });
+    const unreadCount = await Notification.countDocuments({ recipient: req.user._id, readAt: null });
+    res.json({ success: true, notifications, unreadCount });
   } catch (error) { next(error); }
 }
 export async function markRead(req, res, next) {

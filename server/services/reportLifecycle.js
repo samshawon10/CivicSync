@@ -25,5 +25,14 @@ export function canCitizenReopenReport(status) {
 }
 
 export function canReviewReportCompletion(status, currentVerificationStatus, requestedVerificationStatus) {
-  return status === 'completed' && currentVerificationStatus === 'submitted' && ['approved', 'rejected'].includes(requestedVerificationStatus);
+  if (!['completed', 'under_review'].includes(status) || !['submitted', 'verified'].includes(currentVerificationStatus)) return false;
+  // The Department Officer verifies first; the Department Head then resolves.
+  if (requestedVerificationStatus === 'verified') return currentVerificationStatus === 'submitted';
+  if (requestedVerificationStatus === 'approved') return currentVerificationStatus === 'verified';
+  return ['approved', 'rejected'].includes(requestedVerificationStatus);
+}
+
+/** Stage a completion decision moves the case to. */
+export function completionStageFor(verificationStatus) {
+  return { verified: 'VERIFIED', approved: 'RESOLVED', rejected: 'IN_PROGRESS' }[verificationStatus] || '';
 }

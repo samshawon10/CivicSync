@@ -10,6 +10,7 @@ export const TASK_STATES = Object.freeze([
   'completed',
   'cancelled',
   'rejected',
+  'verified',
   // legacy field-execution states still produced by older clients
   'traveling',
   'arrived',
@@ -21,12 +22,13 @@ export const taskTransitions = Object.freeze({
   pending: ['assigned', 'cancelled'],
   assigned: ['team_formed', 'accepted', 'rejected', 'cancelled'],
   team_formed: ['accepted', 'cancelled'],
-  accepted: ['in_progress', 'blocked', 'cancelled'],
+  accepted: ['traveling', 'in_progress', 'blocked', 'cancelled'],
   in_progress: ['on_hold', 'paused', 'blocked', 'completed'],
   on_hold: ['in_progress', 'blocked', 'cancelled'],
   paused: ['in_progress', 'blocked', 'cancelled'],
   blocked: ['in_progress', 'cancelled'],
-  completed: ['reopened'],
+  completed: ['verified', 'reopened'],
+  verified: [],
   cancelled: ['reopened'],
   rejected: [],
   reopened: ['pending', 'assigned'],
@@ -41,13 +43,13 @@ export const OPEN_TASK_STATES = Object.freeze([
 ]);
 
 /** States after which every worker must go back to `available`. */
-export const CLOSING_TASK_STATES = Object.freeze(['completed', 'cancelled', 'rejected']);
+export const CLOSING_TASK_STATES = Object.freeze(['completed', 'verified', 'cancelled', 'rejected']);
 
 /** Roles allowed to drive each target state. */
 const TASK_DRIVERS = Object.freeze({
   officer: [
     'assigned', 'team_formed', 'accepted', 'traveling', 'arrived',
-    'in_progress', 'on_hold', 'paused', 'blocked', 'completed', 'cancelled'
+    'in_progress', 'on_hold', 'paused', 'blocked', 'completed', 'verified', 'cancelled'
   ],
   field_worker: ['accepted', 'in_progress', 'on_hold', 'paused', 'blocked'],
   department_officer: ['in_progress', 'on_hold', 'blocked', 'completed', 'cancelled'],
@@ -109,6 +111,7 @@ export const TASK_AUDIT_ACTIONS = Object.freeze({
   on_hold: 'TASK_ON_HOLD',
   blocked: 'TASK_BLOCKED',
   completed: 'TASK_COMPLETED',
+  verified: 'TASK_VERIFIED',
   cancelled: 'TASK_CANCELLED',
   reopened: 'TASK_REOPENED',
   rejected: 'TASK_REJECTED'

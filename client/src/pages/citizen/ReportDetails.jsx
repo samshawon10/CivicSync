@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ReportStatusTimeline from '../../components/reports/ReportStatusTimeline.jsx';
+import { citizenStageLabel } from '../../components/department/workflowLabels.js';
 import CitizenLayout from '../../components/citizen/CitizenLayout.jsx';
 import { mediaUrl, reportsApi } from '../../services/reportService.js';
 import { apiMessage } from '../../services/api.js';
@@ -84,6 +85,14 @@ export default function ReportDetails() {
     try { const { data } = await reportsApi.get(id); setReport(data.report); } catch (loadError) { setError(apiMessage(loadError)); }
   }
   useEffect(() => { load(); }, [id]);
+  const master = report?.masterCaseSummary;
+  const linkedToMaster = Boolean(report && (
+    report.relationType === 'DUPLICATE'
+    || (master?.id && master.id !== report._id)
+  ));
+  const displayStage = master?.workflowStage || report?.workflowStage;
+  const displayStatus = master?.status || report?.status;
+  const displayHistory = master?.workflowHistory || report?.workflowHistory;
 
   async function verify(action) {
     setBusy(true); setError('');
@@ -120,10 +129,10 @@ export default function ReportDetails() {
           <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
             <div className="flex justify-between gap-4">
               <div>
-                <p className="text-xs font-bold tracking-[.14em] text-civic-600 dark:text-civic-300">REPORT</p>
+                <p className="text-xs font-bold tracking-[.14em] text-civic-600 dark:text-civic-300">REPORT {report.reference ? `· ${report.reference}` : (report.reportId ? `· ${report.reportId}` : '')}</p>
                 <h1 className="mt-2 text-2xl font-bold text-ink dark:text-slate-100">{report.title}</h1>
               </div>
-              <span className="h-fit rounded-full bg-civic-50 dark:bg-civic-500/10 px-3 py-1 text-xs font-bold text-civic-700 dark:text-civic-300">{label(report.status)}</span>
+              <span className="h-fit rounded-full bg-civic-50 dark:bg-civic-500/10 px-3 py-1 text-xs font-bold text-civic-700 dark:text-civic-300">{displayStage ? citizenStageLabel(displayStage) : label(displayStatus)}</span>
             </div>
             <dl className="mt-6 grid gap-5 text-sm sm:grid-cols-2">
               <div>
@@ -147,21 +156,33 @@ export default function ReportDetails() {
                 <dd className="mt-1 font-bold text-ink dark:text-slate-100">{new Date(report.updatedAt).toLocaleString()}</dd>
               </div>
             </dl>
+            {master && (
+              <section className="mt-6 rounded-xl border border-civic-200 bg-civic-50/70 p-4 dark:border-civic-800 dark:bg-civic-950/30">
+                <p className="text-xs font-black uppercase tracking-[.12em] text-civic-700 dark:text-civic-300">
+                  {linkedToMaster ? 'Linked to existing issue' : 'Master civic issue'}
+                </p>
+                <h2 className="mt-1 font-bold text-ink dark:text-slate-100">{master.title}</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  {master.reportCount} citizen report{master.reportCount === 1 ? '' : 's'} · {citizenStageLabel(master.workflowStage || master.status)}
+                </p>
+                {master.location?.area && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{master.location.area}</p>}
+              </section>
+            )}
             <h2 className="mt-6 font-bold text-ink dark:text-slate-100">Description</h2>
             <p className="mt-2 whitespace-pre-wrap leading-7 text-slate-600 dark:text-slate-300">{report.description}</p>
-            {['pending', 'verified'].includes(report.status) && <div className="mt-5 flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={() => setEditing((current) => !current)} className="civic-secondary">{editing ? 'Close editor' : 'Edit report'}</button><button type="button" disabled={busy} onClick={removeReport} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-bold text-red-700 disabled:opacity-50 dark:border-red-800 dark:text-red-300">Delete report</button></div>}
+            {!linkedToMaster && (master?.reportCount || 1) === 1 && ['pending', 'verified'].includes(report.status) && <div className="mt-5 flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={() => setEditing((current) => !current)} className="civic-secondary">{editing ? 'Close editor' : 'Edit report'}</button><button type="button" disabled={busy} onClick={removeReport} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-bold text-red-700 disabled:opacity-50 dark:border-red-800 dark:text-red-300">Delete report</button></div>}
             {editing && <div className="mt-6"><ReportForm report={report} onSave={saveEdit} onCancel={() => setEditing(false)} busy={busy} /></div>}
             {/* Contextual AI. Only the report id/title are sent; the gateway re-authorizes
                 and loads the case server-side, so no case data travels through the client. */}
             <AIBriefingCard
               className="mt-6"
               presetKey="case"
-              context={{ caseId: report._id, caseRef: report.reportId || report._id, caseTitle: report.title, caseStatus: report.status, caseCategory: report.category }}
+              context={{ caseId: report._id, caseRef: report.reportId || report._id, caseTitle: report.title, caseStatus: displayStatus, caseCategory: report.category }}
               title="✦ Ask CivicSync AI"
               subtitle="Get a grounded explanation of this case."
               description="Ask for a summary, the timeline, SLA status, or help drafting a citizen update."
               stats={[
-                { label: 'Status', value: label(report.status) },
+                { label: 'Status', value: displayStage ? citizenStageLabel(displayStage) : label(displayStatus) },
                 { label: 'Priority', value: label(report.priority) },
                 { label: 'Activity entries', value: report.activity?.length || 0 }
               ]}
@@ -169,11 +190,11 @@ export default function ReportDetails() {
             />
             {(report.location?.area || report.location?.address || report.location?.landmark) && <section className="mt-6"><h2 className="font-bold text-ink dark:text-slate-100">Location</h2><p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{[report.location.area, report.location.address, report.location.landmark].filter(Boolean).join(' · ')}</p></section>}
             <AttachmentGallery attachments={report.attachments} />
-            <ResolutionVerification report={report} busy={busy} reopenNote={reopenNote} setReopenNote={setReopenNote} feedback={feedback} setFeedback={setFeedback} verify={verify} submitFeedback={submitFeedback} />
+            <ResolutionVerification report={{ ...report, status: displayStatus }} busy={busy} reopenNote={reopenNote} setReopenNote={setReopenNote} feedback={feedback} setFeedback={setFeedback} verify={verify} submitFeedback={submitFeedback} />
           </section>
           <aside className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-sm">
             <h2 className="font-bold text-ink dark:text-slate-100">Report Status</h2>
-            <div className="mt-5"><ReportStatusTimeline status={report.status} /></div>
+            <div className="mt-5"><ReportStatusTimeline status={displayStatus} stage={displayStage} history={displayHistory} /></div>
             {report.activity?.length ? <div className="mt-7 border-t pt-5"><h2 className="font-bold text-ink dark:text-slate-100">Activity</h2><ul className="mt-3 space-y-3">{report.activity.map((item, index) => <li key={`${item.timestamp}-${index}`} className="text-sm"><p className="font-medium text-slate-700 dark:text-slate-200">{item.action}</p><p className="text-xs text-slate-500 dark:text-slate-400">{new Date(item.timestamp).toLocaleString()}</p></li>)}</ul></div> : null}
             <Link to="/dashboard/citizen/reports" className="mt-6 inline-block text-sm font-bold text-civic-600 dark:text-civic-300">View all reports</Link>
           </aside>

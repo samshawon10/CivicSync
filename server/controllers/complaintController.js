@@ -1,14 +1,14 @@
 import mongoose from 'mongoose';
 import Complaint from '../models/Complaint.js';
 
-const editableFields = ['title', 'description', 'category', 'status'];
+const editableFields = ['title', 'description', 'category'];
 
 function validId(id) { return mongoose.Types.ObjectId.isValid(id); }
 
 export async function createComplaint(req, res, next) {
   try {
     const { title, description, category } = req.body;
-    if (!title?.trim() || !description?.trim() || !category?.trim()) {
+    if (![title, description, category].every((value) => typeof value === 'string' && value.trim())) {
       return res.status(400).json({ success: false, message: 'Title, description, and category are required.' });
     }
     const complaint = await Complaint.create({ title: title.trim(), description: description.trim(), category: category.trim(), createdBy: req.user._id });
@@ -38,6 +38,12 @@ export async function updateComplaint(req, res, next) {
     if (!validId(req.params.id)) return res.status(404).json({ success: false, message: 'Complaint not found.' });
     const complaint = await Complaint.findById(req.params.id);
     if (!complaint || (req.user.role !== 'admin' && !complaint.createdBy.equals(req.user._id))) return res.status(404).json({ success: false, message: 'Complaint not found.' });
+    if (req.body.status !== undefined && req.body.status !== complaint.status) {
+      if (req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Only an administrator can change complaint status.' });
+      const transitions = { Pending: ['In Progress'], 'In Progress': ['Resolved'], Resolved: [] };
+      if (!transitions[complaint.status]?.includes(req.body.status)) return res.status(409).json({ success: false, message: 'Invalid complaint status transition.' });
+      complaint.status = req.body.status;
+    }
     for (const field of editableFields) if (req.body[field] !== undefined) complaint[field] = typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field];
     if (!complaint.title || !complaint.description || !complaint.category) return res.status(400).json({ success: false, message: 'Title, description, and category cannot be empty.' });
     await complaint.save();
@@ -54,4 +60,3 @@ export async function deleteComplaint(req, res, next) {
     return res.json({ success: true, message: 'Complaint deleted.' });
   } catch (error) { next(error); }
 }
-

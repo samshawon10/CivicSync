@@ -77,7 +77,7 @@ export async function createReportCategory(req, res, next) {
       return res.status(409).json({ success: false, message: `A category with the key “${key}” already exists.` });
     }
     const defaultDepartment = clean(req.body.defaultDepartment, 120);
-    if (defaultDepartment && !(await Department.exists({ name: defaultDepartment }))) {
+    if (defaultDepartment && !(await Department.exists({ name: defaultDepartment, status: 'active', scope: { $in: ['civic', 'hybrid'] } }))) {
       return res.status(400).json({ success: false, message: `No department named “${defaultDepartment}” exists.` });
     }
     const category = await ReportCategory.create({
@@ -111,7 +111,7 @@ export async function updateReportCategory(req, res, next) {
     if (req.body.active !== undefined) category.active = Boolean(req.body.active);
     if (req.body.defaultDepartment !== undefined) {
       const defaultDepartment = clean(req.body.defaultDepartment, 120);
-      if (defaultDepartment && !(await Department.exists({ name: defaultDepartment }))) {
+      if (defaultDepartment && !(await Department.exists({ name: defaultDepartment, status: 'active', scope: { $in: ['civic', 'hybrid'] } }))) {
         return res.status(400).json({ success: false, message: `No department named “${defaultDepartment}” exists.` });
       }
       category.defaultDepartment = defaultDepartment;

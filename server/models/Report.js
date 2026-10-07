@@ -4,6 +4,9 @@ import { REPORT_WORKFLOW_STAGES as reportWorkflowStages } from '../services/repo
 export { reportCategories, reportDepartments };
 
 const reportSchema = new mongoose.Schema({
+  // Human-readable reference (for example DEMO-ROAD-001). Optional: reports
+  // created by citizens keep the generated `#ABC123` id shown by the UI.
+  reference: { type: String, trim: true, uppercase: true, maxlength: 40, default: '', index: true },
   title: { type: String, required: true, trim: true, minlength: 3, maxlength: 140 },
   description: { type: String, required: true, trim: true, minlength: 10, maxlength: 2000 },
   // `category` and `departmentName` are intentionally *not* hardcoded enums.
@@ -13,6 +16,11 @@ const reportSchema = new mongoose.Schema({
   // immediately. The shape is still constrained here for storage safety.
   category: { type: String, required: true, trim: true, lowercase: true, maxlength: 60 },
   departmentName: { type: String, required: true, trim: true, maxlength: 120 },
+  masterCaseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null, index: true },
+  isMasterReport: { type: Boolean, default: true, index: true },
+  duplicateOf: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null, index: true },
+  relationType: { type: String, enum: ['MASTER', 'DUPLICATE', 'RELATED'], default: 'MASTER', index: true },
+  duplicateReviewStatus: { type: String, enum: ['pending', 'separate'], default: 'pending' },
   priority: { type: String, enum: reportPriorities, default: 'medium' },
   location: { area: { type: String, trim: true, maxlength: 100, default: '' }, address: { type: String, trim: true, maxlength: 300, default: '' }, landmark: { type: String, trim: true, maxlength: 150, default: '' }, latitude: { type: Number, min: -90, max: 90 }, longitude: { type: Number, min: -180, max: 180 } },
   // Where a case came from. Set only when the citizen explicitly confirms a
@@ -30,7 +38,7 @@ const reportSchema = new mongoose.Schema({
   workflowStage: {
     type: String,
     enum: reportWorkflowStages,
-    default: 'DEPARTMENT_HEAD_REVIEW',
+    default: 'SUBMITTED',
     index: true
   },
   workflowHistory: [
@@ -97,7 +105,7 @@ const reportSchema = new mongoose.Schema({
     afterImages: [{ type: String, trim: true }],
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     submittedAt: { type: Date, default: null },
-    verificationStatus: { type: String, enum: ['not_submitted', 'submitted', 'approved', 'rejected'], default: 'not_submitted' }
+    verificationStatus: { type: String, enum: ['not_submitted', 'submitted', 'verified', 'approved', 'rejected'], default: 'not_submitted' }
   },
   activity: [{ action: { type: String, required: true }, actorRole: { type: String, required: true }, timestamp: { type: Date, default: Date.now }, note: { type: String, maxlength: 500, default: '' } }],
   attachments: [{
@@ -109,10 +117,11 @@ const reportSchema = new mongoose.Schema({
     mediaType: { type: String, required: true, enum: ['image', 'video'] }
   }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true }
-}, { timestamps: true });
+}, { timestamps: true, optimisticConcurrency: true });
 reportSchema.index({ createdBy: 1, createdAt: -1 });
 reportSchema.index({ createdBy: 1, status: 1 });
 reportSchema.index({ departmentName: 1, status: 1, priority: 1, updatedAt: -1 });
+reportSchema.index({ departmentName: 1, category: 1, 'location.latitude': 1, 'location.longitude': 1, workflowStage: 1 });
+reportSchema.index({ masterCaseId: 1, createdAt: 1 });
 
 export default mongoose.model('Report', reportSchema);
-

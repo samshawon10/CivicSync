@@ -1,19 +1,49 @@
 
 export const STAGE_LABELS = {
-  SUBMITTED: 'Report submitted',
-  DEPARTMENT_HEAD_REVIEW: 'Under department review',
+  SUBMITTED: 'Submitted',
+  DEPARTMENT_HEAD_REVIEW: 'Under Review',
   ASSIGNED_TO_DEPARTMENT_OFFICER: 'Assigned to Department Officer',
   DEPARTMENT_OFFICER_REVIEW: 'Department Officer reviewing',
-  ASSIGNED_TO_OFFICER: 'Assigned to Officer',
-  TEAM_FORMED: 'Team assigned',
-  ACCEPTED: 'Team accepted the work',
-  IN_PROGRESS: 'Work in progress',
+  ASSIGNED_TO_OFFICER: 'Preparing field task',
+  TEAM_FORMED: 'Team Assigned',
+  ACCEPTED: 'Accepted by the team',
+  IN_PROGRESS: 'In Progress',
   ON_HOLD: 'Work on hold',
   BLOCKED: 'Work blocked',
   COMPLETED: 'Completed',
+  PENDING_VERIFICATION: 'Pending Verification',
+  VERIFIED: 'Verified',
+  RESOLVED: 'Resolved',
   CANCELLED: 'Cancelled',
   REOPENED: 'Reopened'
 };
+
+/** Progress path shown to the citizen on a case timeline. */
+export const CITIZEN_STAGES = ['SUBMITTED', 'DEPARTMENT_HEAD_REVIEW', 'ASSIGNED_TO_DEPARTMENT_OFFICER', 'ASSIGNED_TO_OFFICER', 'TEAM_FORMED', 'IN_PROGRESS', 'COMPLETED', 'PENDING_VERIFICATION', 'VERIFIED', 'RESOLVED'];
+
+/** Citizen-facing wording for the same stages (mirrors server/services/reportWorkflow.js). */
+export const CITIZEN_STAGE_LABELS = {
+  SUBMITTED: 'Submitted',
+  DEPARTMENT_HEAD_REVIEW: 'Under Review',
+  ASSIGNED_TO_DEPARTMENT_OFFICER: 'Assigned to Department Officer',
+  DEPARTMENT_OFFICER_REVIEW: 'Assigned to Department Officer',
+  ASSIGNED_TO_OFFICER: 'Preparing field task',
+  TEAM_FORMED: 'Team Assigned',
+  ACCEPTED: 'Team Assigned',
+  IN_PROGRESS: 'In Progress',
+  ON_HOLD: 'In Progress',
+  BLOCKED: 'In Progress',
+  COMPLETED: 'Work Finished',
+  PENDING_VERIFICATION: 'Pending Verification',
+  VERIFIED: 'Verified',
+  RESOLVED: 'Resolved',
+  CANCELLED: 'Cancelled',
+  REOPENED: 'Under Review'
+};
+
+export const stageLabel = (stage) => STAGE_LABELS[stage] || String(stage || '').replaceAll('_', ' ');
+
+export const citizenStageLabel = (stage) => CITIZEN_STAGE_LABELS[stage] || stageLabel(stage);
 
 export const TASK_STATE_LABELS = {
   pending: 'Pending',
@@ -27,6 +57,7 @@ export const TASK_STATE_LABELS = {
   paused: 'Paused',
   blocked: 'Blocked',
   completed: 'Completed',
+  verified: 'Verified',
   cancelled: 'Cancelled',
   rejected: 'Rejected',
   reopened: 'Reopened'

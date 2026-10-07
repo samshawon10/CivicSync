@@ -3,8 +3,6 @@ import ReportCategory from '../models/ReportCategory.js';
 import Department from '../models/Department.js';
 import SystemSetting from '../models/SystemSetting.js';
 import {
-  reportCategories,
-  reportDepartments,
   defaultReportCategories,
   defaultReportDepartments
 } from '../config/reportOptions.js';
@@ -24,7 +22,7 @@ export async function allReportCategories() {
 export async function reportCategoryCatalogue() {
   const [categories, departments] = await Promise.all([
     activeReportCategories(),
-    Department.find({ status: 'active' }).select('name').lean()
+    Department.find({ status: 'active', scope: { $in: ['civic', 'hybrid'] } }).select('name').lean()
   ]);
   const activeNames = new Set(departments.map((department) => department.name));
   return categories.map((category) => ({
@@ -40,17 +38,13 @@ export async function reportCategoryCatalogue() {
 export async function isReportCategory(key) {
   const value = String(key || '').trim();
   if (!value) return false;
-  if (await ReportCategory.exists({ key: value, active: true })) return true;
-  const total = await ReportCategory.countDocuments();
-  return total === 0 && reportCategories.includes(value);
+  return Boolean(await ReportCategory.exists({ key: value, active: true }));
 }
 
 export async function isReportDepartment(name) {
   const value = String(name || '').trim();
   if (!value) return false;
-  if (await Department.exists({ name: value, status: 'active' })) return true;
-  const total = await Department.countDocuments({ status: 'active' });
-  return total === 0 && reportDepartments.includes(value);
+  return Boolean(await Department.exists({ name: value, status: 'active', scope: { $in: ['civic', 'hybrid'] } }));
 }
 
 /** Default department for a category, used to pre-fill the citizen form. */
